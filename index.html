@@ -245,7 +245,6 @@
       evals: [],                 // loaded evaluations
       monthStart: null,
       monthEnd: null,
-      questionTextCache: new Map(), // Cache for question text by formId and questionId
       formDetailsCache: new Map()   // Cache for complete form details
     };
 
@@ -574,11 +573,9 @@
       try {
         const url = `https://api.${config.REGION}/api/v2/quality/forms/evaluations?pageSize=100`;
         const forms = await fetchPaginatedGET(url);
-        // Build a questions map for each form (flatten nested groups if present)
         state.forms = forms.map(f => ({
           id: f.id, 
-          name: f.name || f.title || '(Unnamed form)',
-          questionsById: extractQuestionsById(f)
+          name: f.name || f.title || '(Unnamed form)'
         })).sort((a,b)=>a.name.localeCompare(b.name));
         
         state.formsById = Object.fromEntries(state.forms.map(f=>[f.id,f]));
@@ -594,33 +591,6 @@
         console.error('Error fetching forms:', error);
         throw error;
       }
-    }
-
-    function extractQuestionsById(form){
-      const out = {};
-      function walk(node){
-        if(!node) return;
-        // Common shapes: questionGroups -> [ { questions:[], questionGroups:[] } ]
-        if (Array.isArray(node.questions)) {
-          node.questions.forEach(q => {
-            const id = q.id || q.questionId || q.key || q.name;
-            if(!id) return;
-            out[id] = {
-              id,
-              text: q.text || q.name || q.title || ('Question '+id),
-              critical: !!(q.critical || q.isCritical || q.killQuestion || q.killquestion || safeGet(q,'metadata.killQuestion',false)),
-              fatal: !!(q.fatal || q.isFatal || q.killQuestion || q.killquestion),
-              weight: q.weight || null,
-              maxPoints: q.maxPoints || q.points || 0
-            };
-          });
-        }
-        if (Array.isArray(node.questionGroups)) node.questionGroups.forEach(walk);
-        if (Array.isArray(node.sections)) node.sections.forEach(walk);
-        if (Array.isArray(node.children)) node.children.forEach(walk);
-      }
-      walk(form);
-      return out;
     }
 
     // ===== Query Evaluations =====
@@ -816,55 +786,49 @@
       }
     }
 
-    // Helper function to find question and answer details in form structure
-    function findQuestionAndAnswerDetails(formDetails, questionId, answerId) {
+    // NEW: Build a complete lookup map for questions and answers
+    function buildFormLookup(formDetails) {
+      const questionLookup = new Map();
+      const answerLookup = new Map();
+      const groupLookup = new Map();
+      
       if (!formDetails || !formDetails.questionGroups) {
-        return { questionText: `Question ${questionId}`, answerText: `Answer ${answerId}` };
+        return { questionLookup, answerLookup, groupLookup };
       }
       
-      let questionText = `Question ${questionId}`;
-      let answerText = `Answer ${answerId}`;
-      let isCritical = false;
-      let isFatal = false;
-      
-      // Search through question groups recursively
-      function searchGroups(groups) {
-        for (const group of groups) {
-          // Check if this group has questions
+      function processGroups(groups) {
+        groups.forEach(group => {
+          groupLookup.set(group.id, group.name || 'Unnamed Group');
+          
           if (group.questions && Array.isArray(group.questions)) {
-            for (const question of group.questions) {
-              if (question.id === questionId) {
-                questionText = question.text || questionText;
-                isCritical = question.isCritical || false;
-                isFatal = question.isKill || false;
-                
-                // Find answer text
-                if (question.answerOptions && Array.isArray(question.answerOptions) && answerId) {
-                  for (const answer of question.answerOptions) {
-                    if (answer.id === answerId) {
-                      answerText = answer.text || answerText;
-                      break;
-                    }
-                  }
-                }
-                return true;
+            group.questions.forEach(question => {
+              // Store question details
+              questionLookup.set(question.id, {
+                text: question.text || `Question ${question.id}`,
+                isCritical: question.isCritical || false,
+                isFatal: question.isKill || false,
+                groupId: group.id
+              });
+              
+              // Store answer options
+              if (question.answerOptions && Array.isArray(question.answerOptions)) {
+                question.answerOptions.forEach(answer => {
+                  const key = `${question.id}-${answer.id}`;
+                  answerLookup.set(key, answer.text || `Answer ${answer.id}`);
+                });
               }
-            }
+            });
           }
           
-          // Recursively search nested groups
+          // Recursively process nested groups
           if (group.questionGroups && Array.isArray(group.questionGroups)) {
-            if (searchGroups(group.questionGroups)) {
-              return true;
-            }
+            processGroups(group.questionGroups);
           }
-        }
-        return false;
+        });
       }
       
-      searchGroups(formDetails.questionGroups);
-      
-      return { questionText, answerText, isCritical, isFatal };
+      processGroups(formDetails.questionGroups);
+      return { questionLookup, answerLookup, groupLookup };
     }
 
     // ===== Renderers =====
@@ -891,31 +855,6 @@
       if (percent === null || percent === undefined) return null;
       if (percent <= 1) return percent * 100; // if 0..1 scale
       return percent;
-    }
-
-    function listAnswers(e){
-      // Use the questionScores from the evaluation data
-      const answers = [];
-      const questionGroups = safeGet(e, 'answers.questionGroupScores') || [];
-      
-      questionGroups.forEach(group => {
-        const questionScores = group.questionScores || [];
-        questionScores.forEach(qScore => {
-          answers.push({
-            questionId: qScore.questionId,
-            score: qScore.score,
-            failedKillQuestion: qScore.failedKillQuestion || false,
-            markedNA: qScore.markedNA || false,
-            comments: qScore.comments || ''
-          });
-        });
-      });
-      
-      return answers;
-    }
-
-    function isCriticalFlag(answer){
-      return answer.failedKillQuestion || false;
     }
 
     // -------- Overview (KPIs + per-agent table) --------
@@ -1035,30 +974,30 @@
         const score = getEvalPercent(e);
         const questionGroups = safeGet(e, 'answers.questionGroupScores') || [];
 
-        // Get form details to map question and answer IDs to text
+        // Get form details and build lookup maps
         const formDetails = await getFormDetails(formId);
-        console.log('Form details:', formDetails);
+        const { questionLookup, answerLookup, groupLookup } = buildFormLookup(formDetails);
         
         // Build question rows organized by question groups
         let qRows = '';
         
-        if (formDetails && formDetails.questionGroups) {
-          // Create a map of questions by group for organization
-          const questionsByGroup = new Map();
-          
-          // First, organize all questions by their group
-          questionGroups.forEach(group => {
-            const questionScores = group.questionScores || [];
-            questionScores.forEach(qScore => {
-              const groupId = group.questionGroupId || 'ungrouped';
-              if (!questionsByGroup.has(groupId)) {
-                questionsByGroup.set(groupId, []);
-              }
-              questionsByGroup.get(groupId).push(qScore);
-            });
+        // Create a map of questions by group for organization
+        const questionsByGroup = new Map();
+        
+        // First, organize all questions by their group
+        questionGroups.forEach(group => {
+          const questionScores = group.questionScores || [];
+          questionScores.forEach(qScore => {
+            const groupId = group.questionGroupId || 'ungrouped';
+            if (!questionsByGroup.has(groupId)) {
+              questionsByGroup.set(groupId, []);
+            }
+            questionsByGroup.get(groupId).push(qScore);
           });
-          
-          // Now render by question group
+        });
+        
+        // Process groups in order from form details
+        if (formDetails && formDetails.questionGroups) {
           for (const group of formDetails.questionGroups) {
             const groupQuestions = questionsByGroup.get(group.id) || [];
             if (groupQuestions.length === 0) continue;
@@ -1072,23 +1011,21 @@
               const answerId = qScore.answerId || qScore.selectedAnswerId;
               const aiAnswer = qScore.aiAnswer;
               
-              console.log(`Processing question ${qid} with answer ${answerId}`);
+              // Get question and answer text from lookup maps
+              const questionData = questionLookup.get(qid);
+              const questionText = questionData ? questionData.text : `Question ${qid}`;
               
-              const { questionText, answerText, isCritical, isFatal } = findQuestionAndAnswerDetails(formDetails, qid, answerId);
-              
-              console.log(`Found question: "${questionText}", answer: "${answerText}"`);
+              let answerText = 'N/A';
+              if (!qScore.markedNA && answerId) {
+                const answerKey = `${qid}-${answerId}`;
+                answerText = answerLookup.get(answerKey) || `Answer ${answerId}`;
+              } else if (qScore.markedNA) {
+                answerText = 'N/A';
+              }
               
               const ansScore = qScore.score ?? null;
-              const isCrit = qScore.failedKillQuestion || isCritical;
-              const isFat = qScore.failedKillQuestion || isFatal;
-              
-              // Get answer text - use AI explanation if available
-              let displayAnswerText = answerText;
-              if (qScore.markedNA) {
-                displayAnswerText = 'N/A';
-              } else if (aiAnswer && aiAnswer.explanation) {
-                displayAnswerText = answerText; // Still show the answer text, but we'll add AI explanation to comments
-              }
+              const isCrit = qScore.failedKillQuestion || (questionData ? questionData.isCritical : false);
+              const isFat = qScore.failedKillQuestion || (questionData ? questionData.isFatal : false);
               
               // Determine row class for highlighting
               let rowClass = '';
@@ -1109,108 +1046,64 @@
               
               qRows += `<tr class="${rowClass}">
                 <td>${questionText}</td>
-                <td>${displayAnswerText}</td>
-                <td>${ansScore === null ? '-' : fmt(ansScore, 1)}</td>
-                <td>${isFat ? '<span class="badge badge-fatal">Fatal</span>' : isCrit ? '<span class="badge badge-critical">Critical</span>' : '<span class="badge badge-ok">OK</span>'}</td>
-                <td>${allComments}</td>
-              </tr>`;
-            }
-          }
-          
-          // Handle any questions that weren't matched to groups
-          const unmatchedQuestions = [];
-          questionsByGroup.forEach((questions, groupId) => {
-            if (groupId === 'ungrouped') {
-              unmatchedQuestions.push(...questions);
-            } else {
-              // Check if this group ID exists in form details
-              const groupExists = formDetails.questionGroups.some(g => g.id === groupId);
-              if (!groupExists) {
-                unmatchedQuestions.push(...questions);
-              }
-            }
-          });
-          
-          if (unmatchedQuestions.length > 0) {
-            qRows += `<tr class="question-group-header"><td colspan="5">Additional Questions</td></tr>`;
-            for (const qScore of unmatchedQuestions) {
-              const qid = qScore.questionId;
-              const answerId = qScore.answerId || qScore.selectedAnswerId;
-              const { questionText, answerText, isCritical, isFatal } = findQuestionAndAnswerDetails(formDetails, qid, answerId);
-              
-              const ansScore = qScore.score ?? null;
-              const isCrit = qScore.failedKillQuestion || isCritical;
-              const isFat = qScore.failedKillQuestion || isFatal;
-              
-              let displayAnswerText = answerText;
-              if (qScore.markedNA) {
-                displayAnswerText = 'N/A';
-              }
-              
-              let rowClass = '';
-              if (isFat) rowClass = 'fatal-question';
-              else if (isCrit) rowClass = 'critical-warning';
-              
-              let allComments = '';
-              if (qScore.comments) {
-                allComments += `<div class="comment-bubble"><strong>Evaluator Comments:</strong> ${qScore.comments}</div>`;
-              }
-              if (qScore.aiAnswer && qScore.aiAnswer.explanation) {
-                allComments += `<div class="comment-bubble"><strong>AI Analysis:</strong> ${qScore.aiAnswer.explanation}</div>`;
-              }
-              
-              qRows += `<tr class="${rowClass}">
-                <td>${questionText}</td>
-                <td>${displayAnswerText}</td>
-                <td>${ansScore === null ? '-' : fmt(ansScore, 1)}</td>
-                <td>${isFat ? '<span class="badge badge-fatal">Fatal</span>' : isCrit ? '<span class="badge badge-critical">Critical</span>' : '<span class="badge badge-ok">OK</span>'}</td>
-                <td>${allComments}</td>
-              </tr>`;
-            }
-          }
-        } else {
-          // Fallback if we can't get form details
-          qRows += `<tr class="question-group-header"><td colspan="5">Questions</td></tr>`;
-          for (const group of questionGroups) {
-            const questionScores = group.questionScores || [];
-            for (const qScore of questionScores) {
-              const qid = qScore.questionId;
-              const answerId = qScore.answerId || qScore.selectedAnswerId;
-              const ansScore = qScore.score ?? null;
-              const isCrit = qScore.failedKillQuestion || false;
-              const isFat = qScore.failedKillQuestion || false;
-              
-              let answerText = 'N/A';
-              if (!qScore.markedNA && answerId) {
-                answerText = `Answer ${answerId}`;
-              } else if (qScore.markedNA) {
-                answerText = 'N/A';
-              }
-              
-              // Determine row class for highlighting
-              let rowClass = '';
-              if (isFat) {
-                rowClass = 'fatal-question';
-              } else if (isCrit) {
-                rowClass = 'critical-warning';
-              }
-              
-              let allComments = '';
-              if (qScore.comments) {
-                allComments += `<div class="comment-bubble"><strong>Evaluator Comments:</strong> ${qScore.comments}</div>`;
-              }
-              if (qScore.aiAnswer && qScore.aiAnswer.explanation) {
-                allComments += `<div class="comment-bubble"><strong>AI Analysis:</strong> ${qScore.aiAnswer.explanation}</div>`;
-              }
-              
-              qRows += `<tr class="${rowClass}">
-                <td>Question ${qid}</td>
                 <td>${answerText}</td>
                 <td>${ansScore === null ? '-' : fmt(ansScore, 1)}</td>
                 <td>${isFat ? '<span class="badge badge-fatal">Fatal</span>' : isCrit ? '<span class="badge badge-critical">Critical</span>' : '<span class="badge badge-ok">OK</span>'}</td>
                 <td>${allComments}</td>
               </tr>`;
             }
+          }
+        }
+        
+        // Handle any unmatched questions
+        const unmatchedQuestions = [];
+        questionsByGroup.forEach((questions, groupId) => {
+          if (groupId === 'ungrouped' || !groupLookup.has(groupId)) {
+            unmatchedQuestions.push(...questions);
+          }
+        });
+        
+        if (unmatchedQuestions.length > 0) {
+          qRows += `<tr class="question-group-header"><td colspan="5">Additional Questions</td></tr>`;
+          for (const qScore of unmatchedQuestions) {
+            const qid = qScore.questionId;
+            const answerId = qScore.answerId || qScore.selectedAnswerId;
+            
+            // Get question and answer text from lookup maps
+            const questionData = questionLookup.get(qid);
+            const questionText = questionData ? questionData.text : `Question ${qid}`;
+            
+            let answerText = 'N/A';
+            if (!qScore.markedNA && answerId) {
+              const answerKey = `${qid}-${answerId}`;
+              answerText = answerLookup.get(answerKey) || `Answer ${answerId}`;
+            } else if (qScore.markedNA) {
+              answerText = 'N/A';
+            }
+            
+            const ansScore = qScore.score ?? null;
+            const isCrit = qScore.failedKillQuestion || (questionData ? questionData.isCritical : false);
+            const isFat = qScore.failedKillQuestion || (questionData ? questionData.isFatal : false);
+            
+            let rowClass = '';
+            if (isFat) rowClass = 'fatal-question';
+            else if (isCrit) rowClass = 'critical-warning';
+            
+            let allComments = '';
+            if (qScore.comments) {
+              allComments += `<div class="comment-bubble"><strong>Evaluator Comments:</strong> ${qScore.comments}</div>`;
+            }
+            if (qScore.aiAnswer && qScore.aiAnswer.explanation) {
+              allComments += `<div class="comment-bubble"><strong>AI Analysis:</strong> ${qScore.aiAnswer.explanation}</div>`;
+            }
+            
+            qRows += `<tr class="${rowClass}">
+              <td>${questionText}</td>
+              <td>${answerText}</td>
+              <td>${ansScore === null ? '-' : fmt(ansScore, 1)}</td>
+              <td>${isFat ? '<span class="badge badge-fatal">Fatal</span>' : isCrit ? '<span class="badge badge-critical">Critical</span>' : '<span class="badge badge-ok">OK</span>'}</td>
+              <td>${allComments}</td>
+            </tr>`;
           }
         }
 
@@ -1245,7 +1138,18 @@
           questionScores.forEach(qScore => {
             if (qScore.failedKillQuestion) {
               const qid = qScore.questionId;
-              const qText = resolveForm(formId)?.questionsById?.[qid]?.text || ('Question ' + qid);
+              const qText = `Question ${qid}`; // Default fallback
+              
+              // Try to get actual question text from form details
+              const formDetails = state.formDetailsCache.get(formId);
+              if (formDetails) {
+                const { questionLookup } = buildFormLookup(formDetails);
+                const questionData = questionLookup.get(qid);
+                if (questionData) {
+                  qText = questionData.text;
+                }
+              }
+              
               const key = `${formId}|${qid}|${qText}`;
               
               if (!counts.has(key)) {
@@ -1253,7 +1157,6 @@
               }
               
               const o = counts.get(key);
-              // For now, treat all failed kill questions as fatal
               o.fatal++;
             }
           });

@@ -151,7 +151,7 @@
     const clientId = 'fe305808-b368-4547-8af9-325d28d552bb';
     const config = { REGION:'mypurecloud.ie' };
     const DEBUG = new URLSearchParams(window.location.search).has('debug');
-    const redirectUri = 'https://gmcglynn88.github.io/QualityReporting/';
+    const redirectUri = window.location.origin + window.location.pathname; // Use current page as redirect URI
     const oauthUrl = `https://login.${config.REGION}/oauth/authorize?client_id=${encodeURIComponent(clientId)}&response_type=token&redirect_uri=${encodeURIComponent(redirectUri)}&state=qa`;
 
     const state = {
@@ -165,39 +165,57 @@
     };
 
     function showDebugCard() {
-      const dump = { clientId, redirectUri, oauthUrl, region: config.REGION };
+      const dump = { clientId, redirectUri, oauthUrl, region: config.REGION, currentUrl: window.location.href };
       document.getElementById('authDebug').style.display = 'block';
       document.getElementById('authDump').textContent = JSON.stringify(dump, null, 2);
       document.getElementById('signinBtn').onclick = () => location.href = oauthUrl;
       document.getElementById('auth-message').textContent = 'Debug: click "Sign in with Genesys".';
       document.getElementById('auth-message').className = 'info-message';
     }
-    function msg(html, type='info'){ const box=document.getElementById('messageContainer'); box.innerHTML=`<div class="${type}-message">${html}</div>`; box.style.display='block'; if(type==='success'){ setTimeout(()=>box.style.display='none',5000);} }
+    
+    function msg(html, type='info'){ 
+      const box=document.getElementById('messageContainer'); 
+      box.innerHTML=`<div class="${type}-message">${html}</div>`; 
+      box.style.display='block'; 
+      if(type==='success'){ 
+        setTimeout(()=>box.style.display='none',5000);
+      } 
+    }
 
     // ===== Bootstrap =====
     document.addEventListener('DOMContentLoaded', () => {
+      console.log('DOM loaded, checking authentication...');
       const hash = window.location.hash.substring(1);
       const params = new URLSearchParams(hash);
       const tokenFromHash = params.get('access_token');
       const tokenFromSession = sessionStorage.getItem('purecloud_token');
 
       if (tokenFromHash) {
+        console.log('Token found in URL hash');
         state.accessToken = tokenFromHash;
         sessionStorage.setItem('purecloud_token', state.accessToken);
-        history.replaceState(null, '', window.location.href.split('#')[0]);
+        // Clear the hash from URL
+        window.location.hash = '';
         startApp();
       } else if (tokenFromSession) {
+        console.log('Token found in session storage');
         state.accessToken = tokenFromSession;
         startApp();
       } else {
-        if (DEBUG) showDebugCard(); else window.location.href = oauthUrl;
+        console.log('No token found, redirecting to OAuth');
+        if (DEBUG) showDebugCard(); 
+        else window.location.href = oauthUrl;
       }
     });
 
     function startApp(){
+      console.log('Starting app with token:', state.accessToken ? 'Present' : 'Missing');
       document.getElementById('auth-message').textContent = 'Authenticated successfully!';
       document.getElementById('auth-message').className = 'success-message';
-      setTimeout(()=>{ document.getElementById('authCard').style.display='none'; document.getElementById('authDebug').style.display='none'; }, 1200);
+      setTimeout(()=>{ 
+        document.getElementById('authCard').style.display='none'; 
+        document.getElementById('authDebug').style.display='none'; 
+      }, 1200);
 
       document.getElementById('appContent').style.display='block';
 
@@ -217,8 +235,14 @@
 
       // Load lookups
       Promise.all([fetchAllUsers(), fetchAllForms()])
-        .then(()=> { document.getElementById('loadBtn').disabled = false; })
-        .catch(err => msg('Initial load failed: '+err.message,'error'));
+        .then(()=> { 
+          console.log('Lookups loaded successfully');
+          document.getElementById('loadBtn').disabled = false; 
+        })
+        .catch(err => {
+          console.error('Initial load failed:', err);
+          msg('Initial load failed: '+err.message,'error');
+        });
     }
 
     function setTab(name){
@@ -234,16 +258,23 @@
       const [y,m] = val.split('-').map(Number);
       state.monthStart = new Date(Date.UTC(y, m-1, 1, 0, 0, 0));
       state.monthEnd   = new Date(Date.UTC(y, m, 0, 23, 59, 59));
+      console.log('Month range updated:', state.monthStart, 'to', state.monthEnd);
     }
 
     // ===== Helpers =====
     async function fetchPaginatedGET(url){
+      console.log('Fetching:', url);
       let all = [];
       let next = url;
       while(next){
         const res = await fetch(next, { headers: { 'Authorization': 'Bearer ' + state.accessToken }});
-        if(!res.ok) throw new Error(`HTTP ${res.status} for ${next}`);
+        if(!res.ok) {
+          console.error('Fetch failed:', res.status, res.statusText);
+          throw new Error(`HTTP ${res.status} for ${next}`);
+        }
         const data = await res.json();
+        console.log('API Response:', data);
+        
         if (Array.isArray(data.entities)) all = all.concat(data.entities);
         else if (Array.isArray(data.users)) all = all.concat(data.users);
         else if (Array.isArray(data)) all = all.concat(data);
@@ -252,11 +283,16 @@
         if (data.nextUri) next = `https://api.${config.REGION}${data.nextUri}`;
         else next = null;
       }
+      console.log(`Fetched ${all.length} items`);
       return all;
     }
 
     function safeGet(obj, path, def=null){
-      try{ return path.split('.').reduce((o,k)=> (o && k in o) ? o[k] : undefined , obj) ?? def; }catch{ return def; }
+      try{ 
+        return path.split('.').reduce((o,k)=> (o && k in o) ? o[k] : undefined , obj) ?? def; 
+      } catch(e) { 
+        return def; 
+      }
     }
 
     function pct(n, digits=1){ if(n===null||n===undefined||!isFinite(n)) return '-'; return (Math.round(n*10**digits)/10**digits).toFixed(digits)+'%'; }
@@ -266,27 +302,45 @@
 
     // ===== Lookups =====
     async function fetchAllUsers(){
-      const url = `https://api.${config.REGION}/api/v2/users?pageSize=100`;
-      const users = await fetchPaginatedGET(url);
-      state.users = users.map(u => ({ id:u.id, name: (u.name || `${u.givenName||''} ${u.familyName||''}`).trim(), email: u.email || '' }))
-                         .sort((a,b)=>a.name.localeCompare(b.name));
-      const sel = document.getElementById('userSelect');
-      sel.innerHTML = state.users.map(u => `<option value="${u.id}">${u.name}${u.email?` — ${u.email}`:''}</option>`).join('');
-      sel.disabled = false;
+      try {
+        const url = `https://api.${config.REGION}/api/v2/users?pageSize=100`;
+        const users = await fetchPaginatedGET(url);
+        state.users = users.map(u => ({ 
+          id: u.id, 
+          name: (u.name || `${u.givenName||''} ${u.familyName||''}`).trim(), 
+          email: u.email || '' 
+        })).sort((a,b)=>a.name.localeCompare(b.name));
+        
+        const sel = document.getElementById('userSelect');
+        sel.innerHTML = state.users.map(u => `<option value="${u.id}">${u.name}${u.email?` — ${u.email}`:''}</option>`).join('');
+        sel.disabled = false;
+        console.log(`Loaded ${state.users.length} users`);
+      } catch (error) {
+        console.error('Error fetching users:', error);
+        throw error;
+      }
     }
 
     async function fetchAllForms(){
-      const url = `https://api.${config.REGION}/api/v2/quality/forms/evaluations?pageSize=100`;
-      const forms = await fetchPaginatedGET(url);
-      // Build a questions map for each form (flatten nested groups if present)
-      state.forms = forms.map(f => ({
-        id: f.id, name: f.name || f.title || '(Unnamed form)',
-        questionsById: extractQuestionsById(f)
-      })).sort((a,b)=>a.name.localeCompare(b.name));
-      state.formsById = Object.fromEntries(state.forms.map(f=>[f.id,f]));
-      const sel = document.getElementById('formSelect');
-      sel.innerHTML = state.forms.map(f => `<option value="${f.id}">${f.name}</option>`).join('');
-      sel.disabled = false;
+      try {
+        const url = `https://api.${config.REGION}/api/v2/quality/forms/evaluations?pageSize=100`;
+        const forms = await fetchPaginatedGET(url);
+        // Build a questions map for each form (flatten nested groups if present)
+        state.forms = forms.map(f => ({
+          id: f.id, 
+          name: f.name || f.title || '(Unnamed form)',
+          questionsById: extractQuestionsById(f)
+        })).sort((a,b)=>a.name.localeCompare(b.name));
+        
+        state.formsById = Object.fromEntries(state.forms.map(f=>[f.id,f]));
+        const sel = document.getElementById('formSelect');
+        sel.innerHTML = state.forms.map(f => `<option value="${f.id}">${f.name}</option>`).join('');
+        sel.disabled = false;
+        console.log(`Loaded ${state.forms.length} forms`);
+      } catch (error) {
+        console.error('Error fetching forms:', error);
+        throw error;
+      }
     }
 
     function extractQuestionsById(form){
@@ -322,82 +376,139 @@
       const agentIds = Array.from(userSel.selectedOptions).map(o=>o.value);
       const formIds  = Array.from(formSel.selectedOptions).map(o=>o.value);
 
-      if (agentIds.length === 0) { msg('Please select at least one agent.','error'); return; }
-      if (!state.monthStart || !state.monthEnd) { msg('Please select a month.','error'); return; }
+      if (agentIds.length === 0) { 
+        msg('Please select at least one agent.','error'); 
+        return; 
+      }
+      if (!state.monthStart || !state.monthEnd) { 
+        msg('Please select a month.','error'); 
+        return; 
+      }
 
       msg('Loading evaluations…','info');
+      console.log('Loading evaluations for:', {agentIds, formIds, monthStart: state.monthStart, monthEnd: state.monthEnd});
+      
       try{
         const results = [];
-        // We’ll query per agent to satisfy APIs that accept single agent query param.
+        // We'll query per agent to satisfy APIs that accept single agent query param.
         for (const agentId of agentIds){
+          console.log(`Querying evaluations for agent: ${agentId}`);
           const list = await queryEvaluationsForAgent(agentId, formIds, state.monthStart, state.monthEnd);
           results.push(...list);
         }
         state.evals = results;
+        console.log(`Loaded ${results.length} total evaluations`);
         msg(`Loaded ${results.length} evaluations.`, 'success');
         renderAll();
       }catch(e){
+        console.error('Error loading evaluations:', e);
         msg('Failed to load evaluations: '+e.message,'error');
       }
     }
 
     async function queryEvaluationsForAgent(agentId, formIds, startUTC, endUTC){
-      // Try GET first (with common params), then fall back to POST query if needed.
-      const start = new Date(startUTC).toISOString();
-      const end   = new Date(endUTC).toISOString();
+      const start = startUTC.toISOString();
+      const end   = endUTC.toISOString();
+
+      console.log(`Querying evaluations for agent ${agentId} from ${start} to ${end}`);
 
       const base = `https://api.${config.REGION}/api/v2/quality/evaluations/query`;
-      async function tryGET(){
-        const params = new URLSearchParams({ agentUserId: agentId, pageSize: '100', startTime: start, endTime: end });
-        if (formIds && formIds.length===1) params.set('formId', formIds[0]); // some GET variants accept single formId
-        let all = [];
-        let next = `${base}?${params.toString()}`;
-        while(next){
-          const res = await fetch(next, { headers: { 'Authorization':'Bearer '+state.accessToken }});
-          if(res.status===405 || res.status===400) throw new Error('SwitchToPOST'); // not supported in this env
-          if(!res.ok) throw new Error(`GET ${res.status}`);
-          const data = await res.json();
-          const entities = data.entities || data.results || [];
-          all = all.concat(entities);
-          if (data.nextUri) next = `https://api.${config.REGION}${data.nextUri}`; else next = null;
-        }
-        return all;
-      }
+      
+      // Try POST first as it's more reliable for complex queries
       async function tryPOST(){
-        // Broadly compatible POST body (Genesys Cloud commonly uses POST for queries)
         const body = {
           agentUserIds: [agentId],
           pageSize: 100,
           pageNumber: 1,
-          timeRange: { startDate: start, endDate: end },
+          interval: `${start}/${end}`,
           ...(formIds && formIds.length ? { formIds } : {})
         };
+        
+        console.log('POST body:', body);
+        
         let all = [];
         let res = await fetch(base, {
           method:'POST',
-          headers:{'Authorization':'Bearer '+state.accessToken,'Content-Type':'application/json'},
+          headers:{
+            'Authorization':'Bearer '+state.accessToken,
+            'Content-Type':'application/json'
+          },
           body: JSON.stringify(body)
         });
-        if(!res.ok) throw new Error(`POST ${res.status}`);
+        
+        if(!res.ok) {
+          const errorText = await res.text();
+          console.error('POST failed:', res.status, errorText);
+          throw new Error(`POST ${res.status}: ${errorText}`);
+        }
+        
         let data = await res.json();
         all = all.concat(data.entities || data.results || []);
+        console.log(`Initial POST returned ${all.length} evaluations`);
+        
         // follow nextUri if present
         while(data.nextUri){
-          res = await fetch(`https://api.${config.REGION}${data.nextUri}`, { headers:{'Authorization':'Bearer '+state.accessToken}});
+          console.log('Fetching next page:', data.nextUri);
+          res = await fetch(`https://api.${config.REGION}${data.nextUri}`, { 
+            headers:{'Authorization':'Bearer '+state.accessToken}
+          });
           if(!res.ok) throw new Error(`Follow-up GET ${res.status}`);
           data = await res.json();
           all = all.concat(data.entities || data.results || []);
+          console.log(`Added ${data.entities ? data.entities.length : 0} more evaluations`);
+        }
+        
+        return all;
+      }
+
+      // Fallback to GET if POST doesn't work
+      async function tryGET(){
+        const params = new URLSearchParams({ 
+          agentUserId: agentId, 
+          pageSize: '100', 
+          startTime: start, 
+          endTime: end 
+        });
+        if (formIds && formIds.length===1) params.set('formId', formIds[0]);
+        
+        let all = [];
+        let next = `${base}?${params.toString()}`;
+        
+        while(next){
+          console.log('GET request:', next);
+          const res = await fetch(next, { 
+            headers: { 'Authorization':'Bearer '+state.accessToken }
+          });
+          if(res.status===405 || res.status===400) throw new Error('SwitchToPOST');
+          if(!res.ok) throw new Error(`GET ${res.status}`);
+          
+          const data = await res.json();
+          const entities = data.entities || data.results || [];
+          all = all.concat(entities);
+          console.log(`GET returned ${entities.length} evaluations`);
+          
+          if (data.nextUri) next = `https://api.${config.REGION}${data.nextUri}`; 
+          else next = null;
         }
         return all;
       }
 
       try{
-        const list = await tryGET();
+        // Try POST first as it's more reliable
+        const list = await tryPOST();
+        console.log(`Successfully retrieved ${list.length} evaluations for agent ${agentId}`);
         return list;
       }catch(err){
-        if (String(err.message).includes('SwitchToPOST') || String(err.message).startsWith('GET ')){
-          const list = await tryPOST();
-          return list;
+        console.log('POST failed, trying GET:', err.message);
+        if (String(err.message).includes('SwitchToPOST') || String(err.message).startsWith('GET ') || String(err.message).startsWith('POST')){
+          try {
+            const list = await tryGET();
+            console.log(`GET retrieved ${list.length} evaluations for agent ${agentId}`);
+            return list;
+          } catch (getErr) {
+            console.error('Both POST and GET failed:', getErr);
+            throw getErr;
+          }
         }
         throw err;
       }
@@ -405,6 +516,7 @@
 
     // ===== Renderers =====
     function renderAll(){
+      console.log('Rendering all views with', state.evals.length, 'evaluations');
       renderOverview();
       renderTrends();
       renderDetails();
@@ -412,15 +524,20 @@
     }
 
     function resolveUserName(userId){
-      return state.users.find(u=>u.id===userId)?.name || userId || '(unknown)';
+      const user = state.users.find(u=>u.id===userId);
+      return user ? user.name : userId || '(unknown)';
     }
-    function resolveForm(formId){ return state.formsById[formId]; }
+    
+    function resolveForm(formId){ 
+      return state.formsById[formId]; 
+    }
 
     function getEvalPercent(e){
       // Try several fields commonly exposed by evaluation entities
       const percent = e.totalScore || e.totalPercent || safeGet(e,'scoring.totalPercent') || safeGet(e,'oTotalPercent');
-      if (percent && percent<=1) return percent*100; // if 0..1 scale
-      return percent ?? null;
+      if (percent === null || percent === undefined) return null;
+      if (percent <= 1) return percent * 100; // if 0..1 scale
+      return percent;
     }
 
     function listAnswers(e){
@@ -440,27 +557,36 @@
         scan(e);
         answers = flat.length ? flat : [];
       }
-      return answers;
+      return answers || [];
     }
 
     function isCriticalFlag(ans){
+      if (!ans) return false;
       const flags = [
         'critical','isCritical','criticalFail','criticalFailure','killQuestion','killquestion','fatal','isFatal'
       ];
-      for (const f of flags){ if (ans && (ans[f] === true || String(ans[f]).toLowerCase()==='true')) return true; }
+      for (const f of flags){ 
+        if (ans[f] === true || String(ans[f]).toLowerCase()==='true') return true; 
+      }
       // some APIs store metadata
       if (safeGet(ans,'metadata.killQuestion')===true) return true;
       return false;
     }
+    
     function isFatalFlag(ans){
+      if (!ans) return false;
       const flags = ['fatal','isFatal','killQuestion','killquestion'];
-      for (const f of flags){ if (ans && (ans[f] === true || String(ans[f]).toLowerCase()==='true')) return true; }
+      for (const f of flags){ 
+        if (ans[f] === true || String(ans[f]).toLowerCase()==='true') return true; 
+      }
       return false;
     }
 
     // -------- Overview (KPIs + per-agent table) --------
     function renderOverview(){
       const evals = state.evals;
+      console.log('Rendering overview with', evals.length, 'evaluations');
+      
       const byAgent = new Map();
       evals.forEach(e=>{
         const a = safeGet(e,'agent.id') || e.agentUserId || e.userId || '(unknown)';
@@ -470,17 +596,20 @@
         obj.count++;
         if (p!==null && isFinite(p)) obj.sum += Number(p);
       });
+      
       const agentRows = [];
-      let totalCount=0, totalSum=0;
+      let totalCount=0;
       for (const [agentId, {count,sum}] of byAgent.entries()){
         const avg = count ? (sum / count) : null;
         agentRows.push({ agent: resolveUserName(agentId), count, avg });
-        totalCount += count; totalSum += (avg!==null?avg:0)*1;
+        totalCount += count;
       }
       agentRows.sort((a,b)=>a.agent.localeCompare(b.agent));
 
       // KPIs
-      const overallAvg = (agentRows.length && totalCount) ? (agentRows.reduce((s,r)=>s+(r.avg||0),0)/agentRows.length) : null;
+      const overallAvg = agentRows.length ? 
+        (agentRows.reduce((s,r)=>s+(r.avg||0),0)/agentRows.length) : null;
+        
       document.getElementById('overviewKPIs').innerHTML = `
         <div class="kpi">
           <div class="label">Month</div>
@@ -502,14 +631,18 @@
 
       // Per-agent table
       const tbl = document.getElementById('agentSummaryTable');
-      tbl.innerHTML = `
-        <thead><tr>
-          <th>Agent</th><th>Evaluations</th><th>Average Score</th>
-        </tr></thead>
-        <tbody>
-          ${agentRows.map(r=>`<tr><td>${r.agent}</td><td>${r.count}</td><td>${r.avg===null?'-':pct(r.avg,1)}</td></tr>`).join('')}
-        </tbody>
-      `;
+      if (agentRows.length === 0) {
+        tbl.innerHTML = '<tr><td colspan="3" class="muted">No evaluation data available for the selected criteria.</td></tr>';
+      } else {
+        tbl.innerHTML = `
+          <thead><tr>
+            <th>Agent</th><th>Evaluations</th><th>Average Score</th>
+          </tr></thead>
+          <tbody>
+            ${agentRows.map(r=>`<tr><td>${r.agent}</td><td>${r.count}</td><td>${r.avg===null?'-':pct(r.avg,1)}</td></tr>`).join('')}
+          </tbody>
+        `;
+      }
     }
 
     // -------- Trends (daily avg per agent) --------
@@ -520,6 +653,7 @@
       for (let d=new Date(state.monthStart); d<=state.monthEnd; d.setUTCDate(d.getUTCDate()+1)){
         days.push(new Date(d).toISOString().split('T')[0]);
       }
+      
       // Map: agent -> day -> {sum, count}
       const map = new Map();
       evals.forEach(e=>{
@@ -542,20 +676,25 @@
         }).join('');
         return `<tr><td>${resolveUserName(aid)}</td>${cells}</tr>`;
       }).join('');
-      document.getElementById('trendTable').innerHTML = header + `<tbody>${rows}</tbody>`;
+      
+      document.getElementById('trendTable').innerHTML = header + `<tbody>${rows || '<tr><td colspan="' + (days.length + 1) + '" class="muted">No trend data available.</td></tr>'}</tbody>`;
     }
 
     // -------- Details (expand per evaluation; question-level) --------
     function renderDetails(){
       const c = document.getElementById('detailsContainer');
-      if (!state.evals.length){ c.innerHTML = '<div class="muted">No evaluations loaded.</div>'; return; }
+      if (!state.evals.length){ 
+        c.innerHTML = '<div class="muted">No evaluations loaded.</div>'; 
+        return; 
+      }
+      
       c.innerHTML = state.evals.map(e=>{
         const agent = resolveUserName(safeGet(e,'agent.id') || e.agentUserId);
         const evaluator = resolveUserName(safeGet(e,'evaluator.id') || e.evaluatorUserId);
         const formId = safeGet(e,'form.id') || e.formId;
         const form = resolveForm(formId);
         const formName = form?.name || '(Form)';
-        const when = toUKDate(e.releaseDate || e.assignedDate || e.creationDate || e.date || Date.now());
+        const when = toUKDate(e.releaseDate || e.assignedDate || e.creationDate || e.evaluationDate || e.date || Date.now());
         const convo = e.conversationId || e.conversation?.id || '(n/a)';
         const score = getEvalPercent(e);
         const answers = listAnswers(e);
@@ -567,8 +706,8 @@
           const qText = qMeta?.text || a.questionText || ('Question ' + (qid||''));
           const ansText = a.answerText || a.answer || a.value || a.selectedAnswer || '-';
           const ansScore = a.score ?? a.points ?? a.valueScore ?? null;
-          const isCrit = isCriticalFlag(a) || qMeta?.critical;
-          const isFat  = isFatalFlag(a) || qMeta?.fatal;
+          const isCrit = isCriticalFlag(a) || (qMeta?.critical);
+          const isFat  = isFatalFlag(a) || (qMeta?.fatal);
           const badges = (isCrit || isFat)
             ? `<span class="badge ${isFat?'badge-fatal':'badge-critical'}">${isFat?'Fatal':'Critical'}</span>`
             : '';

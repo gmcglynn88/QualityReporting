@@ -905,7 +905,7 @@
 
         // Get form details and build lookup maps
         const formDetails = await getFormDetails(formId);
-        const { questionLookup, answerLookup, groupLookup } = buildFormLookup(formDetails);
+        const { questionLookup, answerLookup, answerLookupAny, groupLookup } = buildFormLookup(formDetails);
         
         // Build question rows organized by question groups
         let qRows = '';
@@ -936,24 +936,10 @@
           for (const qKey of qKeyCandidates){
             if (questionLookup.has(qKey)) { questionData = questionLookup.get(qKey); break; }
           }
-          const questionText = questionData ? questionData.text : `Question ${qid || qCtxId || ''}`;
+          const questionText = (qScore.question && qScore.question.text) ? qScore.question.text : (questionData ? questionData.text : `Question ${qid || qCtxId || ''}`);
 
           // Answer text (supports multi-select)
-          let answerText = 'N/A';
-          if (!qScore.markedNA){
-            const ansIds = getSelectedAnswerIds(qScore);
-            if (ansIds.length){
-              const texts = [];
-              for (const ansId of ansIds){
-                let t = null;
-                for (const qKey of qKeyCandidates){
-                  const key = `${qKey}|${ansId}`;
-                  if (answerLookup.has(key)) { t = answerLookup.get(key); break; }
-                }
-                texts.push(t || `Answer ${ansId}`);
-              }
-              answerText = texts.join(', ');
-            }
+          let answerText = 'N/A';$1const texts = getAnswerTexts(ansIds, qKeyCandidates, answerLookup, answerLookupAny, qScore); answerText = texts.join(', ');$2}
           }
 
           const ansScore = qScore.score ?? null;
@@ -1087,6 +1073,88 @@
         </tr></thead>
         <tbody>${rows || `<tr><td colspan="5" class="muted">No critical/fatal marks found for the selected period.</td></tr>`}</tbody>
       `;
+    }
+
+    // ===== Override: Form Details Lookup (robust id/context + unscoped answers) =====
+    function buildFormLookup(formDetails) {
+      const questionLookup = new Map(); // q.id or q.contextId -> { text, isCritical, isFatal, groupId }
+      const answerLookup   = new Map(); // `${qKey}|${a.id}` or `${qKey}|${a.contextId}` -> answerText
+      const answerLookupAny = new Map(); // a.id or a.contextId -> answerText (unscoped fallback)
+      const groupLookup    = new Map(); // group.id or group.contextId -> groupName
+      
+      if (!formDetails || !Array.isArray(formDetails.questionGroups)) {
+        return { questionLookup, answerLookup, answerLookupAny, groupLookup };
+      }
+
+      function indexQuestion(q, groupId) {
+        const payload = {
+          text: q.text || `Question ${q.id || q.contextId}`,
+          isCritical: !!q.isCritical,
+          isFatal: !!q.isKill,
+          groupId
+        };
+        if (q.id)        questionLookup.set(q.id, payload);
+        if (q.contextId) questionLookup.set(q.contextId, payload);
+
+        const qKeys = [q.id, q.contextId].filter(Boolean);
+        (q.answerOptions || []).forEach(a => {
+          const aText = a.text || `Answer ${a.id || a.contextId}`;
+          qKeys.forEach(qKey => {
+            if (a.id)        answerLookup.set(`${qKey}|${a.id}`, aText);
+            if (a.contextId) answerLookup.set(`${qKey}|${a.contextId}`, aText);
+          });
+          if (a.id)        answerLookupAny.set(a.id, aText);
+          if (a.contextId) answerLookupAny.set(a.contextId, aText);
+        });
+      }
+
+      function walk(groups) {
+        groups.forEach(g => {
+          const gName = g.name || 'Unnamed Group';
+          if (g.id)        groupLookup.set(g.id, gName);
+          if (g.contextId) groupLookup.set(g.contextId, gName);
+
+          (g.questions || []).forEach(q => indexQuestion(q, g.id || g.contextId));
+          if (Array.isArray(g.questionGroups)) walk(g.questionGroups);
+        });
+      }
+
+      walk(formDetails.questionGroups);
+      return { questionLookup, answerLookup, answerLookupAny, groupLookup };
+    }
+
+    // Normalize selected answer IDs (single or multiple) — extended variants
+    function getSelectedAnswerIds(qScore){
+      const arr =
+        qScore.selectedAnswerIds ||
+        qScore.selectedAnswerOptionIds ||
+        qScore.selectedAnswerContextIds ||
+        qScore.selectedAnswerOptionContextIds ||
+        (qScore.selectedAnswerId ? [qScore.selectedAnswerId] : null) ||
+        (qScore.answerOptionId ? [qScore.answerOptionId] : null) ||
+        (qScore.answerId ? [qScore.answerId] : null) ||
+        (qScore.answerContextId ? [qScore.answerContextId] : null) ||
+        [];
+      return Array.isArray(arr) ? arr : [];
+    }
+
+    function getAnswerTexts(ansIds, qKeyCandidates, answerLookup, answerLookupAny, qScore){
+      const texts = [];
+      for (const ansId of ansIds){
+        let t = null;
+        for (const qKey of qKeyCandidates){
+          const key = `${qKey}|${ansId}`;
+          if (answerLookup.has(key)) { t = answerLookup.get(key); break; }
+        }
+        if (!t && answerLookupAny.has(ansId)) t = answerLookupAny.get(ansId);
+        if (!t && qScore && qScore.answer && qScore.answer.text) t = qScore.answer.text; // inline object sometimes present
+        if (!t && Array.isArray(qScore?.selectedAnswers)){
+          const found = qScore.selectedAnswers.find(x => x.id===ansId || x.contextId===ansId);
+          if (found && found.text) t = found.text;
+        }
+        texts.push(t || `Answer ${ansId}`);
+      }
+      return texts;
     }
 
     // ===== Form details fetch (cached) =====

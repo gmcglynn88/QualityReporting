@@ -353,22 +353,52 @@
       const tokenFromHash = params.get('access_token');
       const tokenFromSession = sessionStorage.getItem('purecloud_token');
 
+      // Helper: start app
+      const boot = (token) => { state.accessToken = token; startApp(); };
+
       if (tokenFromHash) {
         console.log('Token found in URL hash');
-        state.accessToken = tokenFromHash;
-        sessionStorage.setItem('purecloud_token', state.accessToken);
-        // Clear the hash from URL
-        window.location.hash = '';
-        startApp();
-      } else if (tokenFromSession) {
-        console.log('Token found in session storage');
-        state.accessToken = tokenFromSession;
-        startApp();
-      } else {
-        console.log('No token found, redirecting to OAuth');
-        if (DEBUG) showDebugCard(); 
-        else window.location.href = oauthUrl;
+        sessionStorage.setItem('purecloud_token', tokenFromHash);
+        // Clear the hash from URL (keep clean)
+        history.replaceState(null, document.title, window.location.pathname + window.location.search);
+        boot(tokenFromHash);
+        return;
       }
+
+      if (tokenFromSession) {
+        console.log('Token found in session storage');
+        boot(tokenFromSession);
+        return;
+      }
+
+      // No token: try auto-redirect, but also show a safe fallback after a short delay
+      console.log('No token found, preparing OAuth redirect...');
+      const tryRedirect = () => {
+        try { window.location.assign(oauthUrl); } catch (e) { console.warn('Auto-redirect failed:', e); }
+      };
+
+      // If debug flag present, show the debug card immediately
+      if (DEBUG) {
+        showDebugCard();
+        return;
+      }
+
+      // Attempt auto-redirect now
+      tryRedirect();
+
+      // If the redirect is blocked or the OAuth app is misconfigured (redirect URI mismatch),
+      // show a clickable signin after 1.2s so the user isn't stuck on the spinner.
+      setTimeout(() => {
+        if (!sessionStorage.getItem('purecloud_token')) {
+          console.warn('Still no token after attempted redirect — showing debug sign-in.');
+          showDebugCard();
+          const msgEl = document.getElementById('auth-message');
+          if (msgEl) {
+            msgEl.textContent = 'Couldn\'t auto-redirect. Click "Sign in with Genesys".';
+            msgEl.className = 'info-message';
+          }
+        }
+      }, 1200);
     });
 
     function startApp(){

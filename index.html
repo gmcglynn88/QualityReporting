@@ -827,10 +827,11 @@
       let isCritical = false;
       let isFatal = false;
       
-      // Search through question groups
+      // Search through question groups recursively
       function searchGroups(groups) {
         for (const group of groups) {
-          if (group.questions) {
+          // Check if this group has questions
+          if (group.questions && Array.isArray(group.questions)) {
             for (const question of group.questions) {
               if (question.id === questionId) {
                 questionText = question.text || questionText;
@@ -838,7 +839,7 @@
                 isFatal = question.isKill || false;
                 
                 // Find answer text
-                if (question.answerOptions && answerId) {
+                if (question.answerOptions && Array.isArray(question.answerOptions) && answerId) {
                   for (const answer of question.answerOptions) {
                     if (answer.id === answerId) {
                       answerText = answer.text || answerText;
@@ -852,8 +853,10 @@
           }
           
           // Recursively search nested groups
-          if (group.questionGroups && searchGroups(group.questionGroups)) {
-            return true;
+          if (group.questionGroups && Array.isArray(group.questionGroups)) {
+            if (searchGroups(group.questionGroups)) {
+              return true;
+            }
           }
         }
         return false;
@@ -1034,6 +1037,7 @@
 
         // Get form details to map question and answer IDs to text
         const formDetails = await getFormDetails(formId);
+        console.log('Form details:', formDetails);
         
         // Build question rows organized by question groups
         let qRows = '';
@@ -1068,7 +1072,11 @@
               const answerId = qScore.answerId || qScore.selectedAnswerId;
               const aiAnswer = qScore.aiAnswer;
               
+              console.log(`Processing question ${qid} with answer ${answerId}`);
+              
               const { questionText, answerText, isCritical, isFatal } = findQuestionAndAnswerDetails(formDetails, qid, answerId);
+              
+              console.log(`Found question: "${questionText}", answer: "${answerText}"`);
               
               const ansScore = qScore.score ?? null;
               const isCrit = qScore.failedKillQuestion || isCritical;
@@ -1108,8 +1116,61 @@
               </tr>`;
             }
           }
+          
+          // Handle any questions that weren't matched to groups
+          const unmatchedQuestions = [];
+          questionsByGroup.forEach((questions, groupId) => {
+            if (groupId === 'ungrouped') {
+              unmatchedQuestions.push(...questions);
+            } else {
+              // Check if this group ID exists in form details
+              const groupExists = formDetails.questionGroups.some(g => g.id === groupId);
+              if (!groupExists) {
+                unmatchedQuestions.push(...questions);
+              }
+            }
+          });
+          
+          if (unmatchedQuestions.length > 0) {
+            qRows += `<tr class="question-group-header"><td colspan="5">Additional Questions</td></tr>`;
+            for (const qScore of unmatchedQuestions) {
+              const qid = qScore.questionId;
+              const answerId = qScore.answerId || qScore.selectedAnswerId;
+              const { questionText, answerText, isCritical, isFatal } = findQuestionAndAnswerDetails(formDetails, qid, answerId);
+              
+              const ansScore = qScore.score ?? null;
+              const isCrit = qScore.failedKillQuestion || isCritical;
+              const isFat = qScore.failedKillQuestion || isFatal;
+              
+              let displayAnswerText = answerText;
+              if (qScore.markedNA) {
+                displayAnswerText = 'N/A';
+              }
+              
+              let rowClass = '';
+              if (isFat) rowClass = 'fatal-question';
+              else if (isCrit) rowClass = 'critical-warning';
+              
+              let allComments = '';
+              if (qScore.comments) {
+                allComments += `<div class="comment-bubble"><strong>Evaluator Comments:</strong> ${qScore.comments}</div>`;
+              }
+              if (qScore.aiAnswer && qScore.aiAnswer.explanation) {
+                allComments += `<div class="comment-bubble"><strong>AI Analysis:</strong> ${qScore.aiAnswer.explanation}</div>`;
+              }
+              
+              qRows += `<tr class="${rowClass}">
+                <td>${questionText}</td>
+                <td>${displayAnswerText}</td>
+                <td>${ansScore === null ? '-' : fmt(ansScore, 1)}</td>
+                <td>${isFat ? '<span class="badge badge-fatal">Fatal</span>' : isCrit ? '<span class="badge badge-critical">Critical</span>' : '<span class="badge badge-ok">OK</span>'}</td>
+                <td>${allComments}</td>
+              </tr>`;
+            }
+          }
         } else {
           // Fallback if we can't get form details
+          qRows += `<tr class="question-group-header"><td colspan="5">Questions</td></tr>`;
           for (const group of questionGroups) {
             const questionScores = group.questionScores || [];
             for (const qScore of questionScores) {
@@ -1134,15 +1195,20 @@
                 rowClass = 'critical-warning';
               }
               
-              const comments = qScore.comments ? 
-                `<div class="comment-bubble">${qScore.comments}</div>` : '';
+              let allComments = '';
+              if (qScore.comments) {
+                allComments += `<div class="comment-bubble"><strong>Evaluator Comments:</strong> ${qScore.comments}</div>`;
+              }
+              if (qScore.aiAnswer && qScore.aiAnswer.explanation) {
+                allComments += `<div class="comment-bubble"><strong>AI Analysis:</strong> ${qScore.aiAnswer.explanation}</div>`;
+              }
               
               qRows += `<tr class="${rowClass}">
                 <td>Question ${qid}</td>
                 <td>${answerText}</td>
                 <td>${ansScore === null ? '-' : fmt(ansScore, 1)}</td>
                 <td>${isFat ? '<span class="badge badge-fatal">Fatal</span>' : isCrit ? '<span class="badge badge-critical">Critical</span>' : '<span class="badge badge-ok">OK</span>'}</td>
-                <td>${comments}</td>
+                <td>${allComments}</td>
               </tr>`;
             }
           }

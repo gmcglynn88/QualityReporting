@@ -110,6 +110,26 @@
       font-size: 12px;
       color: #6c757d;
     }
+
+    /* Row highlighting for critical and fatal questions */
+    tr.critical-warning {
+      background-color: #fffbeb !important;
+      border-left: 4px solid #f59e0b;
+    }
+
+    tr.fatal-question {
+      background-color: #fef2f2 !important;
+      border-left: 4px solid #dc2626;
+    }
+
+    /* Ensure hover states work with the highlighting */
+    tr.critical-warning:hover {
+      background-color: #fef3c7 !important;
+    }
+
+    tr.fatal-question:hover {
+      background-color: #fecaca !important;
+    }
   </style>
 </head>
 <body>
@@ -581,7 +601,8 @@
               text: q.text || q.name || q.title || ('Question '+id),
               critical: !!(q.critical || q.isCritical || q.killQuestion || q.killquestion || safeGet(q,'metadata.killQuestion',false)),
               fatal: !!(q.fatal || q.isFatal || q.killQuestion || q.killquestion),
-              weight: q.weight || null
+              weight: q.weight || null,
+              maxPoints: q.maxPoints || q.points || 0
             };
           });
         }
@@ -758,8 +779,8 @@
       return allEvaluations;
     }
 
-    // ===== Question Text Lookup =====
-    async function getQuestionText(formId, questionId) {
+    // ===== Question Text and Answers Lookup =====
+    async function getQuestionTextAndAnswers(formId, questionId) {
       const cacheKey = `${formId}-${questionId}`;
       
       // Check cache first
@@ -768,28 +789,48 @@
       }
       
       try {
-        // Fetch form details to get question text
+        // Fetch form details to get question text and answer options
         const url = `https://api.${config.REGION}/api/v2/quality/forms/evaluations/${formId}`;
         const res = await rateLimitedFetch(url);
         
         if (!res.ok) {
           console.warn(`Failed to fetch form ${formId}: ${res.status}`);
-          return `Question ${questionId}`;
+          return {
+            text: `Question ${questionId}`,
+            answers: new Map(),
+            maxPoints: 0
+          };
         }
         
         const form = await res.json();
         
         // Search for the question in the form structure
         let questionText = `Question ${questionId}`;
+        let answerOptions = new Map();
+        let maxPoints = 0;
         
         function searchQuestions(node) {
-          if (!node) return;
+          if (!node) return false;
           
           if (Array.isArray(node.questions)) {
             for (const q of node.questions) {
               const qid = q.id || q.questionId;
-              if (qid === questionId && q.text) {
-                questionText = q.text;
+              if (qid === questionId) {
+                questionText = q.text || q.name || questionText;
+                maxPoints = q.maxPoints || q.points || 0;
+                
+                // Extract answer options
+                if (Array.isArray(q.answerOptions)) {
+                  q.answerOptions.forEach(answer => {
+                    const answerId = answer.id || answer.value;
+                    if (answerId) {
+                      answerOptions.set(answerId, {
+                        text: answer.text || answer.name || `Answer ${answerId}`,
+                        value: answer.value || answer.points || 0
+                      });
+                    }
+                  });
+                }
                 return true;
               }
             }
@@ -812,13 +853,23 @@
         
         searchQuestions(form);
         
+        const result = {
+          text: questionText,
+          answers: answerOptions,
+          maxPoints: maxPoints
+        };
+        
         // Cache the result
-        state.questionTextCache.set(cacheKey, questionText);
-        return questionText;
+        state.questionTextCache.set(cacheKey, result);
+        return result;
         
       } catch (error) {
-        console.warn(`Error fetching question text for ${questionId} in form ${formId}:`, error);
-        return `Question ${questionId}`;
+        console.warn(`Error fetching question details for ${questionId} in form ${formId}:`, error);
+        return {
+          text: `Question ${questionId}`,
+          answers: new Map(),
+          maxPoints: 0
+        };
       }
     }
 
@@ -996,22 +1047,39 @@
           const questionScores = group.questionScores || [];
           for (const qScore of questionScores) {
             const qid = qScore.questionId;
-            const qText = await getQuestionText(formId, qid);
+            const questionData = await getQuestionTextAndAnswers(formId, qid);
+            const qText = questionData.text;
             const ansScore = qScore.score ?? null;
-            const isCrit = qScore.failedKillQuestion;
-            const isFat = qScore.failedKillQuestion;
-            const badges = (isCrit || isFat)
-              ? `<span class="badge ${isFat ? 'badge-fatal' : 'badge-critical'}">${isFat ? 'Fatal' : 'Critical'}</span>`
-              : '';
+            const answerId = qScore.answerId || qScore.selectedAnswerId;
+            const isCrit = qScore.failedKillQuestion || false;
+            const isFat = qScore.failedKillQuestion || false;
+            
+            // Get answer text
+            let answerText = 'N/A';
+            if (!qScore.markedNA && answerId && questionData.answers.has(answerId)) {
+              answerText = questionData.answers.get(answerId).text;
+            } else if (qScore.markedNA) {
+              answerText = 'N/A';
+            } else if (ansScore !== null) {
+              answerText = `Scored: ${fmt(ansScore, 1)}`;
+            }
+            
+            // Determine row class for highlighting
+            let rowClass = '';
+            if (isFat) {
+              rowClass = 'fatal-question';
+            } else if (isCrit) {
+              rowClass = 'critical-warning';
+            }
             
             const comments = qScore.comments ? 
               `<div class="comment-bubble">${qScore.comments}</div>` : '';
             
-            qRows += `<tr>
+            qRows += `<tr class="${rowClass}">
               <td>${qText}</td>
-              <td>${qScore.markedNA ? 'N/A' : 'Answered'}</td>
+              <td>${answerText}</td>
               <td>${ansScore === null ? '-' : fmt(ansScore, 1)}</td>
-              <td>${badges || '<span class="badge badge-ok">OK</span>'}</td>
+              <td>${isFat ? '<span class="badge badge-fatal">Fatal</span>' : isCrit ? '<span class="badge badge-critical">Critical</span>' : '<span class="badge badge-ok">OK</span>'}</td>
               <td>${comments}</td>
             </tr>`;
           }

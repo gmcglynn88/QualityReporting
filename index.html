@@ -180,87 +180,87 @@
   </div>
 
   <script>
-// ===== OAuth Configuration =====
-const clientId = 'fe305808-b368-4547-8af9-325d28d552bb';
-const config = { REGION: 'mypurecloud.ie' };
-const DEBUG = new URLSearchParams(window.location.search).has('debug');
+    // ===== OAuth Configuration =====
+    const clientId = 'fe305808-b368-4547-8af9-325d28d552bb';
+    const config = { REGION: 'mypurecloud.ie' };
+    const DEBUG = new URLSearchParams(window.location.search).has('debug');
 
-// Use explicit redirect URI for GitHub Pages
-const redirectUri = 'https://gmcglynn88.github.io/QualityReporting/';
-const oauthUrl = `https://login.${config.REGION}/oauth/authorize?client_id=${encodeURIComponent(clientId)}&response_type=token&redirect_uri=${encodeURIComponent(redirectUri)}&state=qa`;
+    // Use explicit redirect URI for GitHub Pages
+    const redirectUri = 'https://gmcglynn88.github.io/QualityReporting/';
+    const oauthUrl = `https://login.${config.REGION}/oauth/authorize?client_id=${encodeURIComponent(clientId)}&response_type=token&redirect_uri=${encodeURIComponent(redirectUri)}&state=qa`;
 
-console.log('OAuth Configuration:', {
-  clientId,
-  region: config.REGION,
-  redirectUri,
-  currentPath: window.location.pathname
-});
+    console.log('OAuth Configuration:', {
+      clientId,
+      region: config.REGION,
+      redirectUri,
+      currentPath: window.location.pathname
+    });
 
-// ===== Improved Authentication Handler =====
-document.addEventListener('DOMContentLoaded', () => {
-  console.log('DOM loaded, checking authentication...');
-  
-  // Check URL hash first (OAuth callback)
-  const hash = window.location.hash.substring(1);
-  const params = new URLSearchParams(hash);
-  const tokenFromHash = params.get('access_token');
-  
-  if (tokenFromHash) {
-    console.log('✓ Token received via OAuth callback');
-    sessionStorage.setItem('purecloud_token', tokenFromHash);
-    // Clean URL - remove hash
-    history.replaceState(null, document.title, window.location.pathname + window.location.search);
-    startApp(tokenFromHash);
-    return;
-  }
-  
-  // Check existing session
-  const tokenFromSession = sessionStorage.getItem('purecloud_token');
-  if (tokenFromSession) {
-    console.log('✓ Using existing session token');
-    startApp(tokenFromSession);
-    return;
-  }
-  
-  // No token - need authentication
-  console.log('✗ No token found, starting OAuth flow');
-  
-  if (DEBUG) {
-    showDebugCard();
-  } else {
-    // Auto-redirect with user feedback
-    const authMsg = document.getElementById('auth-message');
-    authMsg.textContent = 'Redirecting to Genesys Cloud for authentication...';
-    authMsg.className = 'info-message';
+    const state = {
+      accessToken: null,
+      users: [],                 // [{id, name, email}]
+      forms: [],                 // [{id, name, questionsById}]
+      formsById: {},             // id -> form
+      evals: [],                 // loaded evaluations
+      monthStart: null,
+      monthEnd: null,
+      formDetailsCache: new Map()   // Cache for complete form details
+    };
+
+    // Checkbox dropdown instances
+    const dropdowns = {
+      users: null,
+      forms: null
+    };
+
+    // Rate limiting
+    let lastApiCall = 0;
+    const API_DELAY = 100; // ms between API calls to avoid rate limits
+
+    function showDebugCard() {
+      const debugInfo = {
+        clientId: clientId,
+        region: config.REGION,
+        redirectUri: redirectUri,
+        currentUrl: window.location.href,
+        oauthUrl: oauthUrl,
+        sessionToken: sessionStorage.getItem('purecloud_token') ? 'Present' : 'Missing',
+        urlHash: window.location.hash || 'None'
+      };
+      
+      document.getElementById('authDebug').style.display = 'block';
+      document.getElementById('authDump').textContent = JSON.stringify(debugInfo, null, 2);
+      document.getElementById('signinBtn').onclick = () => {
+        console.log('Manual OAuth redirect');
+        window.location.href = oauthUrl;
+      };
+      
+      document.getElementById('auth-message').textContent = 'Debug mode: Check configuration and click "Sign in with Genesys"';
+    }
     
-    setTimeout(() => {
-      console.log('Redirecting to:', oauthUrl);
-      window.location.href = oauthUrl;
-    }, 1500);
-  }
-});
+    function msg(html, type='info'){ 
+      const box=document.getElementById('messageContainer'); 
+      box.innerHTML=`<div class="${type}-message">${html}</div>`; 
+      box.style.display='block'; 
+      if(type==='success'){ 
+        setTimeout(()=>box.style.display='none',5000);
+      } 
+    }
 
-function showDebugCard() {
-  const debugInfo = {
-    clientId: clientId,
-    region: config.REGION,
-    redirectUri: redirectUri,
-    currentUrl: window.location.href,
-    oauthUrl: oauthUrl,
-    sessionToken: sessionStorage.getItem('purecloud_token') ? 'Present' : 'Missing',
-    urlHash: window.location.hash || 'None'
-  };
-  
-  document.getElementById('authDebug').style.display = 'block';
-  document.getElementById('authDump').textContent = JSON.stringify(debugInfo, null, 2);
-  
-  document.getElementById('signinBtn').onclick = () => {
-    console.log('Manual OAuth redirect');
-    window.location.href = oauthUrl;
-  };
-  
-  document.getElementById('auth-message').textContent = 'Debug mode: Check configuration and click "Sign in with Genesys"';
-}
+    function setLoading(button, isLoading) {
+      const spinner = button.querySelector('.loading-spinner');
+      const text = button.querySelector('.btn-text');
+      if (isLoading) {
+        spinner.style.display = 'inline-block';
+        text.textContent = 'Loading...';
+        button.disabled = true;
+      } else {
+        spinner.style.display = 'none';
+        text.textContent = 'Load Evaluations';
+        button.disabled = false;
+      }
+    }
+
     // ===== Checkbox Dropdown Component =====
     function createCheckboxDropdown(containerId, { placeholder, searchPlaceholder }){
       const root = document.getElementById(containerId);
@@ -366,64 +366,54 @@ function showDebugCard() {
       document.getElementById('loadBtn').disabled = !(hasMonth && (hasUsers || hasForms));
     }
 
-    // ===== Bootstrap =====
+    // ===== Improved Authentication Handler =====
     document.addEventListener('DOMContentLoaded', () => {
       console.log('DOM loaded, checking authentication...');
+      
+      // Check URL hash first (OAuth callback)
       const hash = window.location.hash.substring(1);
       const params = new URLSearchParams(hash);
       const tokenFromHash = params.get('access_token');
-      const tokenFromSession = sessionStorage.getItem('purecloud_token');
-
-      // Helper: start app
-      const boot = (token) => { state.accessToken = token; startApp(); };
-
+      
       if (tokenFromHash) {
-        console.log('Token found in URL hash');
+        console.log('✓ Token received via OAuth callback');
         sessionStorage.setItem('purecloud_token', tokenFromHash);
-        // Clear the hash from URL (keep clean)
+        // Clean URL - remove hash
         history.replaceState(null, document.title, window.location.pathname + window.location.search);
-        boot(tokenFromHash);
+        startApp(tokenFromHash);
         return;
       }
-
+      
+      // Check existing session
+      const tokenFromSession = sessionStorage.getItem('purecloud_token');
       if (tokenFromSession) {
-        console.log('Token found in session storage');
-        boot(tokenFromSession);
+        console.log('✓ Using existing session token');
+        startApp(tokenFromSession);
         return;
       }
-
-      // No token: try auto-redirect, but also show a safe fallback after a short delay
-      console.log('No token found, preparing OAuth redirect...');
-      const tryRedirect = () => {
-        try { window.location.assign(oauthUrl); } catch (e) { console.warn('Auto-redirect failed:', e); }
-      };
-
-      // If debug flag present, show the debug card immediately
+      
+      // No token - need authentication
+      console.log('✗ No token found, starting OAuth flow');
+      
       if (DEBUG) {
         showDebugCard();
-        return;
+      } else {
+        // Auto-redirect with user feedback
+        const authMsg = document.getElementById('auth-message');
+        authMsg.textContent = 'Redirecting to Genesys Cloud for authentication...';
+        authMsg.className = 'info-message';
+        
+        setTimeout(() => {
+          console.log('Redirecting to:', oauthUrl);
+          window.location.href = oauthUrl;
+        }, 1500);
       }
-
-      // Attempt auto-redirect now
-      tryRedirect();
-
-      // If the redirect is blocked or the OAuth app is misconfigured (redirect URI mismatch),
-      // show a clickable signin after 1.2s so the user isn't stuck on the spinner.
-      setTimeout(() => {
-        if (!sessionStorage.getItem('purecloud_token')) {
-          console.warn('Still no token after attempted redirect — showing debug sign-in.');
-          showDebugCard();
-          const msgEl = document.getElementById('auth-message');
-          if (msgEl) {
-            msgEl.textContent = 'Couldn\'t auto-redirect. Click "Sign in with Genesys".';
-            msgEl.className = 'info-message';
-          }
-        }
-      }, 1200);
     });
 
-    function startApp(){
-      console.log('Starting app with token:', state.accessToken ? 'Present' : 'Missing');
+    function startApp(token){
+      console.log('Starting app with token');
+      state.accessToken = token;
+      
       document.getElementById('auth-message').textContent = 'Authenticated successfully!';
       document.getElementById('auth-message').className = 'success-message';
       setTimeout(()=>{ 
@@ -761,10 +751,11 @@ function showDebugCard() {
     function buildFormLookup(formDetails) {
       const questionLookup = new Map(); // q.id or q.contextId -> { text, isCritical, isFatal, groupId }
       const answerLookup   = new Map(); // `${qKey}|${a.id}` or `${qKey}|${a.contextId}` -> answerText
+      const answerLookupAny = new Map(); // a.id or a.contextId -> answerText (unscoped fallback)
       const groupLookup    = new Map(); // group.id or group.contextId -> groupName
       
       if (!formDetails || !Array.isArray(formDetails.questionGroups)) {
-        return { questionLookup, answerLookup, groupLookup };
+        return { questionLookup, answerLookup, answerLookupAny, groupLookup };
       }
 
       function indexQuestion(q, groupId) {
@@ -779,10 +770,13 @@ function showDebugCard() {
 
         const qKeys = [q.id, q.contextId].filter(Boolean);
         (q.answerOptions || []).forEach(a => {
+          const aText = a.text || `Answer ${a.id || a.contextId}`;
           qKeys.forEach(qKey => {
-            if (a.id)        answerLookup.set(`${qKey}|${a.id}`, (a.text || `Answer ${a.id}`));
-            if (a.contextId) answerLookup.set(`${qKey}|${a.contextId}`, (a.text || `Answer ${a.contextId}`));
+            if (a.id)        answerLookup.set(`${qKey}|${a.id}`, aText);
+            if (a.contextId) answerLookup.set(`${qKey}|${a.contextId}`, aText);
           });
+          if (a.id)        answerLookupAny.set(a.id, aText);
+          if (a.contextId) answerLookupAny.set(a.contextId, aText);
         });
       }
 
@@ -798,7 +792,7 @@ function showDebugCard() {
       }
 
       walk(formDetails.questionGroups);
-      return { questionLookup, answerLookup, groupLookup };
+      return { questionLookup, answerLookup, answerLookupAny, groupLookup };
     }
 
     // Normalize selected answer IDs (single or multiple)
@@ -806,10 +800,33 @@ function showDebugCard() {
       const arr =
         qScore.selectedAnswerIds ||
         qScore.selectedAnswerOptionIds ||
+        qScore.selectedAnswerContextIds ||
+        qScore.selectedAnswerOptionContextIds ||
         (qScore.selectedAnswerId ? [qScore.selectedAnswerId] : null) ||
+        (qScore.answerOptionId ? [qScore.answerOptionId] : null) ||
         (qScore.answerId ? [qScore.answerId] : null) ||
+        (qScore.answerContextId ? [qScore.answerContextId] : null) ||
         [];
       return Array.isArray(arr) ? arr : [];
+    }
+
+    function getAnswerTexts(ansIds, qKeyCandidates, answerLookup, answerLookupAny, qScore){
+      const texts = [];
+      for (const ansId of ansIds){
+        let t = null;
+        for (const qKey of qKeyCandidates){
+          const key = `${qKey}|${ansId}`;
+          if (answerLookup.has(key)) { t = answerLookup.get(key); break; }
+        }
+        if (!t && answerLookupAny.has(ansId)) t = answerLookupAny.get(ansId);
+        if (!t && qScore && qScore.answer && qScore.answer.text) t = qScore.answer.text; // inline object sometimes present
+        if (!t && Array.isArray(qScore?.selectedAnswers)){
+          const found = qScore.selectedAnswers.find(x => x.id===ansId || x.contextId===ansId);
+          if (found && found.text) t = found.text;
+        }
+        texts.push(t || `Answer ${ansId}`);
+      }
+      return texts;
     }
 
     // ===== Renderers =====
@@ -990,7 +1007,11 @@ function showDebugCard() {
           const questionText = (qScore.question && qScore.question.text) ? qScore.question.text : (questionData ? questionData.text : `Question ${qid || qCtxId || ''}`);
 
           // Answer text (supports multi-select)
-          let answerText = 'N/A';$1const texts = getAnswerTexts(ansIds, qKeyCandidates, answerLookup, answerLookupAny, qScore); answerText = texts.join(', ');$2}
+          let answerText = 'N/A';
+          const ansIds = getSelectedAnswerIds(qScore);
+          if (ansIds.length > 0) {
+            const texts = getAnswerTexts(ansIds, qKeyCandidates, answerLookup, answerLookupAny, qScore); 
+            answerText = texts.join(', ');
           }
 
           const ansScore = qScore.score ?? null;
@@ -1124,88 +1145,6 @@ function showDebugCard() {
         </tr></thead>
         <tbody>${rows || `<tr><td colspan="5" class="muted">No critical/fatal marks found for the selected period.</td></tr>`}</tbody>
       `;
-    }
-
-    // ===== Override: Form Details Lookup (robust id/context + unscoped answers) =====
-    function buildFormLookup(formDetails) {
-      const questionLookup = new Map(); // q.id or q.contextId -> { text, isCritical, isFatal, groupId }
-      const answerLookup   = new Map(); // `${qKey}|${a.id}` or `${qKey}|${a.contextId}` -> answerText
-      const answerLookupAny = new Map(); // a.id or a.contextId -> answerText (unscoped fallback)
-      const groupLookup    = new Map(); // group.id or group.contextId -> groupName
-      
-      if (!formDetails || !Array.isArray(formDetails.questionGroups)) {
-        return { questionLookup, answerLookup, answerLookupAny, groupLookup };
-      }
-
-      function indexQuestion(q, groupId) {
-        const payload = {
-          text: q.text || `Question ${q.id || q.contextId}`,
-          isCritical: !!q.isCritical,
-          isFatal: !!q.isKill,
-          groupId
-        };
-        if (q.id)        questionLookup.set(q.id, payload);
-        if (q.contextId) questionLookup.set(q.contextId, payload);
-
-        const qKeys = [q.id, q.contextId].filter(Boolean);
-        (q.answerOptions || []).forEach(a => {
-          const aText = a.text || `Answer ${a.id || a.contextId}`;
-          qKeys.forEach(qKey => {
-            if (a.id)        answerLookup.set(`${qKey}|${a.id}`, aText);
-            if (a.contextId) answerLookup.set(`${qKey}|${a.contextId}`, aText);
-          });
-          if (a.id)        answerLookupAny.set(a.id, aText);
-          if (a.contextId) answerLookupAny.set(a.contextId, aText);
-        });
-      }
-
-      function walk(groups) {
-        groups.forEach(g => {
-          const gName = g.name || 'Unnamed Group';
-          if (g.id)        groupLookup.set(g.id, gName);
-          if (g.contextId) groupLookup.set(g.contextId, gName);
-
-          (g.questions || []).forEach(q => indexQuestion(q, g.id || g.contextId));
-          if (Array.isArray(g.questionGroups)) walk(g.questionGroups);
-        });
-      }
-
-      walk(formDetails.questionGroups);
-      return { questionLookup, answerLookup, answerLookupAny, groupLookup };
-    }
-
-    // Normalize selected answer IDs (single or multiple) — extended variants
-    function getSelectedAnswerIds(qScore){
-      const arr =
-        qScore.selectedAnswerIds ||
-        qScore.selectedAnswerOptionIds ||
-        qScore.selectedAnswerContextIds ||
-        qScore.selectedAnswerOptionContextIds ||
-        (qScore.selectedAnswerId ? [qScore.selectedAnswerId] : null) ||
-        (qScore.answerOptionId ? [qScore.answerOptionId] : null) ||
-        (qScore.answerId ? [qScore.answerId] : null) ||
-        (qScore.answerContextId ? [qScore.answerContextId] : null) ||
-        [];
-      return Array.isArray(arr) ? arr : [];
-    }
-
-    function getAnswerTexts(ansIds, qKeyCandidates, answerLookup, answerLookupAny, qScore){
-      const texts = [];
-      for (const ansId of ansIds){
-        let t = null;
-        for (const qKey of qKeyCandidates){
-          const key = `${qKey}|${ansId}`;
-          if (answerLookup.has(key)) { t = answerLookup.get(key); break; }
-        }
-        if (!t && answerLookupAny.has(ansId)) t = answerLookupAny.get(ansId);
-        if (!t && qScore && qScore.answer && qScore.answer.text) t = qScore.answer.text; // inline object sometimes present
-        if (!t && Array.isArray(qScore?.selectedAnswers)){
-          const found = qScore.selectedAnswers.find(x => x.id===ansId || x.contextId===ansId);
-          if (found && found.text) t = found.text;
-        }
-        texts.push(t || `Answer ${ansId}`);
-      }
-      return texts;
     }
 
     // ===== Form details fetch (cached) =====

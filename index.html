@@ -130,6 +130,14 @@
     tr.fatal-question:hover {
       background-color: #fecaca !important;
     }
+
+    .question-group-header {
+      background-color: rgba(99, 171, 143, 0.1);
+      font-weight: 600;
+      font-size: 14px;
+      padding: 8px 12px;
+      border-left: 4px solid var(--primary-color);
+    }
   </style>
 </head>
 <body>
@@ -237,7 +245,8 @@
       evals: [],                 // loaded evaluations
       monthStart: null,
       monthEnd: null,
-      questionTextCache: new Map() // Cache for question text by formId and questionId
+      questionTextCache: new Map(), // Cache for question text by formId and questionId
+      formDetailsCache: new Map()   // Cache for complete form details
     };
 
     // Checkbox dropdown instances
@@ -779,98 +788,80 @@
       return allEvaluations;
     }
 
-    // ===== Question Text and Answers Lookup =====
-    async function getQuestionTextAndAnswers(formId, questionId) {
-      const cacheKey = `${formId}-${questionId}`;
-      
+    // ===== Form Details Lookup =====
+    async function getFormDetails(formId) {
       // Check cache first
-      if (state.questionTextCache.has(cacheKey)) {
-        return state.questionTextCache.get(cacheKey);
+      if (state.formDetailsCache.has(formId)) {
+        return state.formDetailsCache.get(formId);
       }
       
       try {
-        // Fetch form details to get question text and answer options
         const url = `https://api.${config.REGION}/api/v2/quality/forms/evaluations/${formId}`;
         const res = await rateLimitedFetch(url);
         
         if (!res.ok) {
-          console.warn(`Failed to fetch form ${formId}: ${res.status}`);
-          return {
-            text: `Question ${questionId}`,
-            answers: new Map(),
-            maxPoints: 0
-          };
+          console.warn(`Failed to fetch form details ${formId}: ${res.status}`);
+          return null;
         }
         
-        const form = await res.json();
+        const formDetails = await res.json();
         
-        // Search for the question in the form structure
-        let questionText = `Question ${questionId}`;
-        let answerOptions = new Map();
-        let maxPoints = 0;
+        // Cache the result
+        state.formDetailsCache.set(formId, formDetails);
+        return formDetails;
         
-        function searchQuestions(node) {
-          if (!node) return false;
-          
-          if (Array.isArray(node.questions)) {
-            for (const q of node.questions) {
-              const qid = q.id || q.questionId;
-              if (qid === questionId) {
-                questionText = q.text || q.name || questionText;
-                maxPoints = q.maxPoints || q.points || 0;
+      } catch (error) {
+        console.warn(`Error fetching form details for ${formId}:`, error);
+        return null;
+      }
+    }
+
+    // Helper function to find question and answer details in form structure
+    function findQuestionAndAnswerDetails(formDetails, questionId, answerId) {
+      if (!formDetails || !formDetails.questionGroups) {
+        return { questionText: `Question ${questionId}`, answerText: `Answer ${answerId}` };
+      }
+      
+      let questionText = `Question ${questionId}`;
+      let answerText = `Answer ${answerId}`;
+      let isCritical = false;
+      let isFatal = false;
+      
+      // Search through question groups
+      function searchGroups(groups) {
+        for (const group of groups) {
+          if (group.questions) {
+            for (const question of group.questions) {
+              if (question.id === questionId) {
+                questionText = question.text || questionText;
+                isCritical = question.isCritical || false;
+                isFatal = question.isKill || false;
                 
-                // Extract answer options
-                if (Array.isArray(q.answerOptions)) {
-                  q.answerOptions.forEach(answer => {
-                    const answerId = answer.id || answer.value;
-                    if (answerId) {
-                      answerOptions.set(answerId, {
-                        text: answer.text || answer.name || `Answer ${answerId}`,
-                        value: answer.value || answer.points || 0
-                      });
+                // Find answer text
+                if (question.answerOptions && answerId) {
+                  for (const answer of question.answerOptions) {
+                    if (answer.id === answerId) {
+                      answerText = answer.text || answerText;
+                      break;
                     }
-                  });
+                  }
                 }
                 return true;
               }
             }
           }
           
-          if (Array.isArray(node.questionGroups)) {
-            for (const group of node.questionGroups) {
-              if (searchQuestions(group)) return true;
-            }
+          // Recursively search nested groups
+          if (group.questionGroups && searchGroups(group.questionGroups)) {
+            return true;
           }
-          
-          if (Array.isArray(node.sections)) {
-            for (const section of node.sections) {
-              if (searchQuestions(section)) return true;
-            }
-          }
-          
-          return false;
         }
-        
-        searchQuestions(form);
-        
-        const result = {
-          text: questionText,
-          answers: answerOptions,
-          maxPoints: maxPoints
-        };
-        
-        // Cache the result
-        state.questionTextCache.set(cacheKey, result);
-        return result;
-        
-      } catch (error) {
-        console.warn(`Error fetching question details for ${questionId} in form ${formId}:`, error);
-        return {
-          text: `Question ${questionId}`,
-          answers: new Map(),
-          maxPoints: 0
-        };
+        return false;
       }
+      
+      searchGroups(formDetails.questionGroups);
+      
+      return { questionText, answerText, isCritical, isFatal };
     }
 
     // ===== Renderers =====
@@ -1026,10 +1017,10 @@
         return; 
       }
       
-      // Create a loading message while we fetch question texts
-      c.innerHTML = '<div class="info-message">Loading question details...</div>';
+      // Create a loading message while we fetch form details
+      c.innerHTML = '<div class="info-message">Loading evaluation details...</div>';
       
-      // Process evaluations asynchronously to fetch question texts
+      // Process evaluations asynchronously to fetch form details
       const evaluationElements = await Promise.all(state.evals.map(async (e) => {
         const agent = resolveUserName(safeGet(e,'agent.id') || e.agentUserId);
         const evaluator = resolveUserName(safeGet(e,'evaluator.id') || e.evaluatorUserId);
@@ -1041,47 +1032,119 @@
         const score = getEvalPercent(e);
         const questionGroups = safeGet(e, 'answers.questionGroupScores') || [];
 
-        // Build question rows from questionGroups
+        // Get form details to map question and answer IDs to text
+        const formDetails = await getFormDetails(formId);
+        
+        // Build question rows organized by question groups
         let qRows = '';
-        for (const group of questionGroups) {
-          const questionScores = group.questionScores || [];
-          for (const qScore of questionScores) {
-            const qid = qScore.questionId;
-            const questionData = await getQuestionTextAndAnswers(formId, qid);
-            const qText = questionData.text;
-            const ansScore = qScore.score ?? null;
-            const answerId = qScore.answerId || qScore.selectedAnswerId;
-            const isCrit = qScore.failedKillQuestion || false;
-            const isFat = qScore.failedKillQuestion || false;
+        
+        if (formDetails && formDetails.questionGroups) {
+          // Create a map of questions by group for organization
+          const questionsByGroup = new Map();
+          
+          // First, organize all questions by their group
+          questionGroups.forEach(group => {
+            const questionScores = group.questionScores || [];
+            questionScores.forEach(qScore => {
+              const groupId = group.questionGroupId || 'ungrouped';
+              if (!questionsByGroup.has(groupId)) {
+                questionsByGroup.set(groupId, []);
+              }
+              questionsByGroup.get(groupId).push(qScore);
+            });
+          });
+          
+          // Now render by question group
+          for (const group of formDetails.questionGroups) {
+            const groupQuestions = questionsByGroup.get(group.id) || [];
+            if (groupQuestions.length === 0) continue;
             
-            // Get answer text
-            let answerText = 'N/A';
-            if (!qScore.markedNA && answerId && questionData.answers.has(answerId)) {
-              answerText = questionData.answers.get(answerId).text;
-            } else if (qScore.markedNA) {
-              answerText = 'N/A';
-            } else if (ansScore !== null) {
-              answerText = `Scored: ${fmt(ansScore, 1)}`;
+            // Add group header
+            qRows += `<tr class="question-group-header"><td colspan="5">${group.name || 'Question Group'}</td></tr>`;
+            
+            // Add questions for this group
+            for (const qScore of groupQuestions) {
+              const qid = qScore.questionId;
+              const answerId = qScore.answerId || qScore.selectedAnswerId;
+              const aiAnswer = qScore.aiAnswer;
+              
+              const { questionText, answerText, isCritical, isFatal } = findQuestionAndAnswerDetails(formDetails, qid, answerId);
+              
+              const ansScore = qScore.score ?? null;
+              const isCrit = qScore.failedKillQuestion || isCritical;
+              const isFat = qScore.failedKillQuestion || isFatal;
+              
+              // Get answer text - use AI explanation if available
+              let displayAnswerText = answerText;
+              if (qScore.markedNA) {
+                displayAnswerText = 'N/A';
+              } else if (aiAnswer && aiAnswer.explanation) {
+                displayAnswerText = answerText; // Still show the answer text, but we'll add AI explanation to comments
+              }
+              
+              // Determine row class for highlighting
+              let rowClass = '';
+              if (isFat) {
+                rowClass = 'fatal-question';
+              } else if (isCrit) {
+                rowClass = 'critical-warning';
+              }
+              
+              // Combine manual comments and AI explanation
+              let allComments = '';
+              if (qScore.comments) {
+                allComments += `<div class="comment-bubble"><strong>Evaluator Comments:</strong> ${qScore.comments}</div>`;
+              }
+              if (aiAnswer && aiAnswer.explanation) {
+                allComments += `<div class="comment-bubble"><strong>AI Analysis:</strong> ${aiAnswer.explanation}</div>`;
+              }
+              
+              qRows += `<tr class="${rowClass}">
+                <td>${questionText}</td>
+                <td>${displayAnswerText}</td>
+                <td>${ansScore === null ? '-' : fmt(ansScore, 1)}</td>
+                <td>${isFat ? '<span class="badge badge-fatal">Fatal</span>' : isCrit ? '<span class="badge badge-critical">Critical</span>' : '<span class="badge badge-ok">OK</span>'}</td>
+                <td>${allComments}</td>
+              </tr>`;
             }
-            
-            // Determine row class for highlighting
-            let rowClass = '';
-            if (isFat) {
-              rowClass = 'fatal-question';
-            } else if (isCrit) {
-              rowClass = 'critical-warning';
+          }
+        } else {
+          // Fallback if we can't get form details
+          for (const group of questionGroups) {
+            const questionScores = group.questionScores || [];
+            for (const qScore of questionScores) {
+              const qid = qScore.questionId;
+              const answerId = qScore.answerId || qScore.selectedAnswerId;
+              const ansScore = qScore.score ?? null;
+              const isCrit = qScore.failedKillQuestion || false;
+              const isFat = qScore.failedKillQuestion || false;
+              
+              let answerText = 'N/A';
+              if (!qScore.markedNA && answerId) {
+                answerText = `Answer ${answerId}`;
+              } else if (qScore.markedNA) {
+                answerText = 'N/A';
+              }
+              
+              // Determine row class for highlighting
+              let rowClass = '';
+              if (isFat) {
+                rowClass = 'fatal-question';
+              } else if (isCrit) {
+                rowClass = 'critical-warning';
+              }
+              
+              const comments = qScore.comments ? 
+                `<div class="comment-bubble">${qScore.comments}</div>` : '';
+              
+              qRows += `<tr class="${rowClass}">
+                <td>Question ${qid}</td>
+                <td>${answerText}</td>
+                <td>${ansScore === null ? '-' : fmt(ansScore, 1)}</td>
+                <td>${isFat ? '<span class="badge badge-fatal">Fatal</span>' : isCrit ? '<span class="badge badge-critical">Critical</span>' : '<span class="badge badge-ok">OK</span>'}</td>
+                <td>${comments}</td>
+              </tr>`;
             }
-            
-            const comments = qScore.comments ? 
-              `<div class="comment-bubble">${qScore.comments}</div>` : '';
-            
-            qRows += `<tr class="${rowClass}">
-              <td>${qText}</td>
-              <td>${answerText}</td>
-              <td>${ansScore === null ? '-' : fmt(ansScore, 1)}</td>
-              <td>${isFat ? '<span class="badge badge-fatal">Fatal</span>' : isCrit ? '<span class="badge badge-critical">Critical</span>' : '<span class="badge badge-ok">OK</span>'}</td>
-              <td>${comments}</td>
-            </tr>`;
           }
         }
 

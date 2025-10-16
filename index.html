@@ -1,1 +1,650 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <title>QA Evaluations – Monthly View</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <style>
+    :root{
+      --primary-color:#63AB8F; --secondary-color:#4A8C7D; --border-color:#DEE2E6;
+      --light-bg:#F8F9FA; --card-bg:#FFFFFF; --text-color:#2C3E50; --text-light:#6C757D;
+      --pill:#e9f6f0;
+    }
+    body{
+      font-family:'Aptos','Segoe UI',system-ui,-apple-system,Arial,sans-serif;
+      margin:20px;padding:20px;max-width:1400px;background:var(--light-bg);color:var(--text-color)
+    }
+    #logo-container{text-align:center;margin-bottom:20px} #logo{width:300px}
+    h1{margin:0 0 16px}
+    .card{background:var(--card-bg);border:1px solid var(--border-color);border-radius:12px;padding:24px;margin-top:16px;box-shadow:0 1px 3px rgba(0,0,0,.08)}
+    label{display:block;font-weight:600;margin-bottom:6px}
+    input,select,button,textarea{padding:10px;border:1px solid var(--border-color);border-radius:6px;background:#fff;font-size:14px}
+    select[multiple]{min-height:220px}
+    button{background:var(--primary-color);color:#fff;font-weight:600;cursor:pointer;transition:background .2s}
+    button:hover{background:var(--secondary-color)} button:disabled{background:var(--text-light);cursor:not-allowed}
+    .controls{display:grid;grid-template-columns:repeat(auto-fit,minmax(260px,1fr));gap:16px;align-items:start}
+    .full-width-btn{width:100%;padding:14px 18px;font-size:16px;margin-top:12px}
+    .muted{color:var(--text-light);font-size:12px}
+    .section-title{margin:0 0 10px;color:var(--secondary-color)}
 
+    #messageContainer{display:none;margin-top:12px}
+    .error-message{color:#b4231a;background:#fee2e2;border:1px solid #fecaca;padding:10px;border-radius:6px}
+    .success-message{color:#14532d;background:#dcfce7;border:1px solid #bbf7d0;padding:10px;border-radius:6px}
+    .info-message{color:#6b4e16;background:#fff7ed;border:1px solid #ffedd5;padding:10px;border-radius:6px}
+
+    table { width: 100%; border-collapse: collapse; margin-top: 12px; border: 1px solid var(--border-color); border-radius: 6px; overflow: hidden; }
+    th, td { padding: 10px 12px; text-align: left; border-bottom: 1px solid var(--border-color); vertical-align: top; }
+    th { background-color: var(--primary-color); color: white; font-weight: 600; }
+    tr:hover { background-color: rgba(99, 171, 143, 0.05); }
+    .subheader { background: rgba(99,171,143,.15); font-weight: 600; }
+    .table-container { overflow-x: auto; border: 1px solid var(--border-color); border-radius: 6px; padding: 1px; margin-top: 10px; }
+
+    .tab { display: inline-block; padding: 12px 20px; margin-right: 10px; background: #eee; cursor: pointer; border-radius: 6px; font-weight: 500; }
+    .tab.active { background: var(--primary-color); color: white; font-weight: 600; }
+    .tab-content { display: none; }
+    .tab-content.active { display: block; }
+
+    .badge { display:inline-block; padding:2px 8px; border-radius:12px; font-size:12px; border:1px solid var(--border-color); background:#fff }
+    .badge-critical { color:#b4231a; border-color:#fecaca; background:#fee2e2 }
+    .badge-fatal { color:#fff; background:#b4231a; border-color:#b4231a; }
+    .badge-ok { color:#14532d; background:#dcfce7; border-color:#bbf7d0 }
+    details.evaluation { border:1px solid var(--border-color); border-radius:8px; padding:10px; margin:10px 0; background:#fff }
+    details.evaluation summary { cursor:pointer; font-weight:600 }
+
+    .kpis { display:grid; grid-template-columns: repeat(auto-fit,minmax(180px,1fr)); gap:10px; margin-top:10px }
+    .kpi { background:#fff; border:1px solid var(--border-color); border-radius:8px; padding:12px; }
+    .kpi .label { color:var(--text-light); font-size:12px }
+    .kpi .value { font-size:20px; font-weight:700; margin-top:4px }
+  </style>
+</head>
+<body>
+  <div id="logo-container">
+    <img id="logo" src="https://raw.githubusercontent.com/gmcglynn88/Management-Unit-Search/main/Consultinglogo%20(2).png" alt="Company Logo">
+  </div>
+
+  <h1>QA Evaluations – Monthly View</h1>
+
+  <div id="authCard" class="card">
+    <div id="auth-message" class="info-message">Authenticating with PureCloud...</div>
+  </div>
+
+  <!-- Debug (add ?debug=1 to the URL) -->
+  <div id="authDebug" class="card" style="display:none">
+    <h2 class="section-title">Auth debug</h2>
+    <pre id="authDump" style="background:#f6f8fa;border:1px solid #eee;padding:12px;border-radius:8px;overflow:auto"></pre>
+    <button id="signinBtn">Sign in with Genesys</button>
+  </div>
+
+  <div id="appContent" style="display:none;">
+    <div id="messageContainer"></div>
+
+    <div class="card">
+      <h2 class="section-title">Configuration</h2>
+      <div class="controls">
+        <div>
+          <label for="userSelect">Agents (multi-select)</label>
+          <select id="userSelect" multiple disabled>
+            <option>Loading users…</option>
+          </select>
+          <div class="muted">Tip: Ctrl/Cmd+Click to select multiple</div>
+        </div>
+        <div>
+          <label for="formSelect">Evaluation Forms (multi-select)</label>
+          <select id="formSelect" multiple disabled>
+            <option>Loading forms…</option>
+          </select>
+        </div>
+        <div>
+          <label for="monthInput">Month</label>
+          <input id="monthInput" type="month">
+          <div class="muted">Evaluations within the selected month</div>
+        </div>
+        <div>
+          <label>&nbsp;</label>
+          <button id="loadBtn" class="full-width-btn" disabled>Load Evaluations</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- Tabs -->
+    <div class="card">
+      <div style="margin-bottom: 10px;">
+        <div id="tabs">
+          <div id="overviewTabButton" class="tab active">Overview</div>
+          <div id="trendsTabButton" class="tab">Agent Trends</div>
+          <div id="detailsTabButton" class="tab">Evaluation Details</div>
+          <div id="criticalTabButton" class="tab">Critical / Fatal Summary</div>
+        </div>
+      </div>
+
+      <div id="overviewTab" class="tab-content active">
+        <h2 class="section-title">Monthly Overview</h2>
+        <div id="overviewKPIs" class="kpis"></div>
+        <div class="table-container">
+          <table id="agentSummaryTable"></table>
+        </div>
+      </div>
+
+      <div id="trendsTab" class="tab-content">
+        <h2 class="section-title">Daily Trend by Agent</h2>
+        <div class="table-container">
+          <table id="trendTable"></table>
+        </div>
+      </div>
+
+      <div id="detailsTab" class="tab-content">
+        <h2 class="section-title">Evaluation Details (with Question Scores)</h2>
+        <div id="detailsContainer"></div>
+      </div>
+
+      <div id="criticalTab" class="tab-content">
+        <h2 class="section-title">Critical / Kill Question Counts</h2>
+        <div class="table-container">
+          <table id="criticalTable"></table>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    // ===== OAuth / Config =====
+    const clientId = 'fe305808-b368-4547-8af9-325d28d552bb';
+    const config = { REGION:'mypurecloud.ie' };
+    const DEBUG = new URLSearchParams(window.location.search).has('debug');
+    const redirectUri = new URL('.', window.location.href).href;
+    const oauthUrl = `https://login.${config.REGION}/oauth/authorize?client_id=${encodeURIComponent(clientId)}&response_type=token&redirect_uri=${encodeURIComponent(redirectUri)}&state=qa`;
+
+    const state = {
+      accessToken: null,
+      users: [],                 // [{id, name, email}]
+      forms: [],                 // [{id, name, questionsById}]
+      formsById: {},             // id -> form
+      evals: [],                 // loaded evaluations
+      monthStart: null,
+      monthEnd: null
+    };
+
+    function showDebugCard() {
+      const dump = { clientId, redirectUri, oauthUrl, region: config.REGION };
+      document.getElementById('authDebug').style.display = 'block';
+      document.getElementById('authDump').textContent = JSON.stringify(dump, null, 2);
+      document.getElementById('signinBtn').onclick = () => location.href = oauthUrl;
+      document.getElementById('auth-message').textContent = 'Debug: click "Sign in with Genesys".';
+      document.getElementById('auth-message').className = 'info-message';
+    }
+    function msg(html, type='info'){ const box=document.getElementById('messageContainer'); box.innerHTML=`<div class="${type}-message">${html}</div>`; box.style.display='block'; if(type==='success'){ setTimeout(()=>box.style.display='none',5000);} }
+
+    // ===== Bootstrap =====
+    document.addEventListener('DOMContentLoaded', () => {
+      const hash = window.location.hash.substring(1);
+      const params = new URLSearchParams(hash);
+      const tokenFromHash = params.get('access_token');
+      const tokenFromSession = sessionStorage.getItem('purecloud_token');
+
+      if (tokenFromHash) {
+        state.accessToken = tokenFromHash;
+        sessionStorage.setItem('purecloud_token', state.accessToken);
+        history.replaceState(null, '', window.location.href.split('#')[0]);
+        startApp();
+      } else if (tokenFromSession) {
+        state.accessToken = tokenFromSession;
+        startApp();
+      } else {
+        if (DEBUG) showDebugCard(); else window.location.href = oauthUrl;
+      }
+    });
+
+    function startApp(){
+      document.getElementById('auth-message').textContent = 'Authenticated successfully!';
+      document.getElementById('auth-message').className = 'success-message';
+      setTimeout(()=>{ document.getElementById('authCard').style.display='none'; document.getElementById('authDebug').style.display='none'; }, 1200);
+
+      document.getElementById('appContent').style.display='block';
+
+      // Wire controls
+      document.getElementById('overviewTabButton').onclick = () => setTab('overview');
+      document.getElementById('trendsTabButton').onclick = () => setTab('trends');
+      document.getElementById('detailsTabButton').onclick = () => setTab('details');
+      document.getElementById('criticalTabButton').onclick = () => setTab('critical');
+      document.getElementById('loadBtn').onclick = loadEvaluations;
+
+      // Default month = current month
+      const m = new Date();
+      document.getElementById('monthInput').value = `${m.getFullYear()}-${String(m.getMonth()+1).padStart(2,'0')}`;
+      updateMonthRange();
+
+      document.getElementById('monthInput').addEventListener('change', updateMonthRange);
+
+      // Load lookups
+      Promise.all([fetchAllUsers(), fetchAllForms()])
+        .then(()=> { document.getElementById('loadBtn').disabled = false; })
+        .catch(err => msg('Initial load failed: '+err.message,'error'));
+    }
+
+    function setTab(name){
+      ['overview','trends','details','critical'].forEach(n=>{
+        document.getElementById(`${n}Tab`).classList.toggle('active', n===name);
+        document.getElementById(`${n}TabButton`).classList.toggle('active', n===name);
+      });
+    }
+
+    function updateMonthRange(){
+      const val = document.getElementById('monthInput').value; // yyyy-mm
+      if(!val) return;
+      const [y,m] = val.split('-').map(Number);
+      state.monthStart = new Date(Date.UTC(y, m-1, 1, 0, 0, 0));
+      state.monthEnd   = new Date(Date.UTC(y, m, 0, 23, 59, 59));
+    }
+
+    // ===== Helpers =====
+    async function fetchPaginatedGET(url){
+      let all = [];
+      let next = url;
+      while(next){
+        const res = await fetch(next, { headers: { 'Authorization': 'Bearer ' + state.accessToken }});
+        if(!res.ok) throw new Error(`HTTP ${res.status} for ${next}`);
+        const data = await res.json();
+        if (Array.isArray(data.entities)) all = all.concat(data.entities);
+        else if (Array.isArray(data.users)) all = all.concat(data.users);
+        else if (Array.isArray(data)) all = all.concat(data);
+        else if (data.entities) all = all.concat(data.entities);
+        // next page
+        if (data.nextUri) next = `https://api.${config.REGION}${data.nextUri}`;
+        else next = null;
+      }
+      return all;
+    }
+
+    function safeGet(obj, path, def=null){
+      try{ return path.split('.').reduce((o,k)=> (o && k in o) ? o[k] : undefined , obj) ?? def; }catch{ return def; }
+    }
+
+    function pct(n, digits=1){ if(n===null||n===undefined||!isFinite(n)) return '-'; return (Math.round(n*10**digits)/10**digits).toFixed(digits)+'%'; }
+    function fmt(n, digits=1){ if(n===null||n===undefined||!isFinite(n)) return '-'; return (Math.round(n*10**digits)/10**digits).toFixed(digits); }
+    function toUKDate(d){ const dt = new Date(d); return dt.toLocaleDateString('en-GB'); }
+    function dayKeyUTC(d){ const dt = new Date(d); return new Date(Date.UTC(dt.getUTCFullYear(), dt.getUTCMonth(), dt.getUTCDate())).toISOString().split('T')[0]; }
+
+    // ===== Lookups =====
+    async function fetchAllUsers(){
+      const url = `https://api.${config.REGION}/api/v2/users?pageSize=100`;
+      const users = await fetchPaginatedGET(url);
+      state.users = users.map(u => ({ id:u.id, name: (u.name || `${u.givenName||''} ${u.familyName||''}`).trim(), email: u.email || '' }))
+                         .sort((a,b)=>a.name.localeCompare(b.name));
+      const sel = document.getElementById('userSelect');
+      sel.innerHTML = state.users.map(u => `<option value="${u.id}">${u.name}${u.email?` — ${u.email}`:''}</option>`).join('');
+      sel.disabled = false;
+    }
+
+    async function fetchAllForms(){
+      const url = `https://api.${config.REGION}/api/v2/quality/forms/evaluations?pageSize=100`;
+      const forms = await fetchPaginatedGET(url);
+      // Build a questions map for each form (flatten nested groups if present)
+      state.forms = forms.map(f => ({
+        id: f.id, name: f.name || f.title || '(Unnamed form)',
+        questionsById: extractQuestionsById(f)
+      })).sort((a,b)=>a.name.localeCompare(b.name));
+      state.formsById = Object.fromEntries(state.forms.map(f=>[f.id,f]));
+      const sel = document.getElementById('formSelect');
+      sel.innerHTML = state.forms.map(f => `<option value="${f.id}">${f.name}</option>`).join('');
+      sel.disabled = false;
+    }
+
+    function extractQuestionsById(form){
+      const out = {};
+      function walk(node){
+        if(!node) return;
+        // Common shapes: questionGroups -> [ { questions:[], questionGroups:[] } ]
+        if (Array.isArray(node.questions)) {
+          node.questions.forEach(q => {
+            const id = q.id || q.questionId || q.key || q.name;
+            if(!id) return;
+            out[id] = {
+              id,
+              text: q.text || q.name || q.title || ('Question '+id),
+              critical: !!(q.critical || q.isCritical || q.killQuestion || q.killquestion || safeGet(q,'metadata.killQuestion',false)),
+              fatal: !!(q.fatal || q.isFatal || q.killQuestion || q.killquestion),
+              weight: q.weight || null
+            };
+          });
+        }
+        if (Array.isArray(node.questionGroups)) node.questionGroups.forEach(walk);
+        if (Array.isArray(node.sections)) node.sections.forEach(walk);
+        if (Array.isArray(node.children)) node.children.forEach(walk);
+      }
+      walk(form);
+      return out;
+    }
+
+    // ===== Query Evaluations =====
+    async function loadEvaluations(){
+      const userSel = document.getElementById('userSelect');
+      const formSel = document.getElementById('formSelect');
+      const agentIds = Array.from(userSel.selectedOptions).map(o=>o.value);
+      const formIds  = Array.from(formSel.selectedOptions).map(o=>o.value);
+
+      if (agentIds.length === 0) { msg('Please select at least one agent.','error'); return; }
+      if (!state.monthStart || !state.monthEnd) { msg('Please select a month.','error'); return; }
+
+      msg('Loading evaluations…','info');
+      try{
+        const results = [];
+        // We’ll query per agent to satisfy APIs that accept single agent query param.
+        for (const agentId of agentIds){
+          const list = await queryEvaluationsForAgent(agentId, formIds, state.monthStart, state.monthEnd);
+          results.push(...list);
+        }
+        state.evals = results;
+        msg(`Loaded ${results.length} evaluations.`, 'success');
+        renderAll();
+      }catch(e){
+        msg('Failed to load evaluations: '+e.message,'error');
+      }
+    }
+
+    async function queryEvaluationsForAgent(agentId, formIds, startUTC, endUTC){
+      // Try GET first (with common params), then fall back to POST query if needed.
+      const start = new Date(startUTC).toISOString();
+      const end   = new Date(endUTC).toISOString();
+
+      const base = `https://api.${config.REGION}/api/v2/quality/evaluations/query`;
+      async function tryGET(){
+        const params = new URLSearchParams({ agentUserId: agentId, pageSize: '100', startTime: start, endTime: end });
+        if (formIds && formIds.length===1) params.set('formId', formIds[0]); // some GET variants accept single formId
+        let all = [];
+        let next = `${base}?${params.toString()}`;
+        while(next){
+          const res = await fetch(next, { headers: { 'Authorization':'Bearer '+state.accessToken }});
+          if(res.status===405 || res.status===400) throw new Error('SwitchToPOST'); // not supported in this env
+          if(!res.ok) throw new Error(`GET ${res.status}`);
+          const data = await res.json();
+          const entities = data.entities || data.results || [];
+          all = all.concat(entities);
+          if (data.nextUri) next = `https://api.${config.REGION}${data.nextUri}`; else next = null;
+        }
+        return all;
+      }
+      async function tryPOST(){
+        // Broadly compatible POST body (Genesys Cloud commonly uses POST for queries)
+        const body = {
+          agentUserIds: [agentId],
+          pageSize: 100,
+          pageNumber: 1,
+          timeRange: { startDate: start, endDate: end },
+          ...(formIds && formIds.length ? { formIds } : {})
+        };
+        let all = [];
+        let res = await fetch(base, {
+          method:'POST',
+          headers:{'Authorization':'Bearer '+state.accessToken,'Content-Type':'application/json'},
+          body: JSON.stringify(body)
+        });
+        if(!res.ok) throw new Error(`POST ${res.status}`);
+        let data = await res.json();
+        all = all.concat(data.entities || data.results || []);
+        // follow nextUri if present
+        while(data.nextUri){
+          res = await fetch(`https://api.${config.REGION}${data.nextUri}`, { headers:{'Authorization':'Bearer '+state.accessToken}});
+          if(!res.ok) throw new Error(`Follow-up GET ${res.status}`);
+          data = await res.json();
+          all = all.concat(data.entities || data.results || []);
+        }
+        return all;
+      }
+
+      try{
+        const list = await tryGET();
+        return list;
+      }catch(err){
+        if (String(err.message).includes('SwitchToPOST') || String(err.message).startsWith('GET ')){
+          const list = await tryPOST();
+          return list;
+        }
+        throw err;
+      }
+    }
+
+    // ===== Renderers =====
+    function renderAll(){
+      renderOverview();
+      renderTrends();
+      renderDetails();
+      renderCritical();
+    }
+
+    function resolveUserName(userId){
+      return state.users.find(u=>u.id===userId)?.name || userId || '(unknown)';
+    }
+    function resolveForm(formId){ return state.formsById[formId]; }
+
+    function getEvalPercent(e){
+      // Try several fields commonly exposed by evaluation entities
+      const percent = e.totalScore || e.totalPercent || safeGet(e,'scoring.totalPercent') || safeGet(e,'oTotalPercent');
+      if (percent && percent<=1) return percent*100; // if 0..1 scale
+      return percent ?? null;
+    }
+
+    function listAnswers(e){
+      // Normalise answer list; try typical locations
+      let answers = safeGet(e, 'answers') || safeGet(e,'answerList') || safeGet(e,'evaluationAnswers');
+      if (!Array.isArray(answers)) {
+        // sometimes nested per section/groups — flatten whatever arrays exist
+        const flat = [];
+        function scan(obj){
+          if (!obj) return;
+          if (Array.isArray(obj)) obj.forEach(scan);
+          else if (typeof obj === 'object'){
+            if (Array.isArray(obj.answers)) obj.answers.forEach(a=>flat.push(a));
+            Object.values(obj).forEach(v=>scan(v));
+          }
+        }
+        scan(e);
+        answers = flat.length ? flat : [];
+      }
+      return answers;
+    }
+
+    function isCriticalFlag(ans){
+      const flags = [
+        'critical','isCritical','criticalFail','criticalFailure','killQuestion','killquestion','fatal','isFatal'
+      ];
+      for (const f of flags){ if (ans && (ans[f] === true || String(ans[f]).toLowerCase()==='true')) return true; }
+      // some APIs store metadata
+      if (safeGet(ans,'metadata.killQuestion')===true) return true;
+      return false;
+    }
+    function isFatalFlag(ans){
+      const flags = ['fatal','isFatal','killQuestion','killquestion'];
+      for (const f of flags){ if (ans && (ans[f] === true || String(ans[f]).toLowerCase()==='true')) return true; }
+      return false;
+    }
+
+    // -------- Overview (KPIs + per-agent table) --------
+    function renderOverview(){
+      const evals = state.evals;
+      const byAgent = new Map();
+      evals.forEach(e=>{
+        const a = safeGet(e,'agent.id') || e.agentUserId || e.userId || '(unknown)';
+        const p = getEvalPercent(e);
+        if (!byAgent.has(a)) byAgent.set(a, {count:0, sum:0});
+        const obj = byAgent.get(a);
+        obj.count++;
+        if (p!==null && isFinite(p)) obj.sum += Number(p);
+      });
+      const agentRows = [];
+      let totalCount=0, totalSum=0;
+      for (const [agentId, {count,sum}] of byAgent.entries()){
+        const avg = count ? (sum / count) : null;
+        agentRows.push({ agent: resolveUserName(agentId), count, avg });
+        totalCount += count; totalSum += (avg!==null?avg:0)*1;
+      }
+      agentRows.sort((a,b)=>a.agent.localeCompare(b.agent));
+
+      // KPIs
+      const overallAvg = (agentRows.length && totalCount) ? (agentRows.reduce((s,r)=>s+(r.avg||0),0)/agentRows.length) : null;
+      document.getElementById('overviewKPIs').innerHTML = `
+        <div class="kpi">
+          <div class="label">Month</div>
+          <div class="value">${document.getElementById('monthInput').value}</div>
+        </div>
+        <div class="kpi">
+          <div class="label">Evaluations</div>
+          <div class="value">${evals.length}</div>
+        </div>
+        <div class="kpi">
+          <div class="label">Agents</div>
+          <div class="value">${agentRows.length}</div>
+        </div>
+        <div class="kpi">
+          <div class="label">Average Score (Agent Avg)</div>
+          <div class="value">${overallAvg===null?'-':pct(overallAvg,1)}</div>
+        </div>
+      `;
+
+      // Per-agent table
+      const tbl = document.getElementById('agentSummaryTable');
+      tbl.innerHTML = `
+        <thead><tr>
+          <th>Agent</th><th>Evaluations</th><th>Average Score</th>
+        </tr></thead>
+        <tbody>
+          ${agentRows.map(r=>`<tr><td>${r.agent}</td><td>${r.count}</td><td>${r.avg===null?'-':pct(r.avg,1)}</td></tr>`).join('')}
+        </tbody>
+      `;
+    }
+
+    // -------- Trends (daily avg per agent) --------
+    function renderTrends(){
+      const evals = state.evals;
+      const agents = Array.from(new Set(evals.map(e=> safeGet(e,'agent.id') || e.agentUserId))).filter(Boolean);
+      const days = []; // ISO day keys
+      for (let d=new Date(state.monthStart); d<=state.monthEnd; d.setUTCDate(d.getUTCDate()+1)){
+        days.push(new Date(d).toISOString().split('T')[0]);
+      }
+      // Map: agent -> day -> {sum, count}
+      const map = new Map();
+      evals.forEach(e=>{
+        const aid = safeGet(e,'agent.id') || e.agentUserId || '(unknown)';
+        const dayKey = dayKeyUTC(e.releaseDate || e.assignedDate || e.creationDate || e.evaluationDate || e.date || Date.now());
+        const p = getEvalPercent(e);
+        if(!map.has(aid)) map.set(aid, new Map());
+        const dm = map.get(aid);
+        if(!dm.has(dayKey)) dm.set(dayKey, {sum:0, count:0});
+        if (p!==null && isFinite(p)) { const o=dm.get(dayKey); o.sum+=Number(p); o.count++; }
+      });
+
+      const header = `<thead><tr><th>Agent</th>${days.map(k=>`<th>${toUKDate(k)}</th>`).join('')}</tr></thead>`;
+      const rows = agents.map(aid=>{
+        const dm = map.get(aid) || new Map();
+        const cells = days.map(k=>{
+          const v = dm.get(k);
+          if(!v || v.count===0) return '<td>-</td>';
+          return `<td>${pct(v.sum / v.count,1)}</td>`;
+        }).join('');
+        return `<tr><td>${resolveUserName(aid)}</td>${cells}</tr>`;
+      }).join('');
+      document.getElementById('trendTable').innerHTML = header + `<tbody>${rows}</tbody>`;
+    }
+
+    // -------- Details (expand per evaluation; question-level) --------
+    function renderDetails(){
+      const c = document.getElementById('detailsContainer');
+      if (!state.evals.length){ c.innerHTML = '<div class="muted">No evaluations loaded.</div>'; return; }
+      c.innerHTML = state.evals.map(e=>{
+        const agent = resolveUserName(safeGet(e,'agent.id') || e.agentUserId);
+        const evaluator = resolveUserName(safeGet(e,'evaluator.id') || e.evaluatorUserId);
+        const formId = safeGet(e,'form.id') || e.formId;
+        const form = resolveForm(formId);
+        const formName = form?.name || '(Form)';
+        const when = toUKDate(e.releaseDate || e.assignedDate || e.creationDate || e.date || Date.now());
+        const convo = e.conversationId || e.conversation?.id || '(n/a)';
+        const score = getEvalPercent(e);
+        const answers = listAnswers(e);
+
+        // Build question rows
+        const qRows = answers.map(a=>{
+          const qid = a.questionId || a.id || a.key;
+          const qMeta = form?.questionsById?.[qid];
+          const qText = qMeta?.text || a.questionText || ('Question ' + (qid||''));
+          const ansText = a.answerText || a.answer || a.value || a.selectedAnswer || '-';
+          const ansScore = a.score ?? a.points ?? a.valueScore ?? null;
+          const isCrit = isCriticalFlag(a) || qMeta?.critical;
+          const isFat  = isFatalFlag(a) || qMeta?.fatal;
+          const badges = (isCrit || isFat)
+            ? `<span class="badge ${isFat?'badge-fatal':'badge-critical'}">${isFat?'Fatal':'Critical'}</span>`
+            : '';
+          return `<tr>
+              <td>${qText}</td>
+              <td>${ansText}</td>
+              <td>${ansScore===null?'-':fmt(ansScore,1)}</td>
+              <td>${badges || '<span class="badge badge-ok">OK</span>'}</td>
+            </tr>`;
+        }).join('');
+
+        return `
+          <details class="evaluation">
+            <summary>${when} • <strong>${agent}</strong> — ${formName} &nbsp;&middot;&nbsp; Score: <strong>${score===null?'-':pct(score,1)}</strong> ${convo!=='(n/a)'?`&nbsp;&middot;&nbsp; Conversation: ${convo}`:''}</summary>
+            <div class="table-container">
+              <table>
+                <thead><tr><th>Question</th><th>Answer</th><th>Score</th><th>Flags</th></tr></thead>
+                <tbody>${qRows || `<tr><td colspan="4" class="muted">No question data available.</td></tr>`}</tbody>
+              </table>
+            </div>
+          </details>
+        `;
+      }).join('');
+    }
+
+    // -------- Critical / Fatal summary --------
+    function renderCritical(){
+      // Count per question (by form + question id + text)
+      const counts = new Map(); // key -> {formName, questionText, critical, fatal, count}
+      state.evals.forEach(e=>{
+        const formId = safeGet(e,'form.id') || e.formId;
+        const formName = resolveForm(formId)?.name || '(Form)';
+        const answers = listAnswers(e);
+        answers.forEach(a=>{
+          const isCrit = isCriticalFlag(a);
+          const isFat  = isFatalFlag(a);
+          if(!isCrit && !isFat) return;
+          const qid = a.questionId || a.id || a.key || '(unknown)';
+          const qText = resolveForm(formId)?.questionsById?.[qid]?.text || a.questionText || ('Question '+qid);
+          const key = `${formId}|${qid}|${qText}`;
+          if(!counts.has(key)) counts.set(key, {formName, qText, critical:0, fatal:0});
+          const o = counts.get(key);
+          if (isFat) o.fatal++; else o.critical++;
+        });
+      });
+
+      const rows = Array.from(counts.values())
+        .sort((a,b)=> (b.fatal+b.critical) - (a.fatal+a.critical))
+        .map(r=> `<tr>
+          <td>${r.formName}</td>
+          <td>${r.qText}</td>
+          <td>${r.critical}</td>
+          <td>${r.fatal}</td>
+          <td>${r.critical + r.fatal}</td>
+        </tr>`).join('');
+
+      document.getElementById('criticalTable').innerHTML = `
+        <thead><tr>
+          <th>Form</th><th>Question</th><th>Critical</th><th>Fatal/Kill</th><th>Total</th>
+        </tr></thead>
+        <tbody>${rows || `<tr><td colspan="5" class="muted">No critical/fatal marks found for the selected period.</td></tr>`}</tbody>
+      `;
+    }
+
+    // ===== UI Utilities =====
+    function refreshButtons(){
+      const hasUsers = document.getElementById('userSelect').options.length>0;
+      const hasForms = document.getElementById('formSelect').options.length>0;
+      document.getElementById('loadBtn').disabled = !(hasUsers && hasForms && document.getElementById('monthInput').value);
+    }
+
+    // Re-enable button after lookups finish
+    const usersObserver = new MutationObserver(refreshButtons);
+    usersObserver.observe(document.getElementById('userSelect'), {childList:true});
+    const formsObserver = new MutationObserver(refreshButtons);
+    formsObserver.observe(document.getElementById('formSelect'), {childList:true});
+  </script>
+</body>
+</html>

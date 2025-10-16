@@ -84,6 +84,22 @@
         grid-template-columns: 1fr;
       }
     }
+
+    .loading-spinner {
+      display: inline-block;
+      width: 20px;
+      height: 20px;
+      border: 2px solid #f3f3f3;
+      border-top: 2px solid var(--primary-color);
+      border-radius: 50%;
+      animation: spin 1s linear infinite;
+      margin-right: 8px;
+    }
+    
+    @keyframes spin {
+      0% { transform: rotate(0deg); }
+      100% { transform: rotate(360deg); }
+    }
   </style>
 </head>
 <body>
@@ -126,7 +142,10 @@
         </div>
         <div>
           <label>&nbsp;</label>
-          <button id="loadBtn" class="full-width-btn" disabled>Load Evaluations</button>
+          <button id="loadBtn" class="full-width-btn" disabled>
+            <span class="loading-spinner" style="display:none"></span>
+            <span class="btn-text">Load Evaluations</span>
+          </button>
         </div>
       </div>
     </div>
@@ -185,6 +204,7 @@
       forms: [],                 // [{id, name, questionsById}]
       formsById: {},             // id -> form
       evals: [],                 // loaded evaluations
+      overviewData: [],          // analytics aggregate data
       monthStart: null,
       monthEnd: null
     };
@@ -194,6 +214,10 @@
       users: null,
       forms: null
     };
+
+    // Rate limiting
+    let lastApiCall = 0;
+    const API_DELAY = 100; // ms between API calls to avoid rate limits
 
     function showDebugCard() {
       const dump = { clientId, redirectUri, oauthUrl, region: config.REGION, currentUrl: window.location.href };
@@ -211,6 +235,20 @@
       if(type==='success'){ 
         setTimeout(()=>box.style.display='none',5000);
       } 
+    }
+
+    function setLoading(button, isLoading) {
+      const spinner = button.querySelector('.loading-spinner');
+      const text = button.querySelector('.btn-text');
+      if (isLoading) {
+        spinner.style.display = 'inline-block';
+        text.textContent = 'Loading...';
+        button.disabled = true;
+      } else {
+        spinner.style.display = 'none';
+        text.textContent = 'Load Evaluations';
+        button.disabled = false;
+      }
     }
 
     // ===== Checkbox Dropdown Component =====
@@ -408,13 +446,32 @@
       console.log('Month range updated:', state.monthStart, 'to', state.monthEnd);
     }
 
-    // ===== Helpers =====
+    // ===== API Helpers =====
+    async function rateLimitedFetch(url, options = {}) {
+      const now = Date.now();
+      const timeSinceLastCall = now - lastApiCall;
+      
+      if (timeSinceLastCall < API_DELAY) {
+        await new Promise(resolve => setTimeout(resolve, API_DELAY - timeSinceLastCall));
+      }
+      
+      lastApiCall = Date.now();
+      return fetch(url, {
+        ...options,
+        headers: {
+          'Authorization': 'Bearer ' + state.accessToken,
+          'Content-Type': 'application/json',
+          ...options.headers
+        }
+      });
+    }
+
     async function fetchPaginatedGET(url){
       console.log('Fetching:', url);
       let all = [];
       let next = url;
       while(next){
-        const res = await fetch(next, { headers: { 'Authorization': 'Bearer ' + state.accessToken }});
+        const res = await rateLimitedFetch(next);
         if(!res.ok) {
           console.error('Fetch failed:', res.status, res.statusText);
           throw new Error(`HTTP ${res.status} for ${next}`);
@@ -426,6 +483,7 @@
         else if (Array.isArray(data.users)) all = all.concat(data.users);
         else if (Array.isArray(data)) all = all.concat(data);
         else if (data.entities) all = all.concat(data.entities);
+        
         // next page
         if (data.nextUri) next = `https://api.${config.REGION}${data.nextUri}`;
         else next = null;
@@ -537,138 +595,212 @@
         return; 
       }
 
+      const loadBtn = document.getElementById('loadBtn');
+      setLoading(loadBtn, true);
       msg('Loading evaluations…','info');
-      console.log('Loading evaluations for:', {agentIds, formIds, monthStart: state.monthStart, monthEnd: state.monthEnd});
       
-      try{
-        const results = [];
-        // We'll query per agent to satisfy APIs that accept single agent query param.
-        for (const agentId of agentIds){
-          console.log(`Querying evaluations for agent: ${agentId}`);
-          const list = await queryEvaluationsForAgent(agentId, formIds, state.monthStart, state.monthEnd);
-          results.push(...list);
-        }
-        state.evals = results;
-        console.log(`Loaded ${results.length} total evaluations`);
-        msg(`Loaded ${results.length} evaluations.`, 'success');
+      try {
+        // Step 1: Get overview data using analytics API (much faster)
+        console.log('Loading overview data via analytics API...');
+        state.overviewData = await fetchOverviewData(agentIds, formIds);
+        
+        // Step 2: Get detailed evaluations for question-level data
+        console.log('Loading detailed evaluations...');
+        state.evals = await fetchDetailedEvaluations(agentIds, formIds);
+        
+        console.log(`Loaded ${state.evals.length} detailed evaluations`);
+        msg(`Loaded ${state.overviewData.length} agent summaries and ${state.evals.length} detailed evaluations.`, 'success');
         renderAll();
-      }catch(e){
+      } catch(e) {
         console.error('Error loading evaluations:', e);
         msg('Failed to load evaluations: '+e.message,'error');
+      } finally {
+        setLoading(loadBtn, false);
       }
     }
 
-    async function queryEvaluationsForAgent(agentId, formIds, startUTC, endUTC){
-      const start = startUTC.toISOString();
-      const end   = endUTC.toISOString();
-
-      console.log(`Querying evaluations for agent ${agentId} from ${start} to ${end}`);
-
-      const base = `https://api.${config.REGION}/api/v2/quality/evaluations/query`;
+    async function fetchOverviewData(agentIds, formIds) {
+      const start = state.monthStart.toISOString();
+      const end = state.monthEnd.toISOString();
       
-      // Try POST first as it's more reliable for complex queries
-      async function tryPOST(){
-        const body = {
-          agentUserIds: [agentId],
-          pageSize: 100,
-          pageNumber: 1,
-          interval: `${start}/${end}`,
-          ...(formIds && formIds.length ? { formIds } : {})
-        };
+      const body = {
+        interval: `${start}/${end}`,
+        granularity: "P1D",
+        groupBy: ["userId"],
+        metrics: [
+          "nEvaluations",
+          "oTotalCriticalScore", 
+          "oTotalScore",
+          "nEvaluationsRescored"
+        ],
+        filter: {
+          type: "and",
+          predicates: [
+            {
+              type: "dimension",
+              dimension: "userId",
+              operator: "in",
+              values: agentIds
+            }
+          ]
+        }
+      };
+
+      // Add form filter if forms are selected
+      if (formIds && formIds.length > 0) {
+        body.filter.predicates.push({
+          type: "dimension",
+          dimension: "formId",
+          operator: "in",
+          values: formIds
+        });
+      }
+
+      const url = `https://api.${config.REGION}/api/v2/analytics/evaluations/aggregates/query`;
+      
+      const res = await rateLimitedFetch(url, {
+        method: 'POST',
+        body: JSON.stringify(body)
+      });
+
+      if (!res.ok) {
+        const errorText = await res.text();
+        console.error('Analytics API failed:', res.status, errorText);
+        throw new Error(`Analytics API ${res.status}: ${errorText}`);
+      }
+
+      const data = await res.json();
+      console.log('Analytics response:', data);
+      
+      return data.results || [];
+    }
+
+    async function fetchDetailedEvaluations(agentIds, formIds) {
+      const allEvaluations = [];
+      
+      // Process agents in batches to avoid overwhelming the API
+      const batchSize = 5;
+      for (let i = 0; i < agentIds.length; i += batchSize) {
+        const batch = agentIds.slice(i, i + batchSize);
+        console.log(`Processing batch ${i/batchSize + 1} of ${Math.ceil(agentIds.length/batchSize)}`);
         
-        console.log('POST body:', body);
+        const batchPromises = batch.map(agentId => 
+          fetchEvaluationsForAgent(agentId, formIds)
+        );
         
-        let all = [];
-        let res = await fetch(base, {
-          method:'POST',
-          headers:{
-            'Authorization':'Bearer '+state.accessToken,
-            'Content-Type':'application/json'
-          },
+        const batchResults = await Promise.all(batchPromises);
+        batchResults.forEach(evaluations => {
+          allEvaluations.push(...evaluations);
+        });
+        
+        // Small delay between batches
+        if (i + batchSize < agentIds.length) {
+          await new Promise(resolve => setTimeout(resolve, 200));
+        }
+      }
+      
+      return allEvaluations;
+    }
+
+    async function fetchEvaluationsForAgent(agentId, formIds) {
+      const start = state.monthStart.toISOString();
+      const end = state.monthEnd.toISOString();
+      
+      const baseUrl = `https://api.${config.REGION}/api/v2/quality/evaluations/query`;
+      const params = new URLSearchParams({
+        agentUserId: agentId,
+        startTime: start,
+        endTime: end,
+        expandAnswerTotalScores: 'true',
+        pageSize: '50'
+      });
+
+      if (formIds && formIds.length > 0) {
+        // If multiple forms selected, we'll need to make separate calls or use POST
+        // For now, let's use GET with single form or fallback to POST for multiple
+        if (formIds.length === 1) {
+          params.set('formId', formIds[0]);
+        }
+      }
+
+      let allEvaluations = [];
+      let nextUrl = `${baseUrl}?${params.toString()}`;
+
+      while (nextUrl) {
+        const res = await rateLimitedFetch(nextUrl);
+        
+        if (!res.ok) {
+          // If GET fails, try POST method
+          if (res.status === 400 || res.status === 405) {
+            console.log('GET failed, trying POST method...');
+            const postResults = await fetchEvaluationsViaPOST(agentId, formIds);
+            return postResults;
+          }
+          throw new Error(`Failed to fetch evaluations: ${res.status}`);
+        }
+
+        const data = await res.json();
+        const evaluations = data.entities || [];
+        allEvaluations = allEvaluations.concat(evaluations);
+        
+        nextUrl = data.nextUri ? `https://api.${config.REGION}${data.nextUri}` : null;
+      }
+
+      return allEvaluations;
+    }
+
+    async function fetchEvaluationsViaPOST(agentId, formIds) {
+      const start = state.monthStart.toISOString();
+      const end = state.monthEnd.toISOString();
+      
+      const body = {
+        agentUserIds: [agentId],
+        interval: `${start}/${end}`,
+        expandAnswerTotalScores: true,
+        pageSize: 50
+      };
+
+      if (formIds && formIds.length > 0) {
+        body.formIds = formIds;
+      }
+
+      const url = `https://api.${config.REGION}/api/v2/quality/evaluations/query`;
+      let allEvaluations = [];
+      let pageNumber = 1;
+
+      while (true) {
+        body.pageNumber = pageNumber;
+        
+        const res = await rateLimitedFetch(url, {
+          method: 'POST',
           body: JSON.stringify(body)
         });
+
+        if (!res.ok) {
+          throw new Error(`POST method failed: ${res.status}`);
+        }
+
+        const data = await res.json();
+        const evaluations = data.entities || [];
         
-        if(!res.ok) {
-          const errorText = await res.text();
-          console.error('POST failed:', res.status, errorText);
-          throw new Error(`POST ${res.status}: ${errorText}`);
+        if (evaluations.length === 0) break;
+        
+        allEvaluations = allEvaluations.concat(evaluations);
+        
+        // Check if there are more pages
+        if (!data.nextUri && evaluations.length < body.pageSize) {
+          break;
         }
         
-        let data = await res.json();
-        all = all.concat(data.entities || data.results || []);
-        console.log(`Initial POST returned ${all.length} evaluations`);
-        
-        // follow nextUri if present
-        while(data.nextUri){
-          console.log('Fetching next page:', data.nextUri);
-          res = await fetch(`https://api.${config.REGION}${data.nextUri}`, { 
-            headers:{'Authorization':'Bearer '+state.accessToken}
-          });
-          if(!res.ok) throw new Error(`Follow-up GET ${res.status}`);
-          data = await res.json();
-          all = all.concat(data.entities || data.results || []);
-          console.log(`Added ${data.entities ? data.entities.length : 0} more evaluations`);
-        }
-        
-        return all;
+        pageNumber++;
       }
 
-      // Fallback to GET if POST doesn't work
-      async function tryGET(){
-        const params = new URLSearchParams({ 
-          agentUserId: agentId, 
-          pageSize: '100', 
-          startTime: start, 
-          endTime: end 
-        });
-        if (formIds && formIds.length===1) params.set('formId', formIds[0]);
-        
-        let all = [];
-        let next = `${base}?${params.toString()}`;
-        
-        while(next){
-          console.log('GET request:', next);
-          const res = await fetch(next, { 
-            headers: { 'Authorization':'Bearer '+state.accessToken }
-          });
-          if(res.status===405 || res.status===400) throw new Error('SwitchToPOST');
-          if(!res.ok) throw new Error(`GET ${res.status}`);
-          
-          const data = await res.json();
-          const entities = data.entities || data.results || [];
-          all = all.concat(entities);
-          console.log(`GET returned ${entities.length} evaluations`);
-          
-          if (data.nextUri) next = `https://api.${config.REGION}${data.nextUri}`; 
-          else next = null;
-        }
-        return all;
-      }
-
-      try{
-        // Try POST first as it's more reliable
-        const list = await tryPOST();
-        console.log(`Successfully retrieved ${list.length} evaluations for agent ${agentId}`);
-        return list;
-      }catch(err){
-        console.log('POST failed, trying GET:', err.message);
-        if (String(err.message).includes('SwitchToPOST') || String(err.message).startsWith('GET ') || String(err.message).startsWith('POST')){
-          try {
-            const list = await tryGET();
-            console.log(`GET retrieved ${list.length} evaluations for agent ${agentId}`);
-            return list;
-          } catch (getErr) {
-            console.error('Both POST and GET failed:', getErr);
-            throw getErr;
-          }
-        }
-        throw err;
-      }
+      return allEvaluations;
     }
 
     // ===== Renderers =====
     function renderAll(){
-      console.log('Rendering all views with', state.evals.length, 'evaluations');
+      console.log('Rendering all views with', state.overviewData.length, 'overview items and', state.evals.length, 'detailed evaluations');
       renderOverview();
       renderTrends();
       renderDetails();
@@ -686,82 +818,83 @@
 
     function getEvalPercent(e){
       // Try several fields commonly exposed by evaluation entities
-      const percent = e.totalScore || e.totalPercent || safeGet(e,'scoring.totalPercent') || safeGet(e,'oTotalPercent');
+      const percent = e.totalScore || e.totalPercent || safeGet(e,'scoring.totalPercent') || safeGet(e,'oTotalPercent') || safeGet(e, 'answers.totalScore');
       if (percent === null || percent === undefined) return null;
       if (percent <= 1) return percent * 100; // if 0..1 scale
       return percent;
     }
 
     function listAnswers(e){
-      // Normalise answer list; try typical locations
-      let answers = safeGet(e, 'answers') || safeGet(e,'answerList') || safeGet(e,'evaluationAnswers');
-      if (!Array.isArray(answers)) {
-        // sometimes nested per section/groups — flatten whatever arrays exist
-        const flat = [];
-        function scan(obj){
-          if (!obj) return;
-          if (Array.isArray(obj)) obj.forEach(scan);
-          else if (typeof obj === 'object'){
-            if (Array.isArray(obj.answers)) obj.answers.forEach(a=>flat.push(a));
-            Object.values(obj).forEach(v=>scan(v));
-          }
-        }
-        scan(e);
-        answers = flat.length ? flat : [];
-      }
-      return answers || [];
+      // Use the questionScores from the evaluation data
+      const answers = [];
+      const questionGroups = safeGet(e, 'answers.questionGroupScores') || [];
+      
+      questionGroups.forEach(group => {
+        const questionScores = group.questionScores || [];
+        questionScores.forEach(qScore => {
+          answers.push({
+            questionId: qScore.questionId,
+            score: qScore.score,
+            failedKillQuestion: qScore.failedKillQuestion || false,
+            markedNA: qScore.markedNA || false
+          });
+        });
+      });
+      
+      return answers;
     }
 
-    function isCriticalFlag(ans){
-      if (!ans) return false;
-      const flags = [
-        'critical','isCritical','criticalFail','criticalFailure','killQuestion','killquestion','fatal','isFatal'
-      ];
-      for (const f of flags){ 
-        if (ans[f] === true || String(ans[f]).toLowerCase()==='true') return true; 
-      }
-      // some APIs store metadata
-      if (safeGet(ans,'metadata.killQuestion')===true) return true;
-      return false;
-    }
-    
-    function isFatalFlag(ans){
-      if (!ans) return false;
-      const flags = ['fatal','isFatal','killQuestion','killquestion'];
-      for (const f of flags){ 
-        if (ans[f] === true || String(ans[f]).toLowerCase()==='true') return true; 
-      }
-      return false;
+    function isCriticalFlag(answer){
+      return answer.failedKillQuestion || false;
     }
 
     // -------- Overview (KPIs + per-agent table) --------
     function renderOverview(){
-      const evals = state.evals;
-      console.log('Rendering overview with', evals.length, 'evaluations');
+      const overviewData = state.overviewData;
+      console.log('Rendering overview with', overviewData.length, 'agent summaries');
       
-      const byAgent = new Map();
-      evals.forEach(e=>{
-        const a = safeGet(e,'agent.id') || e.agentUserId || e.userId || '(unknown)';
-        const p = getEvalPercent(e);
-        if (!byAgent.has(a)) byAgent.set(a, {count:0, sum:0});
-        const obj = byAgent.get(a);
-        obj.count++;
-        if (p!==null && isFinite(p)) obj.sum += Number(p);
+      // Calculate KPIs from overview data
+      let totalEvaluations = 0;
+      let totalScore = 0;
+      let totalCriticalScore = 0;
+      let scoreCount = 0;
+      let criticalScoreCount = 0;
+
+      overviewData.forEach(item => {
+        const evaluations = safeGet(item, 'metrics[0].stats.count') || safeGet(item, 'metrics.nEvaluations.stats.count') || 0;
+        const score = safeGet(item, 'metrics[2].stats.count') || safeGet(item, 'metrics.oTotalScore.stats.count') || 0; // oTotalScore
+        const criticalScore = safeGet(item, 'metrics[1].stats.count') || safeGet(item, 'metrics.oTotalCriticalScore.stats.count') || 0; // oTotalCriticalScore
+        
+        totalEvaluations += evaluations;
+        if (score > 0) {
+          totalScore += score;
+          scoreCount++;
+        }
+        if (criticalScore > 0) {
+          totalCriticalScore += criticalScore;
+          criticalScoreCount++;
+        }
       });
-      
-      const agentRows = [];
-      let totalCount=0;
-      for (const [agentId, {count,sum}] of byAgent.entries()){
-        const avg = count ? (sum / count) : null;
-        agentRows.push({ agent: resolveUserName(agentId), count, avg });
-        totalCount += count;
-      }
-      agentRows.sort((a,b)=>a.agent.localeCompare(b.agent));
+
+      const avgScore = scoreCount > 0 ? totalScore / scoreCount : null;
+      const avgCriticalScore = criticalScoreCount > 0 ? totalCriticalScore / criticalScoreCount : null;
+
+      // Build agent rows from overview data
+      const agentRows = overviewData.map(item => {
+        const userId = safeGet(item, 'group.userId');
+        const evaluations = safeGet(item, 'metrics[0].stats.count') || safeGet(item, 'metrics.nEvaluations.stats.count') || 0;
+        const score = safeGet(item, 'metrics[2].stats.count') || safeGet(item, 'metrics.oTotalScore.stats.count') || 0;
+        const avg = evaluations > 0 ? score / evaluations : null;
+        
+        return {
+          agent: resolveUserName(userId),
+          count: evaluations,
+          avg: avg
+        };
+      }).filter(row => row.count > 0) // Only show agents with evaluations
+        .sort((a,b) => a.agent.localeCompare(b.agent));
 
       // KPIs
-      const overallAvg = agentRows.length ? 
-        (agentRows.reduce((s,r)=>s+(r.avg||0),0)/agentRows.length) : null;
-        
       document.getElementById('overviewKPIs').innerHTML = `
         <div class="kpi">
           <div class="label">Month</div>
@@ -769,15 +902,15 @@
         </div>
         <div class="kpi">
           <div class="label">Evaluations</div>
-          <div class="value">${evals.length}</div>
+          <div class="value">${totalEvaluations}</div>
         </div>
         <div class="kpi">
           <div class="label">Agents</div>
           <div class="value">${agentRows.length}</div>
         </div>
         <div class="kpi">
-          <div class="label">Average Score (Agent Avg)</div>
-          <div class="value">${overallAvg===null?'-':pct(overallAvg,1)}</div>
+          <div class="label">Average Score</div>
+          <div class="value">${avgScore === null ? '-' : pct(avgScore, 1)}</div>
         </div>
       `;
 
@@ -791,7 +924,7 @@
             <th>Agent</th><th>Evaluations</th><th>Average Score</th>
           </tr></thead>
           <tbody>
-            ${agentRows.map(r=>`<tr><td>${r.agent}</td><td>${r.count}</td><td>${r.avg===null?'-':pct(r.avg,1)}</td></tr>`).join('')}
+            ${agentRows.map(r => `<tr><td>${r.agent}</td><td>${r.count}</td><td>${r.avg === null ? '-' : pct(r.avg, 1)}</td></tr>`).join('')}
           </tbody>
         `;
       }
@@ -800,31 +933,35 @@
     // -------- Trends (daily avg per agent) --------
     function renderTrends(){
       const evals = state.evals;
-      const agents = Array.from(new Set(evals.map(e=> safeGet(e,'agent.id') || e.agentUserId))).filter(Boolean);
+      const agents = Array.from(new Set(evals.map(e => safeGet(e,'agent.id') || e.agentUserId))).filter(Boolean);
       const days = []; // ISO day keys
-      for (let d=new Date(state.monthStart); d<=state.monthEnd; d.setUTCDate(d.getUTCDate()+1)){
+      for (let d = new Date(state.monthStart); d <= state.monthEnd; d.setUTCDate(d.getUTCDate() + 1)) {
         days.push(new Date(d).toISOString().split('T')[0]);
       }
       
       // Map: agent -> day -> {sum, count}
       const map = new Map();
-      evals.forEach(e=>{
+      evals.forEach(e => {
         const aid = safeGet(e,'agent.id') || e.agentUserId || '(unknown)';
         const dayKey = dayKeyUTC(e.releaseDate || e.assignedDate || e.creationDate || e.evaluationDate || e.date || Date.now());
         const p = getEvalPercent(e);
-        if(!map.has(aid)) map.set(aid, new Map());
+        if (!map.has(aid)) map.set(aid, new Map());
         const dm = map.get(aid);
-        if(!dm.has(dayKey)) dm.set(dayKey, {sum:0, count:0});
-        if (p!==null && isFinite(p)) { const o=dm.get(dayKey); o.sum+=Number(p); o.count++; }
+        if (!dm.has(dayKey)) dm.set(dayKey, {sum: 0, count: 0});
+        if (p !== null && isFinite(p)) { 
+          const o = dm.get(dayKey); 
+          o.sum += Number(p); 
+          o.count++; 
+        }
       });
 
-      const header = `<thead><tr><th>Agent</th>${days.map(k=>`<th>${toUKDate(k)}</th>`).join('')}</tr></thead>`;
-      const rows = agents.map(aid=>{
+      const header = `<thead><tr><th>Agent</th>${days.map(k => `<th>${toUKDate(k)}</th>`).join('')}</tr></thead>`;
+      const rows = agents.map(aid => {
         const dm = map.get(aid) || new Map();
-        const cells = days.map(k=>{
+        const cells = days.map(k => {
           const v = dm.get(k);
-          if(!v || v.count===0) return '<td>-</td>';
-          return `<td>${pct(v.sum / v.count,1)}</td>`;
+          if (!v || v.count === 0) return '<td>-</td>';
+          return `<td>${pct(v.sum / v.count, 1)}</td>`;
         }).join('');
         return `<tr><td>${resolveUserName(aid)}</td>${cells}</tr>`;
       }).join('');
@@ -840,7 +977,7 @@
         return; 
       }
       
-      c.innerHTML = state.evals.map(e=>{
+      c.innerHTML = state.evals.map(e => {
         const agent = resolveUserName(safeGet(e,'agent.id') || e.agentUserId);
         const evaluator = resolveUserName(safeGet(e,'evaluator.id') || e.evaluatorUserId);
         const formId = safeGet(e,'form.id') || e.formId;
@@ -849,31 +986,35 @@
         const when = toUKDate(e.releaseDate || e.assignedDate || e.creationDate || e.evaluationDate || e.date || Date.now());
         const convo = e.conversationId || e.conversation?.id || '(n/a)';
         const score = getEvalPercent(e);
-        const answers = listAnswers(e);
+        const questionGroups = safeGet(e, 'answers.questionGroupScores') || [];
 
-        // Build question rows
-        const qRows = answers.map(a=>{
-          const qid = a.questionId || a.id || a.key;
-          const qMeta = form?.questionsById?.[qid];
-          const qText = qMeta?.text || a.questionText || ('Question ' + (qid||''));
-          const ansText = a.answerText || a.answer || a.value || a.selectedAnswer || '-';
-          const ansScore = a.score ?? a.points ?? a.valueScore ?? null;
-          const isCrit = isCriticalFlag(a) || (qMeta?.critical);
-          const isFat  = isFatalFlag(a) || (qMeta?.fatal);
-          const badges = (isCrit || isFat)
-            ? `<span class="badge ${isFat?'badge-fatal':'badge-critical'}">${isFat?'Fatal':'Critical'}</span>`
-            : '';
-          return `<tr>
+        // Build question rows from questionGroups
+        let qRows = '';
+        questionGroups.forEach(group => {
+          const questionScores = group.questionScores || [];
+          questionScores.forEach(qScore => {
+            const qid = qScore.questionId;
+            const qMeta = form?.questionsById?.[qid];
+            const qText = qMeta?.text || ('Question ' + (qid || ''));
+            const ansScore = qScore.score ?? null;
+            const isCrit = qScore.failedKillQuestion || (qMeta?.critical);
+            const isFat = qScore.failedKillQuestion || (qMeta?.fatal);
+            const badges = (isCrit || isFat)
+              ? `<span class="badge ${isFat ? 'badge-fatal' : 'badge-critical'}">${isFat ? 'Fatal' : 'Critical'}</span>`
+              : '';
+            
+            qRows += `<tr>
               <td>${qText}</td>
-              <td>${ansText}</td>
-              <td>${ansScore===null?'-':fmt(ansScore,1)}</td>
+              <td>${qScore.markedNA ? 'N/A' : 'Answered'}</td>
+              <td>${ansScore === null ? '-' : fmt(ansScore, 1)}</td>
               <td>${badges || '<span class="badge badge-ok">OK</span>'}</td>
             </tr>`;
-        }).join('');
+          });
+        });
 
         return `
           <details class="evaluation">
-            <summary>${when} • <strong>${agent}</strong> — ${formName} &nbsp;&middot;&nbsp; Score: <strong>${score===null?'-':pct(score,1)}</strong> ${convo!=='(n/a)'?`&nbsp;&middot;&nbsp; Conversation: ${convo}`:''}</summary>
+            <summary>${when} • <strong>${agent}</strong> — ${formName} &nbsp;&middot;&nbsp; Score: <strong>${score === null ? '-' : pct(score, 1)}</strong> ${convo !== '(n/a)' ? `&nbsp;&middot;&nbsp; Conversation: ${convo}` : ''}</summary>
             <div class="table-container">
               <table>
                 <thead><tr><th>Question</th><th>Answer</th><th>Score</th><th>Flags</th></tr></thead>
@@ -889,26 +1030,35 @@
     function renderCritical(){
       // Count per question (by form + question id + text)
       const counts = new Map(); // key -> {formName, questionText, critical, fatal, count}
-      state.evals.forEach(e=>{
+      
+      state.evals.forEach(e => {
         const formId = safeGet(e,'form.id') || e.formId;
         const formName = resolveForm(formId)?.name || '(Form)';
-        const answers = listAnswers(e);
-        answers.forEach(a=>{
-          const isCrit = isCriticalFlag(a);
-          const isFat  = isFatalFlag(a);
-          if(!isCrit && !isFat) return;
-          const qid = a.questionId || a.id || a.key || '(unknown)';
-          const qText = resolveForm(formId)?.questionsById?.[qid]?.text || a.questionText || ('Question '+qid);
-          const key = `${formId}|${qid}|${qText}`;
-          if(!counts.has(key)) counts.set(key, {formName, qText, critical:0, fatal:0});
-          const o = counts.get(key);
-          if (isFat) o.fatal++; else o.critical++;
+        const questionGroups = safeGet(e, 'answers.questionGroupScores') || [];
+        
+        questionGroups.forEach(group => {
+          const questionScores = group.questionScores || [];
+          questionScores.forEach(qScore => {
+            if (qScore.failedKillQuestion) {
+              const qid = qScore.questionId;
+              const qText = resolveForm(formId)?.questionsById?.[qid]?.text || ('Question ' + qid);
+              const key = `${formId}|${qid}|${qText}`;
+              
+              if (!counts.has(key)) {
+                counts.set(key, {formName, qText, critical: 0, fatal: 0});
+              }
+              
+              const o = counts.get(key);
+              // For now, treat all failed kill questions as fatal
+              o.fatal++;
+            }
+          });
         });
       });
 
       const rows = Array.from(counts.values())
-        .sort((a,b)=> (b.fatal+b.critical) - (a.fatal+a.critical))
-        .map(r=> `<tr>
+        .sort((a,b) => (b.fatal + b.critical) - (a.fatal + a.critical))
+        .map(r => `<tr>
           <td>${r.formName}</td>
           <td>${r.qText}</td>
           <td>${r.critical}</td>

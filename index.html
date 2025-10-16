@@ -151,7 +151,7 @@
     const clientId = 'd4529142-7340-4cd8-a9f9-f3a4d25670df';
     const config = { REGION:'mypurecloud.ie' };
     const DEBUG = new URLSearchParams(window.location.search).has('debug');
-    const redirectUri = new URL('.', window.location.href).href;
+    const redirectUri = 'https://gmcglynn88.github.io/QualityReporting/';
     const oauthUrl = `https://login.${config.REGION}/oauth/authorize?client_id=${encodeURIComponent(clientId)}&response_type=token&redirect_uri=${encodeURIComponent(redirectUri)}&state=qa`;
 
     const state = {

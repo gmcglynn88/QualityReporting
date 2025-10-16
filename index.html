@@ -100,6 +100,16 @@
       0% { transform: rotate(0deg); }
       100% { transform: rotate(360deg); }
     }
+
+    .comment-bubble {
+      background: #f8f9fa;
+      border: 1px solid #dee2e6;
+      border-radius: 12px;
+      padding: 8px 12px;
+      margin-top: 4px;
+      font-size: 12px;
+      color: #6c757d;
+    }
   </style>
 </head>
 <body>
@@ -127,13 +137,14 @@
       <h2 class="section-title">Configuration</h2>
       <div class="controls">
         <div>
-          <label for="userDropdown">Agents</label>
+          <label for="userDropdown">Agents (Optional)</label>
           <div id="userDropdown" class="checkbox-dropdown"></div>
-          <div class="muted">Tip: Click to select multiple agents</div>
+          <div class="muted">Select agents to filter by, or leave empty for all</div>
         </div>
         <div>
-          <label for="formDropdown">Evaluation Forms</label>
+          <label for="formDropdown">Evaluation Forms (Optional)</label>
           <div id="formDropdown" class="checkbox-dropdown"></div>
+          <div class="muted">Select forms to filter by, or leave empty for all</div>
         </div>
         <div>
           <label for="monthInput">Month</label>
@@ -205,7 +216,8 @@
       formsById: {},             // id -> form
       evals: [],                 // loaded evaluations
       monthStart: null,
-      monthEnd: null
+      monthEnd: null,
+      questionTextCache: new Map() // Cache for question text by formId and questionId
     };
 
     // Checkbox dropdown instances
@@ -348,9 +360,11 @@
     }
 
     function updateLoadButtonState(){
-      const hasUsers = dropdowns.users && dropdowns.users.getSelectedValues().length > 0;
       const hasMonth = document.getElementById('monthInput').value;
-      document.getElementById('loadBtn').disabled = !(hasUsers && hasMonth);
+      // Either agents or forms or both can be selected, but at least one selection is required
+      const hasUsers = dropdowns.users && dropdowns.users.getSelectedValues().length > 0;
+      const hasForms = dropdowns.forms && dropdowns.forms.getSelectedValues().length > 0;
+      document.getElementById('loadBtn').disabled = !(hasMonth && (hasUsers || hasForms));
     }
 
     // ===== Bootstrap =====
@@ -392,11 +406,11 @@
 
       // Initialize dropdowns
       dropdowns.users = createCheckboxDropdown('userDropdown', { 
-        placeholder: 'Select agents', 
+        placeholder: 'Select agents (optional)', 
         searchPlaceholder: 'Search agents...' 
       });
       dropdowns.forms = createCheckboxDropdown('formDropdown', { 
-        placeholder: 'Select forms', 
+        placeholder: 'Select forms (optional)', 
         searchPlaceholder: 'Search forms...' 
       });
 
@@ -584,8 +598,9 @@
       const agentIds = dropdowns.users.getSelectedValues();
       const formIds = dropdowns.forms.getSelectedValues();
 
-      if (agentIds.length === 0) { 
-        msg('Please select at least one agent.','error'); 
+      // Either agents or forms must be selected (or both)
+      if (agentIds.length === 0 && formIds.length === 0) { 
+        msg('Please select at least one agent or form.','error'); 
         return; 
       }
       if (!state.monthStart || !state.monthEnd) { 
@@ -598,7 +613,7 @@
       msg('Loading evaluations…','info');
       
       try {
-        // Use only the detailed evaluations API - skip analytics API entirely
+        // Use only the detailed evaluations API
         console.log('Loading detailed evaluations...');
         state.evals = await fetchDetailedEvaluations(agentIds, formIds);
         
@@ -616,11 +631,18 @@
     async function fetchDetailedEvaluations(agentIds, formIds) {
       const allEvaluations = [];
       
+      // If no agents selected but forms are selected, we need to get all users first
+      let agentsToQuery = agentIds;
+      if (agentIds.length === 0 && formIds.length > 0) {
+        console.log('No agents selected, but forms selected. Getting all users first...');
+        agentsToQuery = state.users.map(u => u.id);
+      }
+      
       // Process agents in batches to avoid overwhelming the API
       const batchSize = 5;
-      for (let i = 0; i < agentIds.length; i += batchSize) {
-        const batch = agentIds.slice(i, i + batchSize);
-        console.log(`Processing batch ${i/batchSize + 1} of ${Math.ceil(agentIds.length/batchSize)}`);
+      for (let i = 0; i < agentsToQuery.length; i += batchSize) {
+        const batch = agentsToQuery.slice(i, i + batchSize);
+        console.log(`Processing batch ${i/batchSize + 1} of ${Math.ceil(agentsToQuery.length/batchSize)}`);
         
         const batchPromises = batch.map(agentId => 
           fetchEvaluationsForAgent(agentId, formIds)
@@ -632,7 +654,7 @@
         });
         
         // Small delay between batches
-        if (i + batchSize < agentIds.length) {
+        if (i + batchSize < agentsToQuery.length) {
           await new Promise(resolve => setTimeout(resolve, 200));
         }
       }
@@ -736,6 +758,70 @@
       return allEvaluations;
     }
 
+    // ===== Question Text Lookup =====
+    async function getQuestionText(formId, questionId) {
+      const cacheKey = `${formId}-${questionId}`;
+      
+      // Check cache first
+      if (state.questionTextCache.has(cacheKey)) {
+        return state.questionTextCache.get(cacheKey);
+      }
+      
+      try {
+        // Fetch form details to get question text
+        const url = `https://api.${config.REGION}/api/v2/quality/forms/evaluations/${formId}`;
+        const res = await rateLimitedFetch(url);
+        
+        if (!res.ok) {
+          console.warn(`Failed to fetch form ${formId}: ${res.status}`);
+          return `Question ${questionId}`;
+        }
+        
+        const form = await res.json();
+        
+        // Search for the question in the form structure
+        let questionText = `Question ${questionId}`;
+        
+        function searchQuestions(node) {
+          if (!node) return;
+          
+          if (Array.isArray(node.questions)) {
+            for (const q of node.questions) {
+              const qid = q.id || q.questionId;
+              if (qid === questionId && q.text) {
+                questionText = q.text;
+                return true;
+              }
+            }
+          }
+          
+          if (Array.isArray(node.questionGroups)) {
+            for (const group of node.questionGroups) {
+              if (searchQuestions(group)) return true;
+            }
+          }
+          
+          if (Array.isArray(node.sections)) {
+            for (const section of node.sections) {
+              if (searchQuestions(section)) return true;
+            }
+          }
+          
+          return false;
+        }
+        
+        searchQuestions(form);
+        
+        // Cache the result
+        state.questionTextCache.set(cacheKey, questionText);
+        return questionText;
+        
+      } catch (error) {
+        console.warn(`Error fetching question text for ${questionId} in form ${formId}:`, error);
+        return `Question ${questionId}`;
+      }
+    }
+
     // ===== Renderers =====
     function renderAll(){
       console.log('Rendering all views with', state.evals.length, 'evaluations');
@@ -774,7 +860,8 @@
             questionId: qScore.questionId,
             score: qScore.score,
             failedKillQuestion: qScore.failedKillQuestion || false,
-            markedNA: qScore.markedNA || false
+            markedNA: qScore.markedNA || false,
+            comments: qScore.comments || ''
           });
         });
       });
@@ -881,14 +968,18 @@
     }
 
     // -------- Details (expand per evaluation; question-level) --------
-    function renderDetails(){
+    async function renderDetails(){
       const c = document.getElementById('detailsContainer');
       if (!state.evals.length){ 
         c.innerHTML = '<div class="muted">No evaluations loaded.</div>'; 
         return; 
       }
       
-      c.innerHTML = state.evals.map(e=>{
+      // Create a loading message while we fetch question texts
+      c.innerHTML = '<div class="info-message">Loading question details...</div>';
+      
+      // Process evaluations asynchronously to fetch question texts
+      const evaluationElements = await Promise.all(state.evals.map(async (e) => {
         const agent = resolveUserName(safeGet(e,'agent.id') || e.agentUserId);
         const evaluator = resolveUserName(safeGet(e,'evaluator.id') || e.evaluatorUserId);
         const formId = safeGet(e,'form.id') || e.formId;
@@ -901,40 +992,45 @@
 
         // Build question rows from questionGroups
         let qRows = '';
-        questionGroups.forEach(group => {
+        for (const group of questionGroups) {
           const questionScores = group.questionScores || [];
-          questionScores.forEach(qScore => {
+          for (const qScore of questionScores) {
             const qid = qScore.questionId;
-            const qMeta = form?.questionsById?.[qid];
-            const qText = qMeta?.text || ('Question ' + (qid || ''));
+            const qText = await getQuestionText(formId, qid);
             const ansScore = qScore.score ?? null;
-            const isCrit = qScore.failedKillQuestion || (qMeta?.critical);
-            const isFat = qScore.failedKillQuestion || (qMeta?.fatal);
+            const isCrit = qScore.failedKillQuestion;
+            const isFat = qScore.failedKillQuestion;
             const badges = (isCrit || isFat)
               ? `<span class="badge ${isFat ? 'badge-fatal' : 'badge-critical'}">${isFat ? 'Fatal' : 'Critical'}</span>`
               : '';
+            
+            const comments = qScore.comments ? 
+              `<div class="comment-bubble">${qScore.comments}</div>` : '';
             
             qRows += `<tr>
               <td>${qText}</td>
               <td>${qScore.markedNA ? 'N/A' : 'Answered'}</td>
               <td>${ansScore === null ? '-' : fmt(ansScore, 1)}</td>
               <td>${badges || '<span class="badge badge-ok">OK</span>'}</td>
+              <td>${comments}</td>
             </tr>`;
-          });
-        });
+          }
+        }
 
         return `
           <details class="evaluation">
             <summary>${when} • <strong>${agent}</strong> — ${formName} &nbsp;&middot;&nbsp; Score: <strong>${score===null?'-':pct(score,1)}</strong> ${convo!=='(n/a)'?`&nbsp;&middot;&nbsp; Conversation: ${convo}`:''}</summary>
             <div class="table-container">
               <table>
-                <thead><tr><th>Question</th><th>Answer</th><th>Score</th><th>Flags</th></tr></thead>
-                <tbody>${qRows || `<tr><td colspan="4" class="muted">No question data available.</td></tr>`}</tbody>
+                <thead><tr><th>Question</th><th>Answer</th><th>Score</th><th>Flags</th><th>Comments</th></tr></thead>
+                <tbody>${qRows || `<tr><td colspan="5" class="muted">No question data available.</td></tr>`}</tbody>
               </table>
             </div>
           </details>
         `;
-      }).join('');
+      }));
+      
+      c.innerHTML = evaluationElements.join('');
     }
 
     // -------- Critical / Fatal summary --------

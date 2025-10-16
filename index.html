@@ -477,7 +477,6 @@
           throw new Error(`HTTP ${res.status} for ${next}`);
         }
         const data = await res.json();
-        console.log('API Response:', data);
         
         if (Array.isArray(data.entities)) all = all.concat(data.entities);
         else if (Array.isArray(data.users)) all = all.concat(data.users);
@@ -602,14 +601,14 @@
       try {
         // Step 1: Get overview data using analytics API (much faster)
         console.log('Loading overview data via analytics API...');
-        state.overviewData = await fetchOverviewData(agentIds, formIds);
+        state.overviewData = await fetchOverviewData(agentIds);
         
         // Step 2: Get detailed evaluations for question-level data
         console.log('Loading detailed evaluations...');
         state.evals = await fetchDetailedEvaluations(agentIds, formIds);
         
         console.log(`Loaded ${state.evals.length} detailed evaluations`);
-        msg(`Loaded ${state.overviewData.length} agent summaries and ${state.evals.length} detailed evaluations.`, 'success');
+        msg(`Loaded overview data for ${state.overviewData.length} agents and ${state.evals.length} detailed evaluations.`, 'success');
         renderAll();
       } catch(e) {
         console.error('Error loading evaluations:', e);
@@ -619,42 +618,24 @@
       }
     }
 
-    async function fetchOverviewData(agentIds, formIds) {
+    async function fetchOverviewData(agentIds) {
       const start = state.monthStart.toISOString();
       const end = state.monthEnd.toISOString();
       
       const body = {
         interval: `${start}/${end}`,
-        granularity: "P1D",
+        granularity: "P1D", 
         groupBy: ["userId"],
         metrics: [
           "nEvaluations",
-          "oTotalCriticalScore", 
-          "oTotalScore",
+          "oTotalCriticalScore",
+          "oTotalScore", 
           "nEvaluationsRescored"
-        ],
-        filter: {
-          type: "and",
-          predicates: [
-            {
-              type: "dimension",
-              dimension: "userId",
-              operator: "in",
-              values: agentIds
-            }
-          ]
-        }
+        ]
       };
 
-      // Add form filter if forms are selected
-      if (formIds && formIds.length > 0) {
-        body.filter.predicates.push({
-          type: "dimension",
-          dimension: "formId",
-          operator: "in",
-          values: formIds
-        });
-      }
+      // Get all data without filters and filter client-side
+      console.log('Making analytics API call without filters...');
 
       const url = `https://api.${config.REGION}/api/v2/analytics/evaluations/aggregates/query`;
       
@@ -670,9 +651,19 @@
       }
 
       const data = await res.json();
-      console.log('Analytics response:', data);
+      console.log('Analytics response received, filtering client-side...');
       
-      return data.results || [];
+      const results = data.results || [];
+      
+      // Filter results client-side based on selected agents
+      const filteredResults = results.filter(item => {
+        const userId = safeGet(item, 'group.userId');
+        return agentIds.includes(userId);
+      });
+      
+      console.log(`Filtered ${filteredResults.length} of ${results.length} results for selected agents`);
+      
+      return filteredResults;
     }
 
     async function fetchDetailedEvaluations(agentIds, formIds) {

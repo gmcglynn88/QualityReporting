@@ -16,10 +16,9 @@
     }
     #logo-container{text-align:center;margin-bottom:20px} #logo{width:300px}
     h1{margin:0 0 16px}
-    .card{background:var(--card-bg);border:1px solid var(--border-color);border-radius:12px;padding:24px;margin-top:16px;box-shadow:0 1px 3px rgba(0,0,0,.08)}
+    .card{background:var(--card-bg);border:1px solid var(--border-color);border-radius:12px;padding:24px;margin-top:16px;box-shadow:0 1px 3px rgba(0,0,0,.1)}
     label{display:block;font-weight:600;margin-bottom:6px}
     input,select,button,textarea{padding:10px;border:1px solid var(--border-color);border-radius:6px;background:#fff;font-size:14px}
-    select[multiple]{min-height:220px}
     button{background:var(--primary-color);color:#fff;font-weight:600;cursor:pointer;transition:background .2s}
     button:hover{background:var(--secondary-color)} button:disabled{background:var(--text-light);cursor:not-allowed}
     .controls{display:grid;grid-template-columns:repeat(auto-fit,minmax(260px,1fr));gap:16px;align-items:start}
@@ -55,6 +54,36 @@
     .kpi { background:#fff; border:1px solid var(--border-color); border-radius:8px; padding:12px; }
     .kpi .label { color:var(--text-light); font-size:12px }
     .kpi .value { font-size:20px; font-weight:700; margin-top:4px }
+
+    /* Checkbox dropdown styles from skill management tool */
+    .checkbox-dropdown{position:relative;min-width:220px;width:100%}
+    .cd-trigger{display:flex;align-items:center;justify-content:space-between;border:1px solid var(--border-color);border-radius:6px;background:#fff;padding:10px;cursor:pointer;width:100%;box-sizing:border-box}
+    .cd-trigger .label{color:var(--text-color);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;flex:1}
+    .cd-trigger .count{background:var(--pill);border:1px solid var(--border-color);border-radius:999px;padding:2px 8px;font-size:12px;color:#2c3e50;flex-shrink:0;margin-left:8px}
+    .cd-panel{position:absolute;z-index:1000;margin-top:6px;background:#fff;border:1px solid var(--border-color);border-radius:8px;box-shadow:0 8px 24px rgba(0,0,0,.12);width:100%;max-height:340px;overflow:hidden;display:none;box-sizing:border-box}
+    .cd-panel.open{display:block}
+    .cd-header{padding:10px;border-bottom:1px solid var(--border-color);display:flex;gap:8px;align-items:center}
+    .cd-search{flex:1;border:1px solid var(--border-color);border-radius:6px;padding:8px;width:100%;box-sizing:border-box}
+    .cd-actions{display:flex;gap:8px}
+    .cd-actions button{background:#eef6f2;color:#2c3e50;border:1px solid var(--border-color);border-radius:6px;padding:8px 10px;cursor:pointer;white-space:nowrap}
+    .cd-selectall{padding:8px 12px;border-bottom:1px solid var(--border-color);display:flex;align-items:center;gap:10px}
+    .cd-list{max-height:260px;overflow:auto}
+    .cd-item{display:flex;align-items:center;gap:10px;padding:8px 12px;border-bottom:1px solid #f1f3f5}
+    .cd-item label{display:flex;align-items:center;gap:10px;cursor:pointer;width:100%}
+    .cd-footer{padding:8px 12px;background:#fafafa;border-top:1px solid var(--border-color);font-size:12px;color:var(--text-light);display:flex;justify-content:space-between}
+    
+    /* Responsive adjustments */
+    @media (max-width: 1200px) {
+      .controls {
+        grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
+      }
+    }
+    
+    @media (max-width: 768px) {
+      .controls {
+        grid-template-columns: 1fr;
+      }
+    }
   </style>
 </head>
 <body>
@@ -82,17 +111,13 @@
       <h2 class="section-title">Configuration</h2>
       <div class="controls">
         <div>
-          <label for="userSelect">Agents (multi-select)</label>
-          <select id="userSelect" multiple disabled>
-            <option>Loading users…</option>
-          </select>
-          <div class="muted">Tip: Ctrl/Cmd+Click to select multiple</div>
+          <label for="userDropdown">Agents</label>
+          <div id="userDropdown" class="checkbox-dropdown"></div>
+          <div class="muted">Tip: Click to select multiple agents</div>
         </div>
         <div>
-          <label for="formSelect">Evaluation Forms (multi-select)</label>
-          <select id="formSelect" multiple disabled>
-            <option>Loading forms…</option>
-          </select>
+          <label for="formDropdown">Evaluation Forms</label>
+          <div id="formDropdown" class="checkbox-dropdown"></div>
         </div>
         <div>
           <label for="monthInput">Month</label>
@@ -151,7 +176,7 @@
     const clientId = 'fe305808-b368-4547-8af9-325d28d552bb';
     const config = { REGION:'mypurecloud.ie' };
     const DEBUG = new URLSearchParams(window.location.search).has('debug');
-    const redirectUri = window.location.origin + window.location.pathname; // Use current page as redirect URI
+    const redirectUri = window.location.origin + window.location.pathname;
     const oauthUrl = `https://login.${config.REGION}/oauth/authorize?client_id=${encodeURIComponent(clientId)}&response_type=token&redirect_uri=${encodeURIComponent(redirectUri)}&state=qa`;
 
     const state = {
@@ -162,6 +187,12 @@
       evals: [],                 // loaded evaluations
       monthStart: null,
       monthEnd: null
+    };
+
+    // Checkbox dropdown instances
+    const dropdowns = {
+      users: null,
+      forms: null
     };
 
     function showDebugCard() {
@@ -180,6 +211,109 @@
       if(type==='success'){ 
         setTimeout(()=>box.style.display='none',5000);
       } 
+    }
+
+    // ===== Checkbox Dropdown Component =====
+    function createCheckboxDropdown(containerId, { placeholder, searchPlaceholder }){
+      const root = document.getElementById(containerId);
+      root.innerHTML = '';
+
+      const trigger = document.createElement('div');
+      trigger.className = 'cd-trigger';
+      trigger.innerHTML = `<span class="label">${placeholder}</span><span class="count">0 selected</span>`;
+      root.appendChild(trigger);
+
+      const panel = document.createElement('div');
+      panel.className = 'cd-panel';
+      panel.innerHTML = `
+        <div class="cd-header">
+          <input type="text" class="cd-search" placeholder="${searchPlaceholder}" />
+          <div class="cd-actions">
+            <button type="button" data-cd="clear">Clear</button>
+          </div>
+        </div>
+        <div class="cd-selectall">
+          <label><input type="checkbox" data-cd="selectall"/> Select all</label>
+        </div>
+        <div class="cd-list"></div>
+        <div class="cd-footer">
+          <span data-cd="summary">0 selected</span>
+          <span>Click outside to close</span>
+        </div>
+      `;
+      root.appendChild(panel);
+
+      const list = panel.querySelector('.cd-list');
+      const search = panel.querySelector('.cd-search');
+      const clearBtn = panel.querySelector('[data-cd="clear"]');
+      const selectAll = panel.querySelector('[data-cd="selectall"]');
+      const summary = panel.querySelector('[data-cd="summary"]');
+
+      let options = []; // [{value, label}]
+      let selected = new Set();
+
+      function render(filter=''){
+        const ft = filter.trim().toLowerCase();
+        list.innerHTML = '';
+        const filtered = !ft ? options : options.filter(o => (o.label||'').toLowerCase().includes(ft));
+        if (!filtered.length){ list.innerHTML = `<div class="cd-item" style="color:#6C757D">No matches</div>`; return; }
+        filtered.forEach(o=>{
+          const id = `${containerId}__${o.value}`;
+          const row = document.createElement('div');
+          row.className = 'cd-item';
+          row.innerHTML = `
+            <label for="${id}">
+              <input type="checkbox" id="${id}" value="${o.value}" ${selected.has(o.value)?'checked':''}/>
+              <span>${o.label || o.value}</span>
+            </label>
+          `;
+          const cb = row.querySelector('input');
+          cb.addEventListener('change', ()=>{
+            if (cb.checked) selected.add(o.value); else selected.delete(o.value);
+            updateSummary(); updateSelectAllState();
+            updateLoadButtonState();
+          });
+          list.appendChild(row);
+        });
+      }
+      
+      function updateSummary(){
+        trigger.querySelector('.count').textContent = `${selected.size} selected`;
+        summary.textContent = `${selected.size} selected`;
+      }
+      
+      function updateSelectAllState(){
+        const total = options.length, count = selected.size;
+        selectAll.indeterminate = count>0 && count<total;
+        selectAll.checked = total>0 && count===total;
+      }
+
+      trigger.addEventListener('click', ()=>{ panel.classList.toggle('open'); search.focus(); });
+      document.addEventListener('click', (e)=>{ if (!root.contains(e.target)) panel.classList.remove('open'); });
+      search.addEventListener('input', ()=> render(search.value));
+      clearBtn.addEventListener('click', ()=>{ selected.clear(); render(search.value); updateSummary(); updateSelectAllState(); updateLoadButtonState(); });
+      selectAll.addEventListener('change', ()=>{
+        if (selectAll.checked) options.forEach(o=> selected.add(o.value)); else selected.clear();
+        render(search.value); updateSummary(); updateLoadButtonState();
+      });
+
+      function setOptions(newOptions){
+        options = newOptions || [];
+        selected.forEach(v=>{ if (!options.some(o=>o.value===v)) selected.delete(v); });
+        render(search.value); updateSummary(); updateSelectAllState();
+        updateLoadButtonState();
+      }
+      
+      function getSelectedValues(){ return Array.from(selected); }
+
+      render('');
+      return { setOptions, getSelectedValues };
+    }
+
+    function updateLoadButtonState(){
+      const hasUsers = dropdowns.users && dropdowns.users.getSelectedValues().length > 0;
+      const hasMonth = document.getElementById('monthInput').value;
+      document.getElementById('loadBtn').disabled = !(hasUsers && hasMonth);
     }
 
     // ===== Bootstrap =====
@@ -219,6 +353,16 @@
 
       document.getElementById('appContent').style.display='block';
 
+      // Initialize dropdowns
+      dropdowns.users = createCheckboxDropdown('userDropdown', { 
+        placeholder: 'Select agents', 
+        searchPlaceholder: 'Search agents...' 
+      });
+      dropdowns.forms = createCheckboxDropdown('formDropdown', { 
+        placeholder: 'Select forms', 
+        searchPlaceholder: 'Search forms...' 
+      });
+
       // Wire controls
       document.getElementById('overviewTabButton').onclick = () => setTab('overview');
       document.getElementById('trendsTabButton').onclick = () => setTab('trends');
@@ -231,13 +375,16 @@
       document.getElementById('monthInput').value = `${m.getFullYear()}-${String(m.getMonth()+1).padStart(2,'0')}`;
       updateMonthRange();
 
-      document.getElementById('monthInput').addEventListener('change', updateMonthRange);
+      document.getElementById('monthInput').addEventListener('change', () => {
+        updateMonthRange();
+        updateLoadButtonState();
+      });
 
       // Load lookups
       Promise.all([fetchAllUsers(), fetchAllForms()])
         .then(()=> { 
           console.log('Lookups loaded successfully');
-          document.getElementById('loadBtn').disabled = false; 
+          updateLoadButtonState();
         })
         .catch(err => {
           console.error('Initial load failed:', err);
@@ -311,9 +458,12 @@
           email: u.email || '' 
         })).sort((a,b)=>a.name.localeCompare(b.name));
         
-        const sel = document.getElementById('userSelect');
-        sel.innerHTML = state.users.map(u => `<option value="${u.id}">${u.name}${u.email?` — ${u.email}`:''}</option>`).join('');
-        sel.disabled = false;
+        // Populate the users dropdown
+        const userOptions = state.users.map(u => ({ 
+          value: u.id, 
+          label: `${u.name}${u.email ? ` — ${u.email}` : ''}` 
+        }));
+        dropdowns.users.setOptions(userOptions);
         console.log(`Loaded ${state.users.length} users`);
       } catch (error) {
         console.error('Error fetching users:', error);
@@ -333,9 +483,13 @@
         })).sort((a,b)=>a.name.localeCompare(b.name));
         
         state.formsById = Object.fromEntries(state.forms.map(f=>[f.id,f]));
-        const sel = document.getElementById('formSelect');
-        sel.innerHTML = state.forms.map(f => `<option value="${f.id}">${f.name}</option>`).join('');
-        sel.disabled = false;
+        
+        // Populate the forms dropdown
+        const formOptions = state.forms.map(f => ({ 
+          value: f.id, 
+          label: f.name 
+        }));
+        dropdowns.forms.setOptions(formOptions);
         console.log(`Loaded ${state.forms.length} forms`);
       } catch (error) {
         console.error('Error fetching forms:', error);
@@ -371,10 +525,8 @@
 
     // ===== Query Evaluations =====
     async function loadEvaluations(){
-      const userSel = document.getElementById('userSelect');
-      const formSel = document.getElementById('formSelect');
-      const agentIds = Array.from(userSel.selectedOptions).map(o=>o.value);
-      const formIds  = Array.from(formSel.selectedOptions).map(o=>o.value);
+      const agentIds = dropdowns.users.getSelectedValues();
+      const formIds = dropdowns.forms.getSelectedValues();
 
       if (agentIds.length === 0) { 
         msg('Please select at least one agent.','error'); 
@@ -771,19 +923,6 @@
         <tbody>${rows || `<tr><td colspan="5" class="muted">No critical/fatal marks found for the selected period.</td></tr>`}</tbody>
       `;
     }
-
-    // ===== UI Utilities =====
-    function refreshButtons(){
-      const hasUsers = document.getElementById('userSelect').options.length>0;
-      const hasForms = document.getElementById('formSelect').options.length>0;
-      document.getElementById('loadBtn').disabled = !(hasUsers && hasForms && document.getElementById('monthInput').value);
-    }
-
-    // Re-enable button after lookups finish
-    const usersObserver = new MutationObserver(refreshButtons);
-    usersObserver.observe(document.getElementById('userSelect'), {childList:true});
-    const formsObserver = new MutationObserver(refreshButtons);
-    formsObserver.observe(document.getElementById('formSelect'), {childList:true});
   </script>
 </body>
 </html>

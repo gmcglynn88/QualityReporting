@@ -199,12 +199,13 @@
     const state = {
       accessToken: null,
       users: [],                 // [{id, name, email}]
-      forms: [],                 // [{id, name, questionsById}]
-      formsById: {},             // id -> form
+      forms: [],                 // [{id, name}]
+      formsById: {},             // id -> form meta
       evals: [],                 // loaded evaluations
       monthStart: null,
       monthEnd: null,
-      formDetailsCache: new Map()   // Cache for complete form details
+      formDetailsCache: new Map(),   // formId -> full details JSON
+      formLookupCache: new Map()     // formId -> {questionMap, answerMap}
     };
 
     // Checkbox dropdown instances
@@ -747,99 +748,183 @@
       return allEvaluations;
     }
 
-    // ===== SIMPLE Form Details Lookup =====
+    // ===== ROBUST Form Details Lookup + Indices =====
     function buildSimpleFormLookup(formDetails) {
-      console.log('Building simple form lookup from:', formDetails);
-      
-      const questionMap = new Map(); // questionId -> questionText
-      const answerMap = new Map();   // answerId -> answerText
-      
-      if (!formDetails || !Array.isArray(formDetails.questionGroups)) {
-        return { questionMap, answerMap };
-      }
+      // Returns maps that resolve both id and contextId for questions/answers
+      const questionMap = new Map(); // anyId -> questionText
+      const answerMap = new Map();   // anyId -> answerText
 
-      // Recursively process all question groups and questions
-      function processGroups(groups) {
-        groups.forEach(group => {
-          // Process questions in this group
-          (group.questions || []).forEach(question => {
-            // Store question text by both id and contextId
-            if (question.id && question.text) {
-              questionMap.set(question.id, question.text);
-            }
-            if (question.contextId && question.text) {
-              questionMap.set(question.contextId, question.text);
-            }
-            
-            // Store answer texts
-            (question.answerOptions || []).forEach(answer => {
-              if (answer.id && answer.text) {
-                answerMap.set(answer.id, answer.text);
-              }
-              if (answer.contextId && answer.text) {
-                answerMap.set(answer.contextId, answer.text);
-              }
-            });
-            
-            // Process multiple select questions
-            (question.multipleSelectOptionQuestions || []).forEach(msq => {
-              if (msq.id && msq.text) {
-                questionMap.set(msq.id, msq.text);
-              }
-              if (msq.contextId && msq.text) {
-                questionMap.set(msq.contextId, msq.text);
-              }
-              
-              (msq.answerOptions || []).forEach(answer => {
-                if (answer.id && answer.text) {
-                  answerMap.set(answer.id, answer.text);
-                }
-                if (answer.contextId && answer.text) {
-                  answerMap.set(answer.contextId, answer.text);
-                }
-              });
-            });
-          });
-          
-          // Process nested question groups
-          if (Array.isArray(group.questionGroups)) {
-            processGroups(group.questionGroups);
-          }
+      if (!formDetails) return { questionMap, answerMap };
+
+      function addQuestion(q){
+        if (!q) return;
+        const qText = q.text || q.label || q.title || '';
+        const ids = [q.id, q.contextId, q.questionId, q.questionContextId].filter(Boolean);
+        ids.forEach(id => questionMap.set(id, qText));
+
+        // Standard answer options
+        (q.answerOptions || []).forEach(a => {
+          const aText = a.text ?? String(a.value ?? '');
+          const aIds = [a.id, a.contextId, a.answerId, a.answerOptionId].filter(Boolean);
+          aIds.forEach(id => answerMap.set(id, aText));
+        });
+
+        // Multiple-select nested options (Genesys nests these)
+        (q.multipleSelectOptionQuestions || []).forEach(msq => {
+          addQuestion(msq);
         });
       }
 
-      processGroups(formDetails.questionGroups);
-      
-      console.log('Simple lookup built:', {
-        questions: questionMap.size,
-        answers: answerMap.size
-      });
-      
+      function walkGroups(groups){
+        (groups || []).forEach(g => {
+          (g.questions || []).forEach(addQuestion);
+          if (Array.isArray(g.questionGroups)) walkGroups(g.questionGroups);
+        });
+      }
+
+      // Some payloads put questions at root, some under questionGroups
+      if (Array.isArray(formDetails.questions)) {
+        formDetails.questions.forEach(addQuestion);
+      }
+      walkGroups(formDetails.questionGroups);
+
       return { questionMap, answerMap };
     }
 
-    // ===== SIMPLE Answer ID extraction =====
-    function getSimpleAnswerIds(qScore) {
-      // Try all possible answer ID fields
-      const answerIds = [];
-      
-      if (qScore.selectedAnswerIds && Array.isArray(qScore.selectedAnswerIds)) {
-        answerIds.push(...qScore.selectedAnswerIds);
+    // Helper: ensure lookup cache built for a form
+    function ensureFormLookup(formId){
+      if (state.formLookupCache.has(formId)) return state.formLookupCache.get(formId);
+      const details = state.formDetailsCache.get(formId);
+      const lookup = buildSimpleFormLookup(details || {});
+      state.formLookupCache.set(formId, lookup);
+      return lookup;
+    }
+
+    // Deep fallback search in form JSON (used when IDs are quirky)
+    function deepFindQuestionText(details, id){
+      if (!details || !id) return null;
+      let found = null;
+      function scanQ(q){
+        if (!q || found) return;
+        if ([q.id, q.contextId, q.questionId, q.questionContextId].includes(id)) {
+          found = q.text || q.label || q.title || null;
+        }
+        (q.answerOptions || []).forEach(a => {
+          if ([a.id, a.contextId, a.answerId, a.answerOptionId].includes(id) && !found) {
+            // not a question, but still stop if matched
+            found = q.text || null;
+          }
+        });
+        (q.multipleSelectOptionQuestions || []).forEach(scanQ);
       }
-      if (qScore.selectedAnswerOptionIds && Array.isArray(qScore.selectedAnswerOptionIds)) {
-        answerIds.push(...qScore.selectedAnswerOptionIds);
+      function scanG(g){
+        (g.questions || []).forEach(scanQ);
+        (g.questionGroups || []).forEach(scanG);
       }
-      if (qScore.selectedAnswerId) {
-        answerIds.push(qScore.selectedAnswerId);
+      (details.questions || []).forEach(scanQ);
+      (details.questionGroups || []).forEach(scanG);
+      return found;
+    }
+
+    function deepFindAnswerText(details, id){
+      if (!details || !id) return null;
+      let found = null;
+      function scanQ(q){
+        if (!q || found) return;
+        (q.answerOptions || []).forEach(a => {
+          if ([a.id, a.contextId, a.answerId, a.answerOptionId].includes(id)) {
+            found = a.text ?? String(a.value ?? '');
+          }
+        });
+        (q.multipleSelectOptionQuestions || []).forEach(scanQ);
       }
-      if (qScore.answerOptionId) {
-        answerIds.push(qScore.answerOptionId);
+      function scanG(g){
+        (g.questions || []).forEach(scanQ);
+        (g.questionGroups || []).forEach(scanG);
       }
-      if (qScore.answerId) {
-        answerIds.push(qScore.answerId);
+      (details.questions || []).forEach(scanQ);
+      (details.questionGroups || []).forEach(scanG);
+      return found;
+    }
+
+    // Resolve question text from a qScore + form
+    function resolveQuestionText(formId, qScore){
+      const lookup = ensureFormLookup(formId);
+      const details = state.formDetailsCache.get(formId);
+
+      const candidates = [
+        qScore.questionId,
+        qScore.questionContextId,
+        safeGet(qScore,'question.id'),
+        safeGet(qScore,'question.contextId')
+      ].filter(Boolean);
+
+      for (const id of candidates){
+        const txt = lookup.questionMap.get(id);
+        if (txt) return txt;
       }
-      
-      return answerIds;
+      // Fallback: try deep scan
+      for (const id of candidates){
+        const txt = deepFindQuestionText(details, id);
+        if (txt) return txt;
+      }
+      // Last resort: any text embedded on the score
+      return safeGet(qScore,'question.text') || `Question ${candidates[0] || ''}`.trim();
+    }
+
+    // Extract all plausible answer IDs from a qScore
+    function collectAnswerIds(qScore){
+      const ids = new Set();
+
+      // Common fields
+      (qScore.selectedAnswerIds || []).forEach(x => ids.add(x));
+      (qScore.selectedAnswerOptionIds || []).forEach(x => ids.add(x));
+      if (qScore.selectedAnswerId) ids.add(qScore.selectedAnswerId);
+      if (qScore.answerOptionId) ids.add(qScore.answerOptionId);
+      if (qScore.answerId) ids.add(qScore.answerId);
+
+      // Some shapes embed an 'answer' object
+      const a = qScore.answer;
+      if (a){
+        if (a.id) ids.add(a.id);
+        if (a.contextId) ids.add(a.contextId);
+        if (a.answerId) ids.add(a.answerId);
+        if (a.answerOptionId) ids.add(a.answerOptionId);
+      }
+
+      // Multi-select structures sometimes appear as 'answers'
+      (qScore.answers || []).forEach(ans => {
+        if (ans.id) ids.add(ans.id);
+        if (ans.contextId) ids.add(ans.contextId);
+        if (ans.answerId) ids.add(ans.answerId);
+        if (ans.answerOptionId) ids.add(ans.answerOptionId);
+      });
+
+      return Array.from(ids);
+    }
+
+    // Resolve answer text(s) from a qScore + form
+    function resolveAnswerText(formId, qScore){
+      const lookup = ensureFormLookup(formId);
+      const details = state.formDetailsCache.get(formId);
+
+      const ids = collectAnswerIds(qScore);
+      if (ids.length){
+        const texts = [];
+        ids.forEach(id => {
+          let t = lookup.answerMap.get(id);
+          if (!t) t = deepFindAnswerText(details, id);
+          if (t) texts.push(t);
+        });
+        if (texts.length) return texts.join(', ');
+      }
+
+      // Fallbacks for numeric/text freeform answers
+      if (qScore.freeTextAnswer) return String(qScore.freeTextAnswer);
+      if (qScore.numericAnswer !== undefined && qScore.numericAnswer !== null) return String(qScore.numericAnswer);
+      if (safeGet(qScore,'answer.text')) return qScore.answer.text;
+
+      return 'N/A';
     }
 
     // ===== Renderers =====
@@ -972,7 +1057,17 @@
       // Create a loading message while we fetch form details
       c.innerHTML = '<div class="info-message">Loading evaluation details...</div>';
       
-      // Process evaluations asynchronously to fetch form details
+      // Ensure we have details + lookups cached for all forms present
+      const formIds = Array.from(new Set(state.evals.map(e => safeGet(e,'form.id') || e.formId))).filter(Boolean);
+      await Promise.all(formIds.map(async (fid) => {
+        if (!state.formDetailsCache.has(fid)) {
+          const d = await getFormDetails(fid);
+          state.formDetailsCache.set(fid, d);
+        }
+        ensureFormLookup(fid);
+      }));
+
+      // Build DOM
       const evaluationElements = await Promise.all(state.evals.map(async (e) => {
         const agent = resolveUserName(safeGet(e,'agent.id') || e.agentUserId);
         const evaluator = resolveUserName(safeGet(e,'evaluator.id') || e.evaluatorUserId);
@@ -984,36 +1079,13 @@
         const score = getEvalPercent(e);
         const questionGroups = safeGet(e, 'answers.questionGroupScores') || [];
 
-        // Get form details and build SIMPLE lookup maps
-        const formDetails = await getFormDetails(formId);
-        const { questionMap, answerMap } = buildSimpleFormLookup(formDetails);
-        
-        // Build question rows
+        // Build question rows with robust text resolution
         let qRows = '';
-        
         questionGroups.forEach(group => {
           const questionScores = group.questionScores || [];
           questionScores.forEach(qScore => {
-            // Get question ID
-            const questionId = qScore.questionId || qScore.questionContextId;
-            
-            // Get question text - SIMPLE lookup
-            let questionText = questionMap.get(questionId) || 
-                             qScore.question?.text || 
-                             `Question ${questionId}`;
-            
-            // Get answer IDs and texts - SIMPLE lookup
-            const answerIds = getSimpleAnswerIds(qScore);
-            let answerText = 'N/A';
-            
-            if (answerIds.length > 0) {
-              const answerTexts = answerIds.map(id => 
-                answerMap.get(id) || `Answer ${id}`
-              );
-              answerText = answerTexts.join(', ');
-            } else if (qScore.answer && qScore.answer.text) {
-              answerText = qScore.answer.text;
-            }
+            const qText = resolveQuestionText(formId, qScore);
+            const aText = resolveAnswerText(formId, qScore);
 
             const ansScore = qScore.score ?? null;
             const isFat = !!qScore.failedKillQuestion;
@@ -1032,8 +1104,8 @@
             }
 
             qRows += `<tr class="${rowClass}">
-              <td>${questionText}</td>
-              <td>${answerText}</td>
+              <td>${qText}</td>
+              <td>${aText}</td>
               <td>${ansScore === null ? '-' : fmt(ansScore, 1)}</td>
               <td>${isFat ? '<span class="badge badge-fatal">Fatal</span>' : isCrit ? '<span class="badge badge-critical">Critical</span>' : '<span class="badge badge-ok">OK</span>'}</td>
               <td>${allComments}</td>
@@ -1070,18 +1142,8 @@
         questionGroups.forEach(group => {
           const questionScores = group.questionScores || [];
           questionScores.forEach(qScore => {
-            const qid = qScore.questionId || qScore.questionContextId || '(unknown)';
-
-            // Try to get actual question text from form details
-            let qText = `Question ${qid}`;
-            const formDetails = state.formDetailsCache.get(formId);
-            if (formDetails) {
-              const { questionMap } = buildSimpleFormLookup(formDetails);
-              const actualText = questionMap.get(qid);
-              if (actualText) qText = actualText;
-            }
-
-            const key = `${formId}|${qid}|${qText}`;
+            const qText = resolveQuestionText(formId, qScore) || '(Question)';
+            const key = `${formId}|${qText}`;
             if (!counts.has(key)) {
               counts.set(key, {formName, qText, critical: 0, fatal: 0});
             }
@@ -1129,6 +1191,9 @@
         }
         const formDetails = await res.json();
         state.formDetailsCache.set(formId, formDetails);
+        // also pre-build lookup cache for speed
+        const lookup = buildSimpleFormLookup(formDetails);
+        state.formLookupCache.set(formId, lookup);
         return formDetails;
       } catch (error) {
         console.warn(`Error fetching form details for ${formId}:`, error);

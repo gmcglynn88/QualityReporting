@@ -747,121 +747,99 @@
       return allEvaluations;
     }
 
-    // ===== Improved Form Details Lookup =====
-    function buildFormLookup(formDetails) {
-      const questionLookup = new Map(); // q.id or q.contextId -> { text, isCritical, isFatal, groupId }
-      const answerLookup = new Map(); // `${qKey}|${a.id}` or `${qKey}|${a.contextId}` -> answerText
-      const answerLookupAny = new Map(); // a.id or a.contextId -> answerText (unscoped fallback)
-      const groupLookup = new Map(); // group.id or group.contextId -> groupName
+    // ===== SIMPLE Form Details Lookup =====
+    function buildSimpleFormLookup(formDetails) {
+      console.log('Building simple form lookup from:', formDetails);
+      
+      const questionMap = new Map(); // questionId -> questionText
+      const answerMap = new Map();   // answerId -> answerText
       
       if (!formDetails || !Array.isArray(formDetails.questionGroups)) {
-        return { questionLookup, answerLookup, answerLookupAny, groupLookup };
+        return { questionMap, answerMap };
       }
 
-      function indexQuestion(q, groupId) {
-        const payload = {
-          text: q.text || `Question ${q.id || q.contextId}`,
-          isCritical: !!q.isCritical,
-          isFatal: !!q.isKill,
-          groupId
-        };
-        
-        // Index by both id AND contextId since evaluations might use either
-        if (q.id) questionLookup.set(q.id, payload);
-        if (q.contextId) questionLookup.set(q.contextId, payload);
-
-        const qKeys = [q.id, q.contextId].filter(Boolean);
-        
-        // Handle regular answer options
-        (q.answerOptions || []).forEach(a => {
-          const aText = a.text || `Answer ${a.id || a.contextId}`;
-          qKeys.forEach(qKey => {
-            if (a.id) answerLookup.set(`${qKey}|${a.id}`, aText);
-            if (a.contextId) answerLookup.set(`${qKey}|${a.contextId}`, aText);
-          });
-          if (a.id) answerLookupAny.set(a.id, aText);
-          if (a.contextId) answerLookupAny.set(a.contextId, aText);
-        });
-        
-        // Handle multiple select questions (nested questions)
-        (q.multipleSelectOptionQuestions || []).forEach(msq => {
-          const msqPayload = {
-            text: msq.text || `Question ${msq.id || msq.contextId}`,
-            isCritical: !!msq.isCritical,
-            isFatal: !!msq.isKill,
-            groupId
-          };
-          
-          if (msq.id) questionLookup.set(msq.id, msqPayload);
-          if (msq.contextId) questionLookup.set(msq.contextId, msqPayload);
-          
-          const msqKeys = [msq.id, msq.contextId].filter(Boolean);
-          (msq.answerOptions || []).forEach(a => {
-            const aText = a.text || (a.builtInType === 'Selected' ? 'Yes' : 'No') || `Answer ${a.id || a.contextId}`;
-            msqKeys.forEach(qKey => {
-              if (a.id) answerLookup.set(`${qKey}|${a.id}`, aText);
-              if (a.contextId) answerLookup.set(`${qKey}|${a.contextId}`, aText);
+      // Recursively process all question groups and questions
+      function processGroups(groups) {
+        groups.forEach(group => {
+          // Process questions in this group
+          (group.questions || []).forEach(question => {
+            // Store question text by both id and contextId
+            if (question.id && question.text) {
+              questionMap.set(question.id, question.text);
+            }
+            if (question.contextId && question.text) {
+              questionMap.set(question.contextId, question.text);
+            }
+            
+            // Store answer texts
+            (question.answerOptions || []).forEach(answer => {
+              if (answer.id && answer.text) {
+                answerMap.set(answer.id, answer.text);
+              }
+              if (answer.contextId && answer.text) {
+                answerMap.set(answer.contextId, answer.text);
+              }
             });
-            if (a.id) answerLookupAny.set(a.id, aText);
-            if (a.contextId) answerLookupAny.set(a.contextId, aText);
+            
+            // Process multiple select questions
+            (question.multipleSelectOptionQuestions || []).forEach(msq => {
+              if (msq.id && msq.text) {
+                questionMap.set(msq.id, msq.text);
+              }
+              if (msq.contextId && msq.text) {
+                questionMap.set(msq.contextId, msq.text);
+              }
+              
+              (msq.answerOptions || []).forEach(answer => {
+                if (answer.id && answer.text) {
+                  answerMap.set(answer.id, answer.text);
+                }
+                if (answer.contextId && answer.text) {
+                  answerMap.set(answer.contextId, answer.text);
+                }
+              });
+            });
           });
+          
+          // Process nested question groups
+          if (Array.isArray(group.questionGroups)) {
+            processGroups(group.questionGroups);
+          }
         });
       }
 
-      function walk(groups) {
-        groups.forEach(g => {
-          const gName = g.name || 'Unnamed Group';
-          if (g.id) groupLookup.set(g.id, gName);
-          if (g.contextId) groupLookup.set(g.contextId, gName);
-
-          (g.questions || []).forEach(q => indexQuestion(q, g.id || g.contextId));
-          if (Array.isArray(g.questionGroups)) walk(g.questionGroups);
-        });
-      }
-
-      walk(formDetails.questionGroups);
+      processGroups(formDetails.questionGroups);
       
-      console.log('Form lookup built:', {
-        questions: questionLookup.size,
-        answers: answerLookup.size,
-        groups: groupLookup.size
+      console.log('Simple lookup built:', {
+        questions: questionMap.size,
+        answers: answerMap.size
       });
       
-      return { questionLookup, answerLookup, answerLookupAny, groupLookup };
+      return { questionMap, answerMap };
     }
 
-    // Normalize selected answer IDs (single or multiple)
-    function getSelectedAnswerIds(qScore){
-      const arr =
-        qScore.selectedAnswerIds ||
-        qScore.selectedAnswerOptionIds ||
-        qScore.selectedAnswerContextIds ||
-        qScore.selectedAnswerOptionContextIds ||
-        (qScore.selectedAnswerId ? [qScore.selectedAnswerId] : null) ||
-        (qScore.answerOptionId ? [qScore.answerOptionId] : null) ||
-        (qScore.answerId ? [qScore.answerId] : null) ||
-        (qScore.answerContextId ? [qScore.answerContextId] : null) ||
-        [];
-      return Array.isArray(arr) ? arr : [];
-    }
-
-    function getAnswerTexts(ansIds, qKeyCandidates, answerLookup, answerLookupAny, qScore){
-      const texts = [];
-      for (const ansId of ansIds){
-        let t = null;
-        for (const qKey of qKeyCandidates){
-          const key = `${qKey}|${ansId}`;
-          if (answerLookup.has(key)) { t = answerLookup.get(key); break; }
-        }
-        if (!t && answerLookupAny.has(ansId)) t = answerLookupAny.get(ansId);
-        if (!t && qScore && qScore.answer && qScore.answer.text) t = qScore.answer.text; // inline object sometimes present
-        if (!t && Array.isArray(qScore?.selectedAnswers)){
-          const found = qScore.selectedAnswers.find(x => x.id===ansId || x.contextId===ansId);
-          if (found && found.text) t = found.text;
-        }
-        texts.push(t || `Answer ${ansId}`);
+    // ===== SIMPLE Answer ID extraction =====
+    function getSimpleAnswerIds(qScore) {
+      // Try all possible answer ID fields
+      const answerIds = [];
+      
+      if (qScore.selectedAnswerIds && Array.isArray(qScore.selectedAnswerIds)) {
+        answerIds.push(...qScore.selectedAnswerIds);
       }
-      return texts;
+      if (qScore.selectedAnswerOptionIds && Array.isArray(qScore.selectedAnswerOptionIds)) {
+        answerIds.push(...qScore.selectedAnswerOptionIds);
+      }
+      if (qScore.selectedAnswerId) {
+        answerIds.push(qScore.selectedAnswerId);
+      }
+      if (qScore.answerOptionId) {
+        answerIds.push(qScore.answerOptionId);
+      }
+      if (qScore.answerId) {
+        answerIds.push(qScore.answerId);
+      }
+      
+      return answerIds;
     }
 
     // ===== Renderers =====
@@ -1006,121 +984,62 @@
         const score = getEvalPercent(e);
         const questionGroups = safeGet(e, 'answers.questionGroupScores') || [];
 
-        // Get form details and build lookup maps
+        // Get form details and build SIMPLE lookup maps
         const formDetails = await getFormDetails(formId);
-        const { questionLookup, answerLookup, answerLookupAny, groupLookup } = buildFormLookup(formDetails);
+        const { questionMap, answerMap } = buildSimpleFormLookup(formDetails);
         
-        // Build question rows organized by question groups
+        // Build question rows
         let qRows = '';
         
-        // Create a map of questions by group for organization
-        const questionsByGroup = new Map();
-        
-        // Organize all questions by their group
         questionGroups.forEach(group => {
           const questionScores = group.questionScores || [];
           questionScores.forEach(qScore => {
-            const groupId = group.questionGroupId || group.questionGroupContextId || 'ungrouped';
-            if (!questionsByGroup.has(groupId)) {
-              questionsByGroup.set(groupId, []);
+            // Get question ID
+            const questionId = qScore.questionId || qScore.questionContextId;
+            
+            // Get question text - SIMPLE lookup
+            let questionText = questionMap.get(questionId) || 
+                             qScore.question?.text || 
+                             `Question ${questionId}`;
+            
+            // Get answer IDs and texts - SIMPLE lookup
+            const answerIds = getSimpleAnswerIds(qScore);
+            let answerText = 'N/A';
+            
+            if (answerIds.length > 0) {
+              const answerTexts = answerIds.map(id => 
+                answerMap.get(id) || `Answer ${id}`
+              );
+              answerText = answerTexts.join(', ');
+            } else if (qScore.answer && qScore.answer.text) {
+              answerText = qScore.answer.text;
             }
-            questionsByGroup.get(groupId).push(qScore);
+
+            const ansScore = qScore.score ?? null;
+            const isFat = !!qScore.failedKillQuestion;
+            const isCrit = !!qScore.failedCriticalQuestion;
+
+            let rowClass = '';
+            if (isFat) rowClass = 'fatal-question';
+            else if (isCrit) rowClass = 'critical-warning';
+
+            let allComments = '';
+            if (qScore.comments) {
+              allComments += `<div class="comment-bubble"><strong>Evaluator Comments:</strong> ${qScore.comments}</div>`;
+            }
+            if (qScore.aiAnswer && qScore.aiAnswer.explanation) {
+              allComments += `<div class="comment-bubble"><strong>AI Analysis:</strong> ${qScore.aiAnswer.explanation}</div>`;
+            }
+
+            qRows += `<tr class="${rowClass}">
+              <td>${questionText}</td>
+              <td>${answerText}</td>
+              <td>${ansScore === null ? '-' : fmt(ansScore, 1)}</td>
+              <td>${isFat ? '<span class="badge badge-fatal">Fatal</span>' : isCrit ? '<span class="badge badge-critical">Critical</span>' : '<span class="badge badge-ok">OK</span>'}</td>
+              <td>${allComments}</td>
+            </tr>`;
           });
         });
-        
-        // Helper to resolve question/answer text and flags
-        function renderQuestionRow(qScore){
-          const qid = qScore.questionId || null;
-          const qCtxId = qScore.questionContextId || null;
-          const qKeyCandidates = [qid, qCtxId].filter(Boolean);
-
-          console.log('Processing question:', { qid, qCtxId, qScore });
-
-          // Find question data - try both id and contextId
-          let questionData = null;
-          let questionText = `Question ${qid || qCtxId || ''}`;
-          
-          for (const qKey of qKeyCandidates){
-            if (questionLookup.has(qKey)) { 
-              questionData = questionLookup.get(qKey); 
-              questionText = questionData.text;
-              break; 
-            }
-          }
-          
-          // Fallback: check if question text is directly in the score
-          if (!questionData && qScore.question && qScore.question.text) {
-            questionText = qScore.question.text;
-          }
-
-          // Answer text (supports multi-select)
-          let answerText = 'N/A';
-          const ansIds = getSelectedAnswerIds(qScore);
-          
-          if (ansIds.length > 0) {
-            const texts = getAnswerTexts(ansIds, qKeyCandidates, answerLookup, answerLookupAny, qScore); 
-            answerText = texts.join(', ');
-          } else if (qScore.answer && qScore.answer.text) {
-            // Fallback: check if answer text is directly in the score
-            answerText = qScore.answer.text;
-          }
-
-          const ansScore = qScore.score ?? null;
-          const isFat = !!(qScore.failedKillQuestion || (questionData && questionData.isFatal));
-          const isCrit = !!(qScore.failedCriticalQuestion || (questionData && questionData.isCritical && ansScore === 0));
-
-          let rowClass = '';
-          if (isFat) rowClass = 'fatal-question';
-          else if (isCrit) rowClass = 'critical-warning';
-
-          let allComments = '';
-          if (qScore.comments) {
-            allComments += `<div class="comment-bubble"><strong>Evaluator Comments:</strong> ${qScore.comments}</div>`;
-          }
-          if (qScore.aiAnswer && qScore.aiAnswer.explanation) {
-            allComments += `<div class="comment-bubble"><strong>AI Analysis:</strong> ${qScore.aiAnswer.explanation}</div>`;
-          }
-
-          return `<tr class="${rowClass}">
-            <td>${questionText}</td>
-            <td>${answerText}</td>
-            <td>${ansScore === null ? '-' : fmt(ansScore, 1)}</td>
-            <td>${isFat ? '<span class="badge badge-fatal">Fatal</span>' : isCrit ? '<span class="badge badge-critical">Critical</span>' : '<span class="badge badge-ok">OK</span>'}</td>
-            <td>${allComments}</td>
-          </tr>`;
-        }
-
-        // Process groups in order from form details
-        if (formDetails && Array.isArray(formDetails.questionGroups)) {
-          const queue = [...formDetails.questionGroups];
-          while (queue.length){
-            const group = queue.shift();
-            const gId = group.id || group.contextId;
-            const groupQuestions = questionsByGroup.get(gId) || [];
-            if (groupQuestions.length > 0){
-              qRows += `<tr class="question-group-header"><td colspan="5">${group.name || 'Question Group'}</td></tr>`;
-              for (const qScore of groupQuestions){
-                qRows += renderQuestionRow(qScore);
-              }
-            }
-            if (Array.isArray(group.questionGroups)) queue.push(...group.questionGroups);
-          }
-        }
-        
-        // Handle any unmatched questions
-        const unmatchedQuestions = [];
-        questionsByGroup.forEach((questions, groupId) => {
-          if (!groupLookup.has(groupId)) {
-            unmatchedQuestions.push(...questions);
-          }
-        });
-        
-        if (unmatchedQuestions.length > 0) {
-          qRows += `<tr class="question-group-header"><td colspan="5">Additional Questions</td></tr>`;
-          for (const qScore of unmatchedQuestions) {
-            qRows += renderQuestionRow(qScore);
-          }
-        }
 
         return `
           <details class="evaluation">
@@ -1157,9 +1076,9 @@
             let qText = `Question ${qid}`;
             const formDetails = state.formDetailsCache.get(formId);
             if (formDetails) {
-              const { questionLookup } = buildFormLookup(formDetails);
-              const qData = questionLookup.get(qScore.questionId) || questionLookup.get(qScore.questionContextId);
-              if (qData && qData.text) qText = qData.text;
+              const { questionMap } = buildSimpleFormLookup(formDetails);
+              const actualText = questionMap.get(qid);
+              if (actualText) qText = actualText;
             }
 
             const key = `${formId}|${qid}|${qText}`;
@@ -1167,10 +1086,8 @@
               counts.set(key, {formName, qText, critical: 0, fatal: 0});
             }
 
-            const ansScore = qScore.score ?? null;
-            const qDataTmp = (state.formDetailsCache.get(formId) ? buildFormLookup(state.formDetailsCache.get(formId)).questionLookup.get(qid) : null);
             const isFatal = !!qScore.failedKillQuestion;
-            const isCritical = !!(qScore.failedCriticalQuestion || (qDataTmp && qDataTmp.isCritical && ansScore === 0));
+            const isCritical = !!qScore.failedCriticalQuestion;
 
             const o = counts.get(key);
             if (isFatal) o.fatal++;

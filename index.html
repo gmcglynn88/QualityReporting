@@ -430,21 +430,56 @@
       document.getElementById('loadBtn').disabled=!(hasMonth && (hasUsers || hasTeams || hasForms));
     }
 
-    // ===== Boot =====
-    document.addEventListener('DOMContentLoaded',()=>{
-      const params=new URLSearchParams(window.location.hash.substring(1));
-      const tokenFromHash=params.get('access_token');
-      if(tokenFromHash){ sessionStorage.setItem('purecloud_token',tokenFromHash); history.replaceState(null,document.title,window.location.pathname+window.location.search); startApp(tokenFromHash); return; }
-      const tokenFromSession=sessionStorage.getItem('purecloud_token');
-      if(tokenFromSession){ startApp(tokenFromSession); return; }
-      if(DEBUG){
-        document.getElementById('authDebug').style.display='block';
-        document.getElementById('authDump').textContent='No token. Click Sign in.';
-        document.getElementById('signinBtn').onclick=()=>window.location.href=oauthUrl;
-        document.getElementById('auth-message').textContent='Debug mode: click Sign in with Genesys';
+    // ===== Boot (robust OAuth handling) =====
+    document.addEventListener('DOMContentLoaded', () => {
+      const params = new URLSearchParams((window.location.hash || '').replace(/^#/, ''));
+
+      // Handle OAuth error to avoid redirect loops
+      const oauthError = params.get('error');
+      if (oauthError) {
+        const desc = params.get('error_description') || '';
+        history.replaceState(null, document.title, window.location.pathname + window.location.search);
+        sessionStorage.removeItem('purecloud_token');
+        sessionStorage.removeItem('purecloud_token_exp');
+
+        const dbg = document.getElementById('authDebug');
+        const dump = document.getElementById('authDump');
+        dbg.style.display = 'block';
+        dump.textContent = `OAuth error: ${oauthError}\n${decodeURIComponent(desc)}`;
+        document.getElementById('auth-message').textContent = 'Sign-in failed. See Auth debug below.';
+        document.getElementById('signinBtn').onclick = () => window.location.href = oauthUrl;
+        return;
+      }
+
+      // Token from redirect hash
+      const tokenFromHash = params.get('access_token');
+      if (tokenFromHash) {
+        const expiresIn = parseInt(params.get('expires_in') || '0', 10);
+        const expAt = expiresIn ? Date.now() + (expiresIn - 60) * 1000 : 0; // pad by 60s
+        sessionStorage.setItem('purecloud_token', tokenFromHash);
+        if (expAt) sessionStorage.setItem('purecloud_token_exp', String(expAt));
+        history.replaceState(null, document.title, window.location.pathname + window.location.search);
+        startApp(tokenFromHash);
+        return;
+      }
+
+      // Token from session (not expired)
+      const tokenFromSession = sessionStorage.getItem('purecloud_token');
+      const exp = parseInt(sessionStorage.getItem('purecloud_token_exp') || '0', 10);
+      if (tokenFromSession && (!exp || Date.now() < exp)) {
+        startApp(tokenFromSession);
+        return;
+      }
+
+      // No token yet: show debug sign-in or redirect automatically
+      if (DEBUG) {
+        document.getElementById('authDebug').style.display = 'block';
+        document.getElementById('authDump').textContent = 'No token. Click Sign in.';
+        document.getElementById('signinBtn').onclick = () => window.location.href = oauthUrl;
+        document.getElementById('auth-message').textContent = 'Debug mode: click Sign in with Genesys';
       } else {
-        document.getElementById('auth-message').textContent='Redirecting to Genesys Cloud for authentication...';
-        setTimeout(()=>{ window.location.href=oauthUrl; }, 1200);
+        document.getElementById('auth-message').textContent = 'Redirecting to Genesys Cloud for authentication...';
+        setTimeout(() => { window.location.href = oauthUrl; }, 400);
       }
     });
 
@@ -1051,7 +1086,10 @@
         const p=getEvalPercent(e); if(p!=null && isFinite(p)){ sumScores+=Number(p); scored++; }
       });
       const avgOverall = scored? (sumScores/scored): null;
-      const passRate = total? ((total - Math.max(withFatal, withCritical))/total): null;
+      const passRate = total? ((total - Max(withFatal, withCritical))/total): null; // (kept as ratio 0..1)
+
+      // Fix: Max helper (since Math.max may be minified elsewhere)
+      function Max(a,b){ return a>b?a:b; }
 
       document.getElementById('analyticsKPIs').innerHTML = `
         <div class="kpi"><div class="label">Evaluations (range)</div><div class="value">${total}</div></div>
@@ -1314,7 +1352,7 @@
             </div>
           </details>
         `;
-      });
+      }));
       c.innerHTML = evaluationElements.join('');
     }
 

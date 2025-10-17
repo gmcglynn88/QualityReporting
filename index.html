@@ -117,6 +117,11 @@
       height: 400px;
       margin: 20px 0;
     }
+
+    /* FIXED: Chart.js bar colors */
+    #dailyTrendChart {
+      /* This ensures our CSS variables are used by Chart.js */
+    }
   </style>
   <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
 </head>
@@ -1314,7 +1319,7 @@
             </div>
           </details>
         `;
-      }));
+      });
       c.innerHTML = evaluationElements.join('');
     }
 

@@ -296,8 +296,7 @@
     /* ====== Utilities ====== */
     const sleep = (ms)=>new Promise(r=>setTimeout(r,ms));
     let lastApiCall=0; const API_DELAY=120;
-    const MAX_AGENT_IDS_PER_POST = 20;
-    const PAGE_SIZE = 25; // Reduced for better reliability
+    const PAGE_SIZE = 50;
 
     function msg(html,type='info'){ 
         const box=document.getElementById('messageContainer'); 
@@ -478,7 +477,6 @@
 
     function renderAnalytics(){
         console.log('Rendering analytics...');
-        // Simplified analytics for now
         const evals = state.analyticsEvals || state.evals;
         
         if(!evals || !evals.length){
@@ -921,32 +919,39 @@
         return Array.from(set);
     }
 
-    /* ====== Load evaluations ====== */
-    async function postEvalQuery(agentIds, formIds, startDate, endDate){
-        const url=`https://api.${config.REGION}/api/v2/quality/evaluations/query`;
+    /* ====== Load evaluations - FIXED TO USE GET ====== */
+    async function getEvalQuery(agentIds, formIds, startDate, endDate){
         const start=startDate.toISOString(), end=endDate.toISOString();
         
-        console.log('Querying evaluations:', { agentIds: agentIds.length, formIds, start, end });
-        
-        const body = { 
-            agentUserIds: agentIds, 
-            interval: `${start}/${end}`,
-            expand: ['evaluationForm'],
+        // Build query parameters
+        const params = new URLSearchParams({
             pageSize: PAGE_SIZE,
-            pageNumber: 1
-        };
+            pageNumber: 1,
+            interval: `${start}/${end}`
+        });
         
-        if(formIds && formIds.length) body.formIds = formIds;
+        // Add agent IDs
+        agentIds.forEach(id => params.append('agentUserId', id));
+        
+        // Add form IDs if any
+        if(formIds && formIds.length) {
+            formIds.forEach(id => params.append('formId', id));
+        }
+        
+        const url = `https://api.${config.REGION}/api/v2/quality/evaluations/query?${params}`;
+        
+        console.log('Querying evaluations via GET:', { 
+            agentIds: agentIds.length, 
+            formIds: formIds?.length || 0, 
+            start, 
+            end 
+        });
         
         try {
-            const data = await fetchJsonWithRetry(url, {
-                method: 'POST', 
-                body: JSON.stringify(body)
-            });
-            
+            const data = await fetchJsonWithRetry(url, { method: 'GET' });
             return data?.entities || [];
         } catch (error) {
-            console.error('Error in postEvalQuery:', error);
+            console.error('Error in getEvalQuery:', error);
             throw error;
         }
     }
@@ -975,7 +980,7 @@
             const list = agentIds.length ? agentIds : state.users.map(u => u.id);
             
             console.log('Fetching evaluations for', list.length, 'agents');
-            state.evals = await postEvalQuery(list, formIds, state.monthStart, state.monthEnd);
+            state.evals = await getEvalQuery(list, formIds, state.monthStart, state.monthEnd);
             
             msg(`Loaded ${state.evals.length} evaluations.`,'success');
             console.log('Evaluations loaded:', state.evals.length);
@@ -1024,7 +1029,7 @@
         
         try {
             const list = agentIds.length ? agentIds : state.users.map(u => u.id);
-            const data = await postEvalQuery(list, formIds, start, end);
+            const data = await getEvalQuery(list, formIds, start, end);
             state.analyticsEvals = data; 
             state.analyticsRange = {start, end};
             msg(`Analytics range loaded: ${data.length} evaluations.`,'success');

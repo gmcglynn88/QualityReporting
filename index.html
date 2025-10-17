@@ -6,7 +6,7 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
   <style>
     :root{ --primary-color:#63AB8F; --secondary-color:#4A8C7D; --border-color:#DEE2E6;
-      --light-bg:#F8F9FA; --card-bg:#FFFFFF; --text-color:#2C3E50; --text-light:#6C757D; --pill:#e9f6f0; 
+      --light-bg:#F8F9FA; --card-bg:#FFFFFF; --text-color:#2C3E50; --text-light:#6C757D; --pill:#e9f6f0;
       --ok:#22c55e; --warn:#f59e0b; --bad:#ef4444; }
     body{font-family:'Aptos','Segoe UI',system-ui,-apple-system,Arial,sans-serif;margin:20px;padding:20px;max-width:1400px;background:var(--light-bg);color:var(--text-color)}
     #logo-container{text-align:center;margin-bottom:20px} #logo{width:300px}
@@ -112,11 +112,12 @@
     .sortable th .sort-ind{margin-left:6px;opacity:.8;font-weight:700}
 
     /* Stacked bar chart styling */
-    .stacked-bar-container {
-      position: relative;
-      height: 400px;
-      margin: 20px 0;
-    }
+    .stacked-bar-container { position: relative; height: 400px; margin: 20px 0; }
+
+    /* Header actions */
+    .header-actions{display:flex;gap:8px;align-items:center;justify-content:flex-end;margin-top:8px}
+    .link-btn{background:transparent;border:1px solid var(--border-color);color:var(--text-color)}
+    .link-btn:hover{background:#f8fafc}
   </style>
   <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
 </head>
@@ -126,6 +127,11 @@
   </div>
 
   <h1>QA Evaluations – Monthly View</h1>
+
+  <div class="header-actions">
+    <button id="signOutBtn" class="link-btn" title="Clear token and sign in again">Sign out</button>
+    <button id="openDebugBtn" class="link-btn" title="Show auth debug">Auth debug</button>
+  </div>
 
   <div id="authCard" class="card">
     <div id="auth-message" class="info-message">Authenticating with PureCloud...</div>
@@ -194,7 +200,6 @@
       <div id="analyticsTab" class="tab-content">
         <h2 class="section-title">Analytics</h2>
 
-        <!-- FIXED: Analytics controls -->
         <div class="controls" style="margin-top:8px">
           <div>
             <label for="anaFrom">From (Month)</label>
@@ -236,7 +241,6 @@
 
         <div id="analyticsKPIs" class="kpis"></div>
 
-        <!-- FIXED: Stacked Bar Chart with better styling -->
         <div class="card" style="padding:16px;margin-top:10px">
           <h3 class="section-title" style="margin:0 0 8px">Daily Trend</h3>
           <div class="stacked-bar-container">
@@ -249,7 +253,6 @@
           </div>
         </div>
 
-        <!-- Rest of analytics content -->
         <div class="card" style="padding:16px;margin-top:10px">
           <h3 class="section-title" style="margin:0 0 8px">Scores by Media Type per Agent</h3>
           <div id="agentMediaChart"></div>
@@ -317,7 +320,7 @@
     const clientId = 'fe305808-b368-4547-8af9-325d28d552bb';
     const config = { REGION: 'mypurecloud.ie' };
     const DEBUG = new URLSearchParams(window.location.search).has('debug');
-    const redirectUri = 'https://gmcglynn88.github.io/QualityReporting/';
+    const redirectUri = 'https://gmcglynn88.github.io/QualityReporting/'; // must exactly match your OAuth app
     const oauthUrl = `https://login.${config.REGION}/oauth/authorize?client_id=${encodeURIComponent(clientId)}&response_type=token&redirect_uri=${encodeURIComponent(redirectUri)}&state=qa`;
 
     const state = {
@@ -343,10 +346,20 @@
 
     const dropdowns = { users:null, teams:null, forms:null, analyticsTeams:null };
 
+    // Chart colours resolved from CSS vars (Chart.js can't read CSS vars directly)
+    const cssVar = k => getComputedStyle(document.documentElement).getPropertyValue(k).trim();
+    let COLORS = { OK: '#22c55e', WARN: '#f59e0b', BAD: '#ef4444', TEXT: '#2C3E50' };
+    function resolveColors() {
+      COLORS.OK   = cssVar('--ok')          || COLORS.OK;
+      COLORS.WARN = cssVar('--warn')        || COLORS.WARN;
+      COLORS.BAD  = cssVar('--bad')         || COLORS.BAD;
+      COLORS.TEXT = cssVar('--text-color')  || COLORS.TEXT;
+    }
+
     // Throttle + backoff
     let lastApiCall = 0;
-    const API_DELAY = 120;                  // min spacing between calls
-    const MAX_CONCURRENT_AGENT_BATCH = 3;   // lower concurrency to be gentle
+    const API_DELAY = 120;                  // ms spacing between calls
+    const MAX_CONCURRENT_AGENT_BATCH = 3;
 
     function sleep(ms){ return new Promise(r=>setTimeout(r,ms)); }
 
@@ -397,12 +410,12 @@
           const id=`${containerId}__${o.value}`;
           const row=document.createElement('div'); row.className='cd-item';
           row.innerHTML=`<label for="${id}"><input type="checkbox" id="${id}" value="${o.value}" ${selected.has(o.value)?'checked':''}/><span>${o.label||o.value}</span></label>`;
-          row.querySelector('input').addEventListener('change',(e)=>{ 
-            if(e.target.checked) selected.add(o.value); 
-            else selected.delete(o.value); 
-            updateSummary(); 
-            updateSelectAllState(); 
-            if(containerId !== 'analyticsTeamDropdown') updateLoadButtonState(); 
+          row.querySelector('input').addEventListener('change',(e)=>{
+            if(e.target.checked) selected.add(o.value);
+            else selected.delete(o.value);
+            updateSummary();
+            updateSelectAllState();
+            if(containerId !== 'analyticsTeamDropdown') updateLoadButtonState();
           });
           list.appendChild(row);
         });
@@ -430,14 +443,40 @@
       document.getElementById('loadBtn').disabled=!(hasMonth && (hasUsers || hasTeams || hasForms));
     }
 
-    // ===== Boot (robust OAuth handling) =====
-    document.addEventListener('DOMContentLoaded', () => {
-      const params = new URLSearchParams((window.location.hash || '').replace(/^#/, ''));
+    // ===== Robust OAuth handling =====
+    function forceReauth(reason){
+      sessionStorage.removeItem('purecloud_token');
+      sessionStorage.removeItem('purecloud_token_exp');
+      state.accessToken = null;
+      document.getElementById('appContent').style.display='none';
+      document.getElementById('authCard').style.display='block';
+      const dbg = document.getElementById('authDebug');
+      const dump = document.getElementById('authDump');
+      dbg.style.display = 'block';
+      dump.textContent = (reason||'Sign-in required') + `\n\nRedirect URI: ${redirectUri}`;
+      document.getElementById('auth-message').textContent='Please sign in.';
+    }
 
-      // Handle OAuth error to avoid redirect loops
+    document.getElementById('signOutBtn').onclick = () => {
+      forceReauth('Signed out.');
+      document.getElementById('auth-message').textContent='Signed out. Click "Sign in with Genesys".';
+    };
+    document.getElementById('openDebugBtn').onclick = () => {
+      const dbg = document.getElementById('authDebug');
+      dbg.style.display = dbg.style.display === 'none' ? 'block' : 'none';
+    };
+
+    // ===== Boot (handles errors + expiry, avoids redirect loops) =====
+    document.addEventListener('DOMContentLoaded', () => {
+      resolveColors();
+
+      const rawHash = (window.location.hash || '').replace(/^#/, '');
+      const params = new URLSearchParams(rawHash);
+
+      // 1) OAuth error (prevents infinite redirect)
       const oauthError = params.get('error');
       if (oauthError) {
-        const desc = params.get('error_description') || '';
+        const desc = decodeURIComponent(params.get('error_description') || '');
         history.replaceState(null, document.title, window.location.pathname + window.location.search);
         sessionStorage.removeItem('purecloud_token');
         sessionStorage.removeItem('purecloud_token_exp');
@@ -445,13 +484,13 @@
         const dbg = document.getElementById('authDebug');
         const dump = document.getElementById('authDump');
         dbg.style.display = 'block';
-        dump.textContent = `OAuth error: ${oauthError}\n${decodeURIComponent(desc)}`;
+        dump.textContent = `OAuth error: ${oauthError}\n${desc}`;
         document.getElementById('auth-message').textContent = 'Sign-in failed. See Auth debug below.';
         document.getElementById('signinBtn').onclick = () => window.location.href = oauthUrl;
         return;
       }
 
-      // Token from redirect hash
+      // 2) Token in hash
       const tokenFromHash = params.get('access_token');
       if (tokenFromHash) {
         const expiresIn = parseInt(params.get('expires_in') || '0', 10);
@@ -463,7 +502,7 @@
         return;
       }
 
-      // Token from session (not expired)
+      // 3) Token from session (if not expired)
       const tokenFromSession = sessionStorage.getItem('purecloud_token');
       const exp = parseInt(sessionStorage.getItem('purecloud_token_exp') || '0', 10);
       if (tokenFromSession && (!exp || Date.now() < exp)) {
@@ -471,7 +510,7 @@
         return;
       }
 
-      // No token yet: show debug sign-in or redirect automatically
+      // 4) No token yet
       if (DEBUG) {
         document.getElementById('authDebug').style.display = 'block';
         document.getElementById('authDump').textContent = 'No token. Click Sign in.';
@@ -493,7 +532,6 @@
       dropdowns.users=createCheckboxDropdown('userDropdown',{placeholder:'Select agents (optional)',searchPlaceholder:'Search agents...'});
       dropdowns.teams=createCheckboxDropdown('teamDropdown',{placeholder:'Select work teams (optional)',searchPlaceholder:'Search teams...'});
       dropdowns.forms=createCheckboxDropdown('formDropdown',{placeholder:'Select forms (optional)',searchPlaceholder:'Search forms...'});
-      // Analytics team filter
       dropdowns.analyticsTeams=createCheckboxDropdown('analyticsTeamDropdown',{placeholder:'Filter teams (optional)',searchPlaceholder:'Search teams...'});
 
       document.getElementById('overviewTabButton').onclick=()=>setTab('overview');
@@ -504,7 +542,6 @@
 
       document.getElementById('loadAnalyticsBtn').onclick=loadAnalyticsRange;
       document.getElementById('insightsSort').onchange=renderAgentInsights;
-      // Analytics filter controls
       document.getElementById('applyAnalyticsFilters').onclick=renderAnalytics;
 
       const m=new Date();
@@ -519,7 +556,6 @@
       Promise.all([fetchAllUsers(), fetchAllTeams(), fetchAllForms()])
         .then(()=> {
           updateLoadButtonState();
-          // Set analytics team dropdown options
           dropdowns.analyticsTeams.setOptions(state.teams.map(t=>({value:t.id,label:t.name})));
         })
         .catch(err => msg('Initial load failed: '+err.message,'error'));
@@ -549,20 +585,25 @@
       return fetch(url,{...options,headers:{'Authorization':'Bearer '+state.accessToken,'Content-Type':'application/json',...(options.headers||{})}});
     }
 
+    function handleAuthStatus(status){
+      if(status===401 || status===403){
+        forceReauth('Session expired or unauthorised. Please sign in again.');
+        throw new Error(`HTTP ${status}`);
+      }
+    }
+
     async function fetchJsonWithRetry(url, options={}, {retries=5, baseDelay=500}={}){
       let attempt=0;
       while(true){
         const res = await rawFetch(url, options);
         if(res.ok){
-          // 204
           if(res.status===204) return null;
           return await res.json();
         }
-        // For method issues (400/401/403/404/405), bubble quickly so caller can fallback to another method
         if([400,401,403,404,405].includes(res.status)){
+          handleAuthStatus(res.status);
           const err=new Error(`HTTP ${res.status}`); err.status=res.status; throw err;
         }
-        // Backoff for 429/408/5xx
         attempt++;
         if(attempt>retries){
           const err=new Error(`HTTP ${res.status}`); err.status=res.status; throw err;
@@ -593,29 +634,29 @@
     function dayKeyUTC(d){ const dt=new Date(d); return new Date(Date.UTC(dt.getUTCFullYear(),dt.getUTCMonth(),dt.getUTCDate())).toISOString().split('T')[0]; }
 
     // Analytics helper functions
-    function getPassSettings(){ 
-      const pass=parseFloat(document.getElementById('passTarget').value||'85'); 
-      const band=parseFloat(document.getElementById('amberBand').value||'5'); 
-      return {pass, band}; 
-    }
-    
-    function colourFor(score, pass, band){ 
-      if(score==null||!isFinite(score)) return 'var(--bad)'; 
-      if(score>=pass) return 'var(--ok)'; 
-      if(score>=pass-band) return 'var(--warn)'; 
-      return 'var(--bad)'; 
-    }
-    
-    function standardiseMedia(m){ 
-      const x=String(m||'').toUpperCase(); 
-      if(x.includes('EMAIL')) return 'Email'; 
-      if(x.includes('CALL')||x.includes('VOICE')||x==='CALL') return 'Voice'; 
-      if(x.includes('CHAT')||x.includes('MESSAGE')) return 'Message'; 
-      if(x.includes('SOCIAL')) return 'Social'; 
-      return 'Other'; 
+    function getPassSettings(){
+      const pass=parseFloat(document.getElementById('passTarget').value||'85');
+      const band=parseFloat(document.getElementById('amberBand').value||'5');
+      return {pass, band};
     }
 
-    // FIXED: Stacked bar chart initialization with proper syntax
+    function colourFor(score, pass, band){
+      if(score==null||!isFinite(score)) return COLORS.BAD;
+      if(score>=pass) return COLORS.OK;
+      if(score>=pass-band) return COLORS.WARN;
+      return COLORS.BAD;
+    }
+
+    function standardiseMedia(m){
+      const x=String(m||'').toUpperCase();
+      if(x.includes('EMAIL')) return 'Email';
+      if(x.includes('CALL')||x.includes('VOICE')||x==='CALL') return 'Voice';
+      if(x.includes('CHAT')||x.includes('MESSAGE')) return 'Message';
+      if(x.includes('SOCIAL')) return 'Social';
+      return 'Other';
+    }
+
+    // Stacked bar chart init
     function initializeStackedBarChart() {
       const ctx = document.getElementById('dailyTrendChart').getContext('2d');
       return new Chart(ctx, {
@@ -623,63 +664,25 @@
         data: {
           labels: ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'],
           datasets: [
-            {
-              label: 'Passed',
-              data: [65, 59, 80, 81, 56, 55, 40],
-              backgroundColor: '#22c55e',
-              borderColor: '#22c55e',
-              borderWidth: 1
-            },
-            {
-              label: 'Amber',
-              data: [28, 48, 40, 19, 86, 27, 90],
-              backgroundColor: '#f59e0b',
-              borderColor: '#f59e0b',
-              borderWidth: 1
-            },
-            {
-              label: 'Failed',
-              data: [12, 15, 10, 8, 12, 18, 5],
-              backgroundColor: '#ef4444',
-              borderColor: '#ef4444',
-              borderWidth: 1
-            }
+            { label: 'Passed', data: [65,59,80,81,56,55,40], backgroundColor: COLORS.OK,   borderColor: COLORS.OK,   borderWidth: 1 },
+            { label: 'Amber',  data: [28,48,40,19,86,27,90], backgroundColor: COLORS.WARN, borderColor: COLORS.WARN, borderWidth: 1 },
+            { label: 'Failed', data: [12,15,10, 8,12,18, 5], backgroundColor: COLORS.BAD,  borderColor: COLORS.BAD,  borderWidth: 1 }
           ]
         },
         options: {
           responsive: true,
           maintainAspectRatio: false,
           scales: {
-            x: {
-              stacked: true,
-              grid: {
-                color: 'rgba(0,0,0,0.1)'
-              }
-            },
+            x: { stacked: true, grid: { color: 'rgba(0,0,0,0.1)' } },
             y: {
-              stacked: true,
-              beginAtZero: true,
-              title: {
-                display: true,
-                text: 'Number of Evaluations'
-              },
-              grid: {
-                color: 'rgba(0,0,0,0.1)'
-              }
+              stacked: true, beginAtZero: true,
+              title: { display: true, text: 'Number of Evaluations' },
+              grid: { color: 'rgba(0,0,0,0.1)' }
             }
           },
           plugins: {
-            legend: {
-              position: 'top',
-              labels: {
-                color: '#2C3E50'
-              }
-            },
-            title: {
-              display: true,
-              text: 'Daily Performance Trend',
-              color: '#2C3E50'
-            }
+            legend: { position: 'top', labels: { color: COLORS.TEXT } },
+            title: { display: true, text: 'Daily Performance Trend', color: COLORS.TEXT }
           }
         }
       });
@@ -688,38 +691,38 @@
     let dailyTrendChart = null;
 
     // Table sorter
-    function tableSorter(tableId){ 
-      const t=document.getElementById(tableId); 
-      if(!t||!t.tHead) return; 
-      const ths=[...t.tHead.querySelectorAll('th')]; 
-      ths.forEach((th,i)=>{ 
-        th.onclick=()=>{ 
-          const dir=th.dataset.dir==='asc'?'desc':'asc'; 
+    function tableSorter(tableId){
+      const t=document.getElementById(tableId);
+      if(!t||!t.tHead) return;
+      const ths=[...t.tHead.querySelectorAll('th')];
+      ths.forEach((th,i)=>{
+        th.onclick=()=>{
+          const dir=th.dataset.dir==='asc'?'desc':'asc';
           ths.forEach(h=>{
-            h.dataset.dir=''; 
-            const s=h.querySelector('.sort-ind'); 
+            h.dataset.dir='';
+            const s=h.querySelector('.sort-ind');
             if(s) s.remove();
-          }); 
-          th.dataset.dir=dir; 
-          const ind=document.createElement('span'); 
-          ind.className='sort-ind'; 
-          ind.textContent=dir==='asc'?'▲':'▼'; 
+          });
+          th.dataset.dir=dir;
+          const ind=document.createElement('span');
+          ind.className='sort-ind';
+          ind.textContent=dir==='asc'?'▲':'▼';
           th.appendChild(ind);
-          const body=t.tBodies[0]; 
-          const rows=[...body.rows]; 
-          const num=th.dataset.type==='num'; 
-          rows.sort((a,b)=>{ 
-            const av=a.cells[i].getAttribute('data-sort') ?? a.cells[i].innerText; 
-            const bv=b.cells[i].getAttribute('data-sort') ?? b.cells[i].innerText; 
-            const A=num?Number(av):String(av).toLowerCase(); 
-            const B=num?Number(bv):String(bv).toLowerCase(); 
-            return dir==='asc'? (A>B?1:A<B?-1:0) : (A<B?1:A>B?-1:0); 
-          }); 
-          body.innerHTML=''; 
-          rows.forEach(r=>body.appendChild(r)); 
-        }; 
-      }); 
-      t.classList.add('sortable'); 
+          const body=t.tBodies[0];
+          const rows=[...body.rows];
+          const num=th.dataset.type==='num';
+          rows.sort((a,b)=>{
+            const av=a.cells[i].getAttribute('data-sort') ?? a.cells[i].innerText;
+            const bv=b.cells[i].getAttribute('data-sort') ?? b.cells[i].innerText;
+            const A=num?Number(av):String(av).toLowerCase();
+            const B=num?Number(bv):String(bv).toLowerCase();
+            return dir==='asc'? (A>B?1:A<B?-1:0) : (A<B?1:A>B?-1:0);
+          });
+          body.innerHTML='';
+          rows.forEach(r=>body.appendChild(r));
+        };
+      });
+      t.classList.add('sortable');
     }
 
     // ===== Lookups =====
@@ -773,11 +776,11 @@
     }
 
     // Helper for analytics team filtering
-    async function agentsForTeams(teamIds){ 
-      await ensureTeamMembersLoaded(teamIds); 
-      const ids=new Set(); 
-      teamIds.forEach(tid=>(state.teamMembers.get(tid)||[]).forEach(id=>ids.add(id))); 
-      return Array.from(ids); 
+    async function agentsForTeams(teamIds){
+      await ensureTeamMembersLoaded(teamIds);
+      const ids=new Set();
+      teamIds.forEach(tid=>(state.teamMembers.get(tid)||[]).forEach(id=>ids.add(id)));
+      return Array.from(ids);
     }
 
     // ===== Evaluations with GET/POST fallback + retry =====
@@ -837,7 +840,7 @@
         const batch=agentIds.slice(i,i+MAX_CONCURRENT_AGENT_BATCH);
         const res=await Promise.all(batch.map(id=>fetchEvaluationsForAgentInterval(id,formIds,startDate,endDate)));
         res.forEach(items=>all.push(...items));
-        if(i+MAX_CONCURRENT_AGENT_BATCH<agentIds.length) await sleep(300); // small gap between batches
+        if(i+MAX_CONCURRENT_AGENT_BATCH<agentIds.length) await sleep(300);
       }
       return all;
     }
@@ -857,7 +860,6 @@
         });
         if(singleFormId) params.set('formId', singleFormId);
         const url = `${base}?${params.toString()}`;
-        // paginate via nextUri
         let all=[]; let next=url;
         while(next){
           try{
@@ -865,10 +867,7 @@
             const entities = data?.entities || [];
             all = all.concat(entities);
             next = data?.nextUri ? `https://api.${config.REGION}${data.nextUri}` : null;
-          }catch(err){
-            // bubble only 400/401/403/404/405; others already retried
-            throw err;
-          }
+          }catch(err){ throw err; }
         }
         return all;
       }
@@ -894,32 +893,19 @@
             all = all.concat(entities);
             if(!data.nextUri && entities.length < body.pageSize) break;
             page++;
-          }catch(err){
-            throw err; // bubble to outer to try fallback
-          }
+          }catch(err){ throw err; }
         }
         return all;
       }
 
-      // Strategy:
-      // - If 0/1 formId -> try GET first (usually allowed), else POST.
-      // - If chosen method 405s, fallback to the other.
       if(!formIds || formIds.length<=1){
-        try{
-          return await getViaGET(formIds?.[0]);
-        }catch(err){
-          if(err.status===405 || err.status===400){ /* fallback */ }
-          else throw err;
-        }
+        try{ return await getViaGET(formIds?.[0]); }
+        catch(err){ if(err.status===405 || err.status===400){ /* fallback */ } else throw err; }
       }
 
-      try{
-        return await getViaPOST();
-      }catch(err){
-        if(err.status===405 || err.status===400){
-          // fallback: GET without form filter (server doesn't like POST or multiple)
-          return await getViaGET(undefined);
-        }
+      try{ return await getViaPOST(); }
+      catch(err){
+        if(err.status===405 || err.status===400){ return await getViaGET(undefined); }
         throw err;
       }
     }
@@ -936,15 +922,11 @@
         : `https://api.${config.REGION}/api/v2/quality/forms/evaluations/${formId}`;
       try{
         let data;
-        try{
-          data = await fetchJsonWithRetry(url,{method:'GET'});
-        }catch(err){
-          // fallback to latest if versioned lookup fails
+        try{ data = await fetchJsonWithRetry(url,{method:'GET'}); }
+        catch(err){
           if(versionId && versionId!=='__published__'){
             data = await fetchJsonWithRetry(`https://api.${config.REGION}/api/v2/quality/forms/evaluations/${formId}`,{method:'GET'});
-          }else{
-            throw err;
-          }
+          }else{ throw err; }
         }
         state.formDetailsCache.set(key,data);
         state.formLookupCache.set(key,buildFormLookup(data||{}));
@@ -1041,7 +1023,6 @@
         : '<tr><td colspan="3" class="muted">No evaluation data available for the selected criteria.</td></tr>';
     }
 
-    // === Analytics - ENHANCED ===
     function getAnalyticsSet(){ return (state.analyticsEvals && state.analyticsRange) ? state.analyticsEvals : state.evals; }
     function guessMediaType(e){ return standardiseMedia(safeGet(e,'mediaType') || safeGet(e,'conversation.mediaType') || 'Unknown'); }
     function buildDays(start,end){ const out=[]; for(let d=new Date(start); d<=end; d.setUTCDate(d.getUTCDate()+1)){ out.push(new Date(d)); } return out; }
@@ -1060,17 +1041,12 @@
         return;
       }
 
-      // Initialize stacked bar chart if not already done
-      if (!dailyTrendChart) {
-        dailyTrendChart = initializeStackedBarChart();
-      }
+      if (!dailyTrendChart) dailyTrendChart = initializeStackedBarChart();
 
       // Apply team filter for analytics
       const teamFilter = dropdowns.analyticsTeams.getSelectedValues();
       let allowedAgents = null;
-      if(teamFilter.length){ 
-        allowedAgents = new Set(await agentsForTeams(teamFilter)); 
-      }
+      if(teamFilter.length){ allowedAgents = new Set(await agentsForTeams(teamFilter)); }
       const evals = allowedAgents ? raw.filter(e => allowedAgents.has(safeGet(e,'agent.id')||e.agentUserId)) : raw;
 
       let withFatal=0, withCritical=0, total=evals.length;
@@ -1086,10 +1062,7 @@
         const p=getEvalPercent(e); if(p!=null && isFinite(p)){ sumScores+=Number(p); scored++; }
       });
       const avgOverall = scored? (sumScores/scored): null;
-      const passRate = total? ((total - Max(withFatal, withCritical))/total): null; // (kept as ratio 0..1)
-
-      // Fix: Max helper (since Math.max may be minified elsewhere)
-      function Max(a,b){ return a>b?a:b; }
+      const passRate = total? ((total - Math.max(withFatal, withCritical))/total): null;
 
       document.getElementById('analyticsKPIs').innerHTML = `
         <div class="kpi"><div class="label">Evaluations (range)</div><div class="value">${total}</div></div>
@@ -1099,28 +1072,27 @@
         <div class="kpi"><div class="label">Pass Rate</div><div class="value">${passRate==null?'-':pct(passRate*100,1)}</div></div>
       `;
 
-      // Agent media chart
       const {pass, band} = getPassSettings();
       const byAgent=new Map(); // agent -> media -> {count,sum,scored}
       evals.forEach(e=>{
-        const aid=safeGet(e,'agent.id')||e.agentUserId||'(unknown)'; 
-        const name=resolveUserName(aid); 
+        const aid=safeGet(e,'agent.id')||e.agentUserId||'(unknown)';
+        const name=resolveUserName(aid);
         const mt=guessMediaType(e);
         if(!byAgent.has(aid)) byAgent.set(aid,{name,map:new Map()});
-        const m=byAgent.get(aid).map; 
+        const m=byAgent.get(aid).map;
         if(!m.has(mt)) m.set(mt,{count:0,sum:0,scored:0});
-        const o=m.get(mt); 
-        o.count++; 
-        const p=getEvalPercent(e); 
+        const o=m.get(mt);
+        o.count++;
+        const p=getEvalPercent(e);
         if(p!=null&&isFinite(p)){ o.sum+=Number(p); o.scored++; }
       });
       const mediaOrder = ['Voice','Email','Message','Social','Other'];
       const width=700, height=22;
       const rowsHtml = Array.from(byAgent.values()).sort((a,b)=>a.name.localeCompare(b.name)).map(row=>{
-        const total=Array.from(row.map.values()).reduce((s,o)=>s+o.count,0)||1; 
+        const total=Array.from(row.map.values()).reduce((s,o)=>s+o.count,0)||1;
         let x=0;
         const rects = mediaOrder.map(type=>{
-          const o=row.map.get(type); 
+          const o=row.map.get(type);
           if(!o) return '';
           const w=Math.max(1, Math.round((o.count/total)*width));
           const avg = o.scored? (o.sum/o.scored) : null;

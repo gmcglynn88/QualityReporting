@@ -128,6 +128,11 @@
           <div class="muted">Select agents to filter by, or leave empty for all</div>
         </div>
         <div>
+          <label for="teamDropdown">Work Teams (Optional)</label>
+          <div id="teamDropdown" class="checkbox-dropdown"></div>
+          <div class="muted">Select teams to filter by, or leave empty for all</div>
+        </div>
+        <div>
           <label for="formDropdown">Evaluation Forms (Optional)</label>
           <div id="formDropdown" class="checkbox-dropdown"></div>
           <div class="muted">Select forms to filter by, or leave empty for all</div>
@@ -261,19 +266,25 @@
       users: [],
       forms: [],
       formsById: {},
+      teams: [],
+      teamsById: {},
+      teamMembers: new Map(),  // teamId -> [userId,...]
+
       evals: [],
       monthStart: null,
       monthEnd: null,
-      // analytics data (separate range)
+
+      // analytics range
       analyticsEvals: null,
-      analyticsRange: null, // {start:Date,end:Date}
+      analyticsRange: null, // {start,end}
+
       // form caches
       formDetailsCache: new Map(),
       formLookupCache: new Map(),
       combinedLookupCache: new Map()
     };
 
-    const dropdowns = { users:null, forms:null };
+    const dropdowns = { users:null, teams:null, forms:null };
     let lastApiCall = 0;
     const API_DELAY = 100;
 
@@ -288,10 +299,10 @@
       const spinner=button.querySelector('.loading-spinner');
       const text=button.querySelector('.btn-text');
       if(isLoading){ spinner.style.display='inline-block'; text.textContent='Loading...'; button.disabled=true; }
-      else{ spinner.style.display='none'; text.textContent='Load Range'; button.disabled=false; }
+      else{ spinner.style.display='none'; text.textContent = (button.id==='loadAnalyticsBtn'?'Load Range':'Load Evaluations'); button.disabled=false; }
     }
 
-    // ===== Checkbox dropdown (same as before) =====
+    // ===== Checkbox dropdown =====
     function createCheckboxDropdown(containerId,{placeholder,searchPlaceholder}){
       const root=document.getElementById(containerId); root.innerHTML='';
       const trigger=document.createElement('div'); trigger.className='cd-trigger';
@@ -346,8 +357,9 @@
     function updateLoadButtonState(){
       const hasMonth=document.getElementById('monthInput').value;
       const hasUsers=dropdowns.users && dropdowns.users.getSelectedValues().length>0;
+      const hasTeams=dropdowns.teams && dropdowns.teams.getSelectedValues().length>0;
       const hasForms=dropdowns.forms && dropdowns.forms.getSelectedValues().length>0;
-      document.getElementById('loadBtn').disabled=!(hasMonth && (hasUsers||hasForms));
+      document.getElementById('loadBtn').disabled=!(hasMonth && (hasUsers || hasTeams || hasForms));
     }
 
     // ===== Bootstrapping =====
@@ -376,6 +388,7 @@
       document.getElementById('appContent').style.display='block';
 
       dropdowns.users=createCheckboxDropdown('userDropdown',{placeholder:'Select agents (optional)',searchPlaceholder:'Search agents...'});
+      dropdowns.teams=createCheckboxDropdown('teamDropdown',{placeholder:'Select work teams (optional)',searchPlaceholder:'Search teams...'});
       dropdowns.forms=createCheckboxDropdown('formDropdown',{placeholder:'Select forms (optional)',searchPlaceholder:'Search forms...'});
 
       document.getElementById('overviewTabButton').onclick=()=>setTab('overview');
@@ -396,7 +409,10 @@
       updateMonthRange();
       document.getElementById('monthInput').addEventListener('change',()=>{ updateMonthRange(); updateLoadButtonState(); });
 
-      Promise.all([fetchAllUsers(),fetchAllForms()]).then(updateLoadButtonState).catch(e=>msg('Initial load failed: '+e.message,'error'));
+      // Load lookups
+      Promise.all([fetchAllUsers(), fetchAllTeams(), fetchAllForms()])
+        .then(()=> updateLoadButtonState())
+        .catch(err => msg('Initial load failed: '+err.message,'error'));
     }
 
     function setTab(name){
@@ -404,7 +420,6 @@
         document.getElementById(`${n}Tab`).classList.toggle('active', n===name);
         document.getElementById(`${n}TabButton`).classList.toggle('active', n===name);
       });
-      // whenever switching to analytics, render it with current data
       if(name==='analytics') renderAnalytics();
     }
 
@@ -413,7 +428,7 @@
       if(!val) return;
       const [y,m]=val.split('-').map(Number);
       state.monthStart=new Date(Date.UTC(y, m-1, 1, 0,0,0));
-      state.monthEnd=new Date(Date.UTC(y, m, 0, 23,59,59));
+      state.monthEnd  =new Date(Date.UTC(y, m,   0, 23,59,59));
     }
 
     // ===== API helpers =====
@@ -443,13 +458,36 @@
     function toUKDate(d){ const dt=new Date(d); return dt.toLocaleDateString('en-GB'); }
     function dayKeyUTC(d){ const dt=new Date(d); return new Date(Date.UTC(dt.getUTCFullYear(),dt.getUTCMonth(),dt.getUTCDate())).toISOString().split('T')[0]; }
 
-    // ===== Lookups and forms (from the previous version) =====
+    // ===== Lookups =====
     async function fetchAllUsers(){
       const url=`https://api.${config.REGION}/api/v2/users?pageSize=100`;
       const users=await fetchPaginatedGET(url);
       state.users=users.map(u=>({id:u.id,name:(u.name || `${u.givenName||''} ${u.familyName||''}`).trim(),email:u.email||''})).sort((a,b)=>a.name.localeCompare(b.name));
       dropdowns.users.setOptions(state.users.map(u=>({value:u.id,label:`${u.name}${u.email?` — ${u.email}`:''}`})));
     }
+
+    async function fetchAllTeams(){
+      const url=`https://api.${config.REGION}/api/v2/teams?pageSize=100`;
+      const teams = await fetchPaginatedGET(url);
+      state.teams = teams.map(t=>({id:t.id,name:t.name||'(Unnamed team)'})).sort((a,b)=>a.name.localeCompare(b.name));
+      state.teamsById = Object.fromEntries(state.teams.map(t=>[t.id,t]));
+      dropdowns.teams.setOptions(state.teams.map(t=>({value:t.id,label:t.name})));
+    }
+
+    async function ensureTeamMembersLoaded(teamIds){
+      const missing = teamIds.filter(id=>!state.teamMembers.has(id));
+      if(!missing.length) return;
+      await Promise.all(missing.map(fetchTeamMembers));
+    }
+
+    async function fetchTeamMembers(teamId){
+      const url=`https://api.${config.REGION}/api/v2/teams/${teamId}/members?pageSize=100`;
+      const members=await fetchPaginatedGET(url);
+      // Try common shapes: member.user.id OR user.id OR just id
+      const ids = Array.from(new Set(members.map(m => safeGet(m,'member.id') || safeGet(m,'member.user.id') || safeGet(m,'user.id') || safeGet(m,'id')).filter(Boolean)));
+      state.teamMembers.set(teamId, ids);
+    }
+
     async function fetchAllForms(){
       const url=`https://api.${config.REGION}/api/v2/quality/forms/evaluations?pageSize=100`;
       const forms=await fetchPaginatedGET(url);
@@ -458,16 +496,38 @@
       dropdowns.forms.setOptions(state.forms.map(f=>({value:f.id,label:f.name})));
     }
 
-    async function loadEvaluations(){
-      const agentIds=dropdowns.users.getSelectedValues();
-      const formIds=dropdowns.forms.getSelectedValues();
-      if(agentIds.length===0 && formIds.length===0){ msg('Please select at least one agent or form.','error'); return; }
-      if(!state.monthStart || !state.monthEnd){ msg('Please select a month.','error'); return; }
+    // ===== Agent selection from Users + Teams =====
+    async function computeSelectedAgentIds(){
+      const userIds = dropdowns.users.getSelectedValues();
+      const teamIds = dropdowns.teams.getSelectedValues();
+      const set = new Set(userIds);
+      if(teamIds.length){
+        await ensureTeamMembersLoaded(teamIds);
+        teamIds.forEach(tid=>{
+          (state.teamMembers.get(tid)||[]).forEach(uid=>set.add(uid));
+        });
+      }
+      return Array.from(set);
+    }
 
-      const btn=document.getElementById('loadBtn'); // reuse spinner text
-      setLoading(btn,true); msg('Loading evaluations…','info');
+    // ===== Evaluations =====
+    async function loadEvaluations(){
+      const agentIds = await computeSelectedAgentIds();
+      const formIds = dropdowns.forms.getSelectedValues();
+
+      if(agentIds.length===0 && formIds.length===0){
+        msg('Please select at least one agent, team, or form.','error');
+        return;
+      }
+      if(!state.monthStart || !state.monthEnd){
+        msg('Please select a month.','error');
+        return;
+      }
+
+      const btn=document.getElementById('loadBtn'); setLoading(btn,true); msg('Loading evaluations…','info');
       try{
-        state.evals=await fetchDetailedEvaluations(agentIds,formIds,state.monthStart,state.monthEnd);
+        const agentList = agentIds.length ? agentIds : state.users.map(u=>u.id); // if only forms selected, pull all users
+        state.evals = await fetchDetailedEvaluations(agentList, formIds, state.monthStart, state.monthEnd);
         msg(`Loaded ${state.evals.length} evaluations.`,'success');
         renderAll();
       }catch(e){ console.error(e); msg('Failed to load evaluations: '+e.message,'error'); }
@@ -484,29 +544,30 @@
       const end  =new Date(Date.UTC(ty, tm,   0, 23,59,59));
       if(start>end){ msg('The From month must be before the To month.','error'); return; }
 
-      const btn=document.getElementById('loadAnalyticsBtn');
-      setLoading(btn,true);
+      const formIds = dropdowns.forms.getSelectedValues();
+      const agentIds = await computeSelectedAgentIds();
+      if(agentIds.length===0 && formIds.length===0){
+        msg('Please select at least one agent, team, or form.','error'); return;
+      }
+
+      const btn=document.getElementById('loadAnalyticsBtn'); setLoading(btn,true);
       try{
-        const agentIds=dropdowns.users.getSelectedValues();
-        const formIds=dropdowns.forms.getSelectedValues();
-        if(agentIds.length===0 && formIds.length===0){ msg('Please select at least one agent or form.','error'); return; }
-        const data=await fetchDetailedEvaluations(agentIds,formIds,start,end);
-        state.analyticsEvals=data;
-        state.analyticsRange={start,end};
+        const agentList = agentIds.length ? agentIds : state.users.map(u=>u.id);
+        const data=await fetchDetailedEvaluations(agentList,formIds,start,end);
+        state.analyticsEvals=data; state.analyticsRange={start,end};
         msg(`Analytics range loaded: ${data.length} evaluations.`, 'success');
-        renderAnalytics(); // refresh
+        renderAnalytics();
       }catch(e){ console.error(e); msg('Failed to load analytics range: '+e.message,'error'); }
       finally{ setLoading(btn,false); }
     }
 
     async function fetchDetailedEvaluations(agentIds,formIds,startDate,endDate){
-      const all=[]; let agentsToQuery=agentIds.length?agentIds:state.users.map(u=>u.id);
-      const batchSize=5;
-      for(let i=0;i<agentsToQuery.length;i+=batchSize){
-        const batch=agentsToQuery.slice(i,i+batchSize);
+      const all=[]; const batchSize=5;
+      for(let i=0;i<agentIds.length;i+=batchSize){
+        const batch=agentIds.slice(i,i+batchSize);
         const res=await Promise.all(batch.map(id=>fetchEvaluationsForAgentInterval(id,formIds,startDate,endDate)));
         res.forEach(items=>all.push(...items));
-        if(i+batchSize<agentsToQuery.length) await new Promise(r=>setTimeout(r,200));
+        if(i+batchSize<agentIds.length) await new Promise(r=>setTimeout(r,200));
       }
       return all;
     }
@@ -521,20 +582,15 @@
         body.pageNumber=page;
         const res=await rateLimitedFetch(url,{method:'POST',body:JSON.stringify(body)});
         if(!res.ok) throw new Error(`Eval query failed: ${res.status}`);
-        const data=await res.json();
-        const items=data.entities||[];
-        if(items.length===0) break;
-        all=all.concat(items);
-        if(!data.nextUri && items.length<body.pageSize) break;
-        page++;
+        const data=await res.json(); const items=data.entities||[];
+        if(items.length===0) break; all=all.concat(items);
+        if(!data.nextUri && items.length<body.pageSize) break; page++;
       }
       return all;
     }
 
-    // ===== Forms + lookups (same as in previous message) =====
-    function formKey(formId, versionId){
-      return (versionId === '__published__') ? `pub@${formId}` : `${formId}@${versionId || 'latest'}`;
-    }
+    // ===== Forms & lookup (same as earlier build) =====
+    function formKey(formId, versionId){ return (versionId === '__published__') ? `pub@${formId}` : `${formId}@${versionId || 'latest'}`; }
     async function getFormDetails(formId, versionId){
       const key=formKey(formId,versionId);
       if(state.formDetailsCache.has(key)) return state.formDetailsCache.get(key);
@@ -555,6 +611,7 @@
         return json;
       }catch(e){ state.formDetailsCache.set(key,null); return null; }
     }
+
     function buildFormLookup(form){
       const questionText=new Map(), answerText=new Map(), questionObj=new Map();
       function addQ(q){
@@ -575,6 +632,7 @@
       (form?.questions||[]).forEach(addQ); walk(form?.questionGroups);
       return {questionText,answerText,questionObj};
     }
+
     async function getCombinedLookupForEval(e){
       const pubId = safeGet(e,'evaluationForm.id');
       const formId = safeGet(e,'form.id') || e.formId;
@@ -601,7 +659,7 @@
       return combined;
     }
 
-    // ===== Helpers to resolve text/answer =====
+    // ===== Utility for answers/text (as before) =====
     function approx(a,b){ return Math.abs(Number(a)-Number(b))<1e-6; }
     function collectAnswerIds(qScore){
       const ids=new Set();
@@ -621,10 +679,9 @@
       return safeGet(qScore,'question.text') || `Question ${candidates[0]||''}`.trim();
     }
 
-    // ======= RENDER (overview/details/critical) from prior version =======
+    // ===== Renderers (Overview / Analytics / Details / Critical) =====
     function renderAll(){ renderOverview(); renderAnalytics(); renderDetails(); renderCritical(); }
     function resolveUserName(id){ const u=state.users.find(x=>x.id===id); return u?u.name:(id||'(unknown)'); }
-    function resolveForm(formId){ return state.formsById[formId]; }
     function getEvalPercent(e){
       const p=e.totalScore || e.totalPercent || safeGet(e,'scoring.totalPercent') || safeGet(e,'oTotalPercent') || safeGet(e,'answers.totalScore');
       if(p==null) return null; return p<=1 ? p*100 : p;
@@ -656,22 +713,12 @@
         : '<tr><td colspan="3" class="muted">No evaluation data available for the selected criteria.</td></tr>';
     }
 
-    // ---- Analytics (new) ----
-    function getAnalyticsSet(){
-      return (state.analyticsEvals && state.analyticsRange) ? state.analyticsEvals : state.evals;
-    }
-
-    function guessMediaType(e){
-      return (safeGet(e,'mediaType') || safeGet(e,'conversation.mediaType') || 'Unknown');
-    }
-
-    function buildDays(start, end){
-      const out=[]; for(let d=new Date(start); d<=end; d.setUTCDate(d.getUTCDate()+1)){ out.push(new Date(d)); }
-      return out;
-    }
+    // === Analytics (uses current state.analyticsEvals if loaded, else state.evals) ===
+    function getAnalyticsSet(){ return (state.analyticsEvals && state.analyticsRange) ? state.analyticsEvals : state.evals; }
+    function guessMediaType(e){ return (safeGet(e,'mediaType') || safeGet(e,'conversation.mediaType') || 'Unknown'); }
+    function buildDays(start,end){ const out=[]; for(let d=new Date(start); d<=end; d.setUTCDate(d.getUTCDate()+1)){ out.push(new Date(d)); } return out; }
 
     async function renderAnalytics(){
-      // dataset = analytics range (if loaded) else current month
       const evals = getAnalyticsSet();
       if(!evals || !evals.length){
         document.getElementById('analyticsKPIs').innerHTML='';
@@ -684,7 +731,7 @@
         return;
       }
 
-      // --- KPIs: pass/fail counts, avg etc.
+      // KPIs
       let withFatal=0, withCritical=0, total=evals.length;
       let sumScores=0, scored=0;
       evals.forEach(e=>{
@@ -708,8 +755,8 @@
         <div class="kpi"><div class="label">Pass Rate</div><div class="value">${passRate==null?'-':pct(passRate*100,1)}</div></div>
       `;
 
-      // --- Media type table (count + average)
-      const mediaMap=new Map(); // type -> {count,sum,scored}
+      // Media table
+      const mediaMap=new Map();
       evals.forEach(e=>{
         const mt=guessMediaType(e);
         if(!mediaMap.has(mt)) mediaMap.set(mt,{count:0,sum:0,scored:0});
@@ -725,8 +772,8 @@
         <tbody>${mediaRows}</tbody>
       `;
 
-      // --- Repeated fails by question (top 12)
-      const failMap=new Map(); // text -> {critical:0,fatal:0,formName}
+      // Repeated fails by question
+      const failMap=new Map();
       for(const e of evals){
         const lookup = await getCombinedLookupForEval(e);
         const qgs=safeGet(e,'answers.questionGroupScores')||[];
@@ -751,8 +798,8 @@
         <tbody>${repeatRows || `<tr><td colspan="5" class="muted">No critical/fatal marks found.</td></tr>`}</tbody>
       `;
 
-      // --- Agent insights (bars)
-      const byAgent=new Map(); // id -> {name,count,sum,scored,fails}
+      // Agent insights
+      const byAgent=new Map();
       evals.forEach(e=>{
         const id=safeGet(e,'agent.id')||e.agentUserId||'(unknown)';
         const name=resolveUserName(id);
@@ -763,27 +810,17 @@
         const hasFail=(safeGet(e,'answers.questionGroupScores')||[]).some(g=>(g.questionScores||[]).some(q=>q.failedKillQuestion||q.failedCriticalQuestion));
         if(hasFail) o.fails++;
       });
-      const insightArr = Array.from(byAgent.values()).map(o=>({
-        name:o.name, count:o.count, avg:o.scored?o.sum/o.scored:null, fails:o.fails
-      }));
-
-      function sortInsights(mode, arr){
-        const a=[...arr];
-        if(mode==='avgAsc') a.sort((x,y)=>(x.avg??-1)-(y.avg??-1));
-        else if(mode==='avgDesc') a.sort((x,y)=>(y.avg??-1)-(x.avg??-1));
-        else if(mode==='failsDesc') a.sort((x,y)=>y.fails-x.fails);
-        else if(mode==='evalsDesc') a.sort((x,y)=>y.count-x.count);
-        return a;
-      }
-      window._insightData = insightArr; // stash for sorter
+      const insightArr = Array.from(byAgent.values()).map(o=>({ name:o.name, count:o.count, avg:o.scored?o.sum/o.scored:null, fails:o.fails }));
+      window._insightData = insightArr;
       renderAgentInsights();
 
-      // --- Trend table (daily)
-      const days = buildDays(state.analyticsRange?.start || state.monthStart,
-                             state.analyticsRange?.end   || state.monthEnd);
+      // Trend table
+      const start = state.analyticsRange?.start || state.monthStart;
+      const end   = state.analyticsRange?.end   || state.monthEnd;
+      const days = buildDays(start,end);
       const dayKeys = days.map(d=> d.toISOString().split('T')[0]);
       const agents = Array.from(new Set(evals.map(e=> safeGet(e,'agent.id') || e.agentUserId))).filter(Boolean);
-      const map = new Map(); // agent -> day -> {sum,count}
+      const map = new Map();
       evals.forEach(e=>{
         const aid = safeGet(e,'agent.id') || e.agentUserId || '(unknown)';
         const dk = dayKeyUTC(e.releaseDate || e.assignedDate || e.creationDate || e.evaluationDate || e.date || Date.now());
@@ -805,7 +842,7 @@
       }).join('');
       document.getElementById('trendTable').innerHTML = header + `<tbody>${rows}</tbody>`;
 
-      // --- Top/Bottom mini tables
+      // Top/bottom tables
       const byAvg = insightArr.filter(x=>x.avg!=null).sort((a,b)=>b.avg-a.avg);
       const top = byAvg.slice(0,5).map(x=>`<tr><td>${x.name}</td><td>${x.count}</td><td>${pct(x.avg,1)}</td></tr>`).join('');
       const bottom = byAvg.slice(-5).map(x=>`<tr><td>${x.name}</td><td>${x.count}</td><td>${pct(x.avg,1)}</td></tr>`).join('');
@@ -817,18 +854,18 @@
 
     function renderAgentInsights(){
       const data = window._insightData || [];
-      const sortMode = document.getElementById('insightsSort').value || 'avgDesc';
-      const arr = (function sortInsights(mode, arr){
-        const a=[...arr];
-        if(mode==='avgAsc') a.sort((x,y)=>(x.avg??-1)-(y.avg??-1));
-        else if(mode==='avgDesc') a.sort((x,y)=>(y.avg??-1)-(x.avg??-1));
-        else if(mode==='failsDesc') a.sort((x,y)=>y.fails-x.fails);
-        else if(mode==='evalsDesc') a.sort((x,y)=>y.count-x.count);
-        return a;
-      })(sortMode, data);
+      const mode = document.getElementById('insightsSort').value || 'avgDesc';
+      const arr = (function sort(mode, a){
+        const x=[...a];
+        if(mode==='avgAsc') x.sort((u,v)=>(u.avg??-1)-(v.avg??-1));
+        else if(mode==='avgDesc') x.sort((u,v)=>(v.avg??-1)-(u.avg??-1));
+        else if(mode==='failsDesc') x.sort((u,v)=>v.fails-u.fails);
+        else if(mode==='evalsDesc') x.sort((u,v)=>v.count-u.count);
+        return x;
+      })(mode, data);
 
       const html = arr.map(a=>{
-        const w = a.avg==null?0:Math.max(0,Math.min(100,a.avg)); // % bar width
+        const w = a.avg==null?0:Math.max(0,Math.min(100,a.avg));
         return `<div class="insight-row">
           <div class="insight-name">${a.name}</div>
           <div class="insight-bar-wrap"><div class="insight-bar" style="width:${w}%"></div></div>
@@ -838,7 +875,7 @@
       document.getElementById('agentInsights').innerHTML = html || '<div class="muted">No agent data.</div>';
     }
 
-    // -------- Details (unchanged core, uses lookups) --------
+    // ===== Details (unchanged core display) =====
     async function renderDetails(){
       const c=document.getElementById('detailsContainer');
       if (!state.evals.length){ c.innerHTML = '<div class="muted">No evaluations loaded.</div>'; return; }
@@ -846,10 +883,6 @@
 
       const evaluationElements = await Promise.all(state.evals.map(async (e) => {
         const agent = resolveUserName(safeGet(e,'agent.id') || e.agentUserId);
-        const evaluator = resolveUserName(safeGet(e,'evaluator.id') || e.evaluatorUserId);
-        const pubId = safeGet(e,'evaluationForm.id');
-        const formId = pubId || safeGet(e,'form.id') || e.formId;
-        const formVersionId = pubId ? '__published__' : (safeGet(e,'form.versionId') || e.formVersionId || safeGet(e,'form.version'));
         const lookup = await getCombinedLookupForEval(e);
         const formName = lookup.formName;
         const when = toUKDate(e.releaseDate || e.assignedDate || e.creationDate || e.evaluationDate || e.date || Date.now());
@@ -857,7 +890,6 @@
         const score = getEvalPercent(e);
         const questionGroups = safeGet(e, 'answers.questionGroupScores') || [];
 
-        let qRows = '';
         function resolveAnswerTextWithLookup(lookup,qScore){
           const ids=new Set();
           (qScore.selectedAnswerIds||[]).forEach(x=>ids.add(x));
@@ -886,9 +918,9 @@
           return 'N/A';
         }
 
+        let qRows = '';
         questionGroups.forEach(group => {
-          const questionScores = group.questionScores || [];
-          questionScores.forEach(qScore => {
+          (group.questionScores || []).forEach(qScore => {
             const questionText = resolveQuestionTextWithLookup(lookup,qScore);
             const answerText = resolveAnswerTextWithLookup(lookup,qScore);
             const ansScore = qScore.score ?? null;
@@ -928,7 +960,7 @@
       c.innerHTML = evaluationElements.join('');
     }
 
-    // ===== Critical view with agent dropdowns (as in your working build) =====
+    // ===== Critical view (with agent dropdowns) =====
     async function renderCritical(){
       const tbl=document.getElementById('criticalTable');
       if(!state.evals.length){ tbl.innerHTML='<tr><td class="muted">No evaluations loaded.</td></tr>'; return; }
@@ -978,8 +1010,7 @@
             </tr>`);
           });
       }
-      rowsFrom(fatalMap,'fatal');
-      rowsFrom(critMap,'critical');
+      rowsFrom(fatalMap,'fatal'); rowsFrom(critMap,'critical');
 
       tbl.innerHTML = `
         <thead><tr>

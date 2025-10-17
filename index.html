@@ -63,7 +63,7 @@
     .cd-search{flex:1;border:1px solid var(--border-color);border-radius:6px;padding:8px;width:100%;box-sizing:border-box}
     .cd-actions{display:flex;gap:8px}
     .cd-actions button{background:#eef6f2;color:#2c3e50;border:1px solid var(--border-color);border-radius:6px;padding:8px 10px;cursor:pointer;white-space:nowrap}
-    .cd-selectall{padding:8px 12px;border-bottom:1px solid var(--border-color);display:flex;align-items:center;gap:10px}
+    .cd-selectall{padding:8px 12px;border-bottom:1px solid #f1f3f5;display:flex;align-items:center;gap:10px}
     .cd-list{max-height:260px;overflow:auto}
     .cd-item{display:flex;align-items:center;gap:10px;padding:8px 12px;border-bottom:1px solid #f1f3f5}
     .cd-item label{display:flex;align-items:center;gap:10px;cursor:pointer;width:100%}
@@ -294,7 +294,7 @@
   </div>
 
   <script>
-    /* ==== Auth / setup bits (unchanged behaviour) ==== */
+    /* ==== Auth / setup bits ==== */
     const clientId = 'fe305808-b368-4547-8af9-325d28d552bb';
     const config = { REGION: 'mypurecloud.ie' };
     const DEBUG = new URLSearchParams(window.location.search).has('debug');
@@ -403,7 +403,11 @@
     }
 
     function setTab(name){ ['overview','analytics','details','critical'].forEach(n=>{ document.getElementById(`${n}Tab`).classList.toggle('active', n===name); document.getElementById(`${n}TabButton`).classList.toggle('active', n===name); }); if(name==='analytics') renderAnalytics(); }
+
     function updateMonthRange(){ const v=document.getElementById('monthInput').value; if(!v) return; const [y,m]=v.split('-').map(Number); state.monthStart=new Date(Date.UTC(y,m-1,1,0,0,0)); state.monthEnd=new Date(Date.UTC(y,m,0,23,59,59)); }
+
+    /* 🔧 Added: central renderer to prevent 'renderAll is not defined' */
+    function renderAll(){ renderOverview(); renderAnalytics(); renderDetails(); renderCritical(); }
 
     /* ==== HTTP helpers with backoff ==== */
     async function rawFetch(url,options={}){ const now=Date.now(); const delta=now-lastApiCall; if(delta<API_DELAY) await sleep(API_DELAY-delta); lastApiCall=Date.now(); return fetch(url,{...options,headers:{'Authorization':'Bearer '+state.accessToken,'Content-Type':'application/json',...(options.headers||{})}}); }
@@ -454,13 +458,13 @@
     }
     async function fetchEvaluationsForAgentInterval(agentId,formIds,startDate,endDate){
       const start=startDate.toISOString(), end=endDate.toISOString(); const base=`https://api.${config.REGION}/api/v2/quality/evaluations/query`;
-      async function getViaGET(singleFormId){ const params=new URLSearchParams({agentUserId:agentId,startTime:start,endTime:end,expandAnswerTotalScores:'true',pageSize:'50'}); if(singleFormId) params.set('formId',singleFormId); const url=`${base}?${params.toString()}`; let all=[], next=url; while(next){ const data=await fetchJsonWithRetry(next,{method:'GET'}); const ents=data?.entities||[]; all=all.concat(ents); next=data?.nextUri?`https://api.${config.REGION}${data.nextUri}`:null; } return all; }
+      async function getViaGET(singleFormId){ const params=new URLSearchParams({agentUserId:agentId,startTime:start,endTime:end,expandAnswerTotalScores:'true',pageSize:'50'}); if(singleFormId) params.set('formId', singleFormId); const url=`${base}?${params.toString()}`; let all=[], next=url; while(next){ const data=await fetchJsonWithRetry(next,{method:'GET'}); const ents=data?.entities||[]; all=all.concat(ents); next=data?.nextUri?`https://api.${config.REGION}${data.nextUri}`:null; } return all; }
       async function getViaPOST(){ const url=base; const body={agentUserIds:[agentId],interval:`${start}/${end}`,expandAnswerTotalScores:true,pageSize:50}; if(formIds&&formIds.length>0) body.formIds=formIds; let page=1, all=[]; while(true){ body.pageNumber=page; const data=await fetchJsonWithRetry(url,{method:'POST',body:JSON.stringify(body)}); const ents=data?.entities||[]; if(!ents.length) break; all=all.concat(ents); if(!data.nextUri && ents.length<body.pageSize) break; page++; } return all; }
       if(!formIds||formIds.length<=1){ try{ return await getViaGET(formIds?.[0]); }catch(err){ if(err.status===405||err.status===400){} else throw err; } }
       try{ return await getViaPOST(); }catch(err){ if(err.status===405||err.status===400){ return await getViaGET(undefined); } throw err; }
     }
 
-    /* ==== Forms + lookups (for details/critical) ==== */
+    /* ==== Forms + lookups ==== */
     function formKey(formId,versionId){ return (versionId==='__published__')?`pub@${formId}`:`${formId}@${versionId||'latest'}`; }
     async function getFormDetails(formId,versionId){ const key=formKey(formId,versionId); if(state.formDetailsCache.has(key)) return state.formDetailsCache.get(key); let url; if(versionId==='__published__') url=`https://api.${config.REGION}/api/v2/quality/publishedforms/evaluations/${formId}`; else url=versionId?`https://api.${config.REGION}/api/v2/quality/forms/evaluations/${formId}/versions/${versionId}`:`https://api.${config.REGION}/api/v2/quality/forms/evaluations/${formId}`; try{ let data; try{ data=await fetchJsonWithRetry(url,{method:'GET'}); }catch(err){ if(versionId&&versionId!=='__published__'){ data=await fetchJsonWithRetry(`https://api.${config.REGION}/api/v2/quality/forms/evaluations/${formId}`,{method:'GET'}); } else throw err; } state.formDetailsCache.set(key,data); state.formLookupCache.set(key,buildFormLookup(data||{})); return data; }catch(e){ state.formDetailsCache.set(key,null); return null; } }
     function buildFormLookup(form){ const questionText=new Map(), answerText=new Map(), questionObj=new Map(); function addQ(q){ if(!q) return; const qTxt=q.text||q.label||q.title||''; [q.id,q.contextId,q.questionId,q.questionContextId].filter(Boolean).forEach(id=>{questionText.set(id,qTxt);questionObj.set(id,q);}); (q.answerOptions||[]).forEach(a=>{ const aTxt=a.text??String(a.value??''); [a.id,a.contextId,a.answerId,a.answerOptionId].filter(Boolean).forEach(id=>answerText.set(id,aTxt)); }); (q.multipleSelectOptionQuestions||[]).forEach(addQ); } function walk(groups){ (groups||[]).forEach(g=>{ (g.questions||[]).forEach(addQ); (g.questionGroups||[]).forEach(walk); }); } (form?.questions||[]).forEach(addQ); walk(form?.questionGroups); return {questionText,answerText,questionObj}; }
@@ -545,7 +549,7 @@
         const o=m.get(mt); o.count++; const p=getEvalPercent(e); if(p!=null&&isFinite(p)){ o.sum+=Number(p); o.scored++; }
       });
       const mediaOrder = ['Voice','Email','Message','Social','Other'];
-      const width=700, height=22, gap=6; // svg sizes per row
+      const width=700, height=22;
       const rowsHtml = Array.from(byAgent.values()).sort((a,b)=>a.name.localeCompare(b.name)).map(row=>{
         const total=Array.from(row.map.values()).reduce((s,o)=>s+o.count,0)||1;
         let x=0;
@@ -556,9 +560,7 @@
           const fill = colourFor(avg, pass, band);
           const tooltip = `${type}: ${o.count} evals · ${avg==null?'-':pct(avg,1)}`;
           const rx=x; x+=w;
-          return `<rect x="${rx}" y="0" width="${w}" height="${height}" fill="${fill}">
-                    <title>${tooltip}</title>
-                  </rect>`;
+          return `<rect x="${rx}" y="0" width="${w}" height="${height}" fill="${fill}"><title>${tooltip}</title></rect>`;
         }).join('');
         const label = Array.from(row.map.entries()).map(([t,o])=>`${t}:${o.count}`).join(' • ');
         return `<div class="chart-row">
@@ -595,7 +597,7 @@
         <tbody>${mediaRows}</tbody>`;
       tableSorter('mediaTable');
 
-      /* Repeated fails table (unchanged compute) */
+      /* Repeated fails table */
       const failMap=new Map();
       for(const e of evals){
         const lookup = await getCombinedLookupForEval(e);
@@ -622,7 +624,7 @@
         </tr></thead><tbody>${repeatRows || `<tr><td colspan="5" class="muted">No critical/fatal marks found.</td></tr>`}</tbody>`;
       tableSorter('repeatFailsTable');
 
-      /* Maintain the old daily table for reference */
+      /* Keep daily table for reference */
       const start = state.analyticsRange?.start || state.monthStart; const end = state.analyticsRange?.end || state.monthEnd;
       const days=[]; for(let d=new Date(start); d<=end; d.setUTCDate(d.getUTCDate()+1)) days.push(new Date(d).toISOString().split('T')[0]);
       const agents = Array.from(new Set(evals.map(e=> safeGet(e,'agent.id') || e.agentUserId))).filter(Boolean);
@@ -664,7 +666,7 @@
       document.getElementById('agentInsights').innerHTML = html || '<div class="muted">No agent data.</div>';
     }
 
-    /* ==== Details (unchanged core) ==== */
+    /* ==== Details ==== */
     async function renderDetails(){
       const c=document.getElementById('detailsContainer'); if(!state.evals.length){ c.innerHTML='<div class="muted">No evaluations loaded.</div>'; return; }
       c.innerHTML='<div class="info-message">Loading evaluation details...</div>';
@@ -688,7 +690,7 @@
       c.innerHTML=elements.join('');
     }
 
-    /* ==== Critical view with agent list ==== */
+    /* ==== Critical view ==== */
     async function renderCritical(){
       const tbl=document.getElementById('criticalTable'); if(!state.evals.length){ tbl.innerHTML='<tr><td class="muted">No evaluations loaded.</td></tr>'; return; }
       const fatalMap=new Map(); const critMap=new Map();

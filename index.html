@@ -5,11 +5,9 @@
   <title>QA Evaluations – Monthly View</title>
   <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
   <style>
-    :root{
-      --primary-color:#63AB8F; --secondary-color:#4A8C7D; --border-color:#DEE2E6;
-      --light-bg:#F8F9FA; --card-bg:#FFFFFF; --text-color:#2C3E50; --text-light:#6C757D; --pill:#e9f6f0;
-      --ok:#22c55e; --warn:#f59e0b; --bad:#ef4444;
-    }
+    :root{ --primary-color:#63AB8F; --secondary-color:#4A8C7D; --border-color:#DEE2E6;
+      --light-bg:#F8F9FA; --card-bg:#FFFFFF; --text-color:#2C3E50; --text-light:#6C757D; --pill:#e9f6f0; 
+      --ok:#22c55e; --warn:#f59e0b; --bad:#ef4444; }
     body{font-family:'Aptos','Segoe UI',system-ui,-apple-system,Arial,sans-serif;margin:20px;padding:20px;max-width:1400px;background:var(--light-bg);color:var(--text-color)}
     #logo-container{text-align:center;margin-bottom:20px} #logo{width:300px}
     h1{margin:0 0 16px}
@@ -32,8 +30,6 @@
     th{background-color:var(--primary-color);color:white;font-weight:600}
     tr:hover{background-color:rgba(99,171,143,.05)}
     .table-container{overflow-x:auto;border:1px solid var(--border-color);border-radius:6px;padding:1px;margin-top:10px}
-    .sortable th{cursor:pointer}
-    .sortable th .sort-ind{margin-left:6px;opacity:.8;font-weight:700}
 
     .tab{display:inline-block;padding:12px 20px;margin-right:10px;background:#eee;cursor:pointer;border-radius:6px;font-weight:500}
     .tab.active{background:var(--primary-color);color:white}
@@ -44,7 +40,6 @@
     .badge-critical{color:#b4231a;border-color:#fecaca;background:#fee2e2}
     .badge-fatal{color:#fff;background:#b4231a;border-color:#b4231a}
     .badge-ok{color:#14532d;background:#dcfce7;border-color:#bbf7d0}
-
     details.evaluation{border:1px solid var(--border-color);border-radius:8px;padding:10px;margin:10px 0;background:#fff}
     details.evaluation summary{cursor:pointer;font-weight:600}
 
@@ -64,7 +59,7 @@
     .cd-search{flex:1;border:1px solid var(--border-color);border-radius:6px;padding:8px;width:100%;box-sizing:border-box}
     .cd-actions{display:flex;gap:8px}
     .cd-actions button{background:#eef6f2;color:#2c3e50;border:1px solid var(--border-color);border-radius:6px;padding:8px 10px;cursor:pointer;white-space:nowrap}
-    .cd-selectall{padding:8px 12px;border-bottom:1px solid #f1f3f5;display:flex;align-items:center;gap:10px}
+    .cd-selectall{padding:8px 12px;border-bottom:1px solid var(--border-color);display:flex;align-items:center;gap:10px}
     .cd-list{max-height:260px;overflow:auto}
     .cd-item{display:flex;align-items:center;gap:10px;padding:8px 12px;border-bottom:1px solid #f1f3f5}
     .cd-item label{display:flex;align-items:center;gap:10px;cursor:pointer;width:100%}
@@ -80,16 +75,31 @@
     tr.critical-warning:hover{background-color:#fef3c7!important}
     tr.fatal-question:hover{background-color:#fecaca!important}
 
-    /* Details table widths */
-    .details-table th:nth-child(1), .details-table td:nth-child(1){ width:32%; min-width:280px }
-    .details-table th:nth-child(2), .details-table td:nth-child(2){ width:14% }
-    .details-table th:nth-child(3), .details-table td:nth-child(3){ width:8%; white-space:nowrap }
-    .details-table th:nth-child(4), .details-table td:nth-child(4){ width:10%; white-space:nowrap }
-    .details-table th:nth-child(5), .details-table td:nth-child(5){ width:auto }
+    /* Details table: keep question column roomy */
+    .details-table th:nth-child(1),
+    .details-table td:nth-child(1){ width:32%; min-width:280px }
+    .details-table th:nth-child(2),
+    .details-table td:nth-child(2){ width:14% }
+    .details-table th:nth-child(3),
+    .details-table td:nth-child(3){ width:8%; white-space:nowrap }
+    .details-table th:nth-child(4),
+    .details-table td:nth-child(4){ width:10%; white-space:nowrap }
+    .details-table th:nth-child(5),
+    .details-table td:nth-child(5){ width:auto }
 
-    /* Trend table first col wider */
-    .trend-table th:first-child, .trend-table td:first-child{ width:220px; min-width:220px; white-space:nowrap }
+    /* Analytics: widen first column in trends table */
+    .trend-table th:first-child,
+    .trend-table td:first-child{ width:220px; min-width:220px; white-space:nowrap }
 
+    /* Agent insights bars */
+    .insight-row{display:flex;align-items:center;gap:10px;padding:8px;border-bottom:1px solid #f1f3f5}
+    .insight-name{width:200px;flex-shrink:0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+    .insight-bar-wrap{flex:1;background:#f1f3f5;border-radius:999px;overflow:hidden;height:12px}
+    .insight-bar{height:100%;background:var(--primary-color)}
+    .insight-meta{width:120px;text-align:right;font-size:12px;color:#6c757d}
+    .pill{display:inline-block;border:1px solid var(--border-color);border-radius:999px;padding:2px 8px;font-size:12px;background:#fff;margin-left:6px}
+
+    /* NEW: Analytics enhancements */
     .chart-row{display:flex;align-items:center;gap:10px;margin:8px 0}
     .chart-label{width:200px;flex-shrink:0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
     .chart-svg{flex:1;border:1px solid #f1f3f5;border-radius:8px;background:#fafafa}
@@ -97,7 +107,9 @@
     .legend .key{display:flex;align-items:center;gap:6px}
     .swatch{width:14px;height:14px;border-radius:3px;border:1px solid #ddd}
 
-    .pill{display:inline-block;border:1px solid var(--border-color);border-radius:999px;padding:2px 8px;font-size:12px;background:#fff;margin-left:6px}
+    /* Sortable tables */
+    .sortable th{cursor:pointer}
+    .sortable th .sort-ind{margin-left:6px;opacity:.8;font-weight:700}
   </style>
 </head>
 <body>
@@ -178,10 +190,12 @@
           <div>
             <label for="anaFrom">From (Month)</label>
             <input id="anaFrom" type="month">
+            <div class="muted">Start of range (inclusive)</div>
           </div>
           <div>
             <label for="anaTo">To (Month)</label>
             <input id="anaTo" type="month">
+            <div class="muted">End of range (inclusive)</div>
           </div>
           <div>
             <label>&nbsp;</label>
@@ -192,6 +206,7 @@
           </div>
         </div>
 
+        <!-- NEW: Analytics filters -->
         <div class="controls" style="margin-top:8px">
           <div>
             <label for="passTarget">Pass target (%)</label>
@@ -213,6 +228,7 @@
 
         <div id="analyticsKPIs" class="kpis"></div>
 
+        <!-- NEW: Agent media chart -->
         <div class="card" style="padding:16px;margin-top:10px">
           <h3 class="section-title" style="margin:0 0 8px">Scores by Media Type per Agent</h3>
           <div id="agentMediaChart"></div>
@@ -246,7 +262,7 @@
           <div id="agentInsights" style="margin-top:8px"></div>
         </div>
 
-        <h3 class="section-title" style="margin-top:18px">Daily Trend by Agent (Table)</h3>
+        <h3 class="section-title" style="margin-top:18px">Daily Trend by Agent (Selected Period)</h3>
         <div class="table-container">
           <table id="trendTable" class="trend-table"></table>
         </div>
@@ -276,7 +292,7 @@
   </div>
 
   <script>
-    /* ====== Config ====== */
+    // ===== OAuth Configuration =====
     const clientId = 'fe305808-b368-4547-8af9-325d28d552bb';
     const config = { REGION: 'mypurecloud.ie' };
     const DEBUG = new URLSearchParams(window.location.search).has('debug');
@@ -285,767 +301,984 @@
 
     const state = {
       accessToken: null,
-      users: [], forms: [], formsById: {},
-      teams: [], teamsById: {}, teamMembers: new Map(),
-      evals: [], monthStart:null, monthEnd:null,
-      analyticsEvals: null, analyticsRange: null,
-      formDetailsCache:new Map(), formLookupCache:new Map(), combinedLookupCache:new Map()
+      users: [],
+      forms: [],
+      formsById: {},
+      teams: [],
+      teamsById: {},
+      teamMembers: new Map(),
+
+      evals: [],
+      monthStart: null,
+      monthEnd: null,
+
+      analyticsEvals: null,
+      analyticsRange: null,
+
+      formDetailsCache: new Map(),
+      formLookupCache: new Map(),
+      combinedLookupCache: new Map()
     };
+
     const dropdowns = { users:null, teams:null, forms:null, analyticsTeams:null };
 
-    /* ====== Utilities ====== */
-    const sleep = (ms)=>new Promise(r=>setTimeout(r,ms));
-    let lastApiCall=0; const API_DELAY=120;
-    const PAGE_SIZE = 50;
+    // Throttle + backoff
+    let lastApiCall = 0;
+    const API_DELAY = 120;                  // min spacing between calls
+    const MAX_CONCURRENT_AGENT_BATCH = 3;   // lower concurrency to be gentle
 
-    function msg(html,type='info'){ 
-        const box=document.getElementById('messageContainer'); 
-        box.innerHTML=`<div class="${type}-message">${html}</div>`; 
-        box.style.display='block'; 
-        if(type==='success'){ setTimeout(()=>box.style.display='none',5000); } 
-    }
-    
-    function setLoading(button,isLoading){ 
-        const s=button.querySelector('.loading-spinner'); 
-        const t=button.querySelector('.btn-text'); 
-        if(isLoading){ 
-            s.style.display='inline-block'; 
-            t.textContent='Loading...'; 
-            button.disabled=true; 
-        } else { 
-            s.style.display='none'; 
-            t.textContent=(button.id==='loadAnalyticsBtn'?'Load Range':'Load Evaluations'); 
-            button.disabled=false; 
-        } 
-    }
-    
-    function toUKDate(d){ const dt=new Date(d); return dt.toLocaleDateString('en-GB'); }
-    function pct(n,d=1){ if(n==null||!isFinite(n)) return '-'; return (Math.round(n*10**d)/10**d).toFixed(d)+'%'; }
-    function fmt(n,d=1){ if(n==null||!isFinite(n)) return '-'; return (Math.round(n*10**d)/10**d).toFixed(d); }
-    
-    function safeGet(o,p,def=null){ 
-        try{ 
-            return p.split('.').reduce((x,k)=>(x && k in x)?x[k]:undefined ,o) ?? def; 
-        }catch{ 
-            return def; 
-        } 
-    }
-    
-    function dayKeyUTC(d){ 
-        const dt=new Date(d); 
-        return new Date(Date.UTC(dt.getUTCFullYear(),dt.getUTCMonth(),dt.getUTCDate())).toISOString().split('T')[0]; 
+    function sleep(ms){ return new Promise(r=>setTimeout(r,ms)); }
+
+    function msg(html,type='info'){
+      const box=document.getElementById('messageContainer');
+      box.innerHTML=`<div class="${type}-message">${html}</div>`;
+      box.style.display='block';
+      if(type==='success'){ setTimeout(()=>box.style.display='none',5000); }
     }
 
-    function tableSorter(tableId){ 
-        const t=document.getElementById(tableId); 
-        if(!t||!t.tHead) return; 
-        const ths=[...t.tHead.querySelectorAll('th')]; 
-        ths.forEach((th,i)=>{ 
-            th.onclick=()=>{ 
-                const dir=th.dataset.dir==='asc'?'desc':'asc'; 
-                ths.forEach(h=>{
-                    h.dataset.dir=''; 
-                    const s=h.querySelector('.sort-ind'); 
-                    if(s) s.remove();
-                }); 
-                th.dataset.dir=dir; 
-                const ind=document.createElement('span'); 
-                ind.className='sort-ind'; 
-                ind.textContent=dir==='asc'?'▲':'▼'; 
-                th.appendChild(ind);
-                const body=t.tBodies[0]; 
-                const rows=[...body.rows]; 
-                const num=th.dataset.type==='num'; 
-                rows.sort((a,b)=>{ 
-                    const av=a.cells[i].getAttribute('data-sort') ?? a.cells[i].innerText; 
-                    const bv=b.cells[i].getAttribute('data-sort') ?? b.cells[i].innerText; 
-                    const A=num?Number(av):String(av).toLowerCase(); 
-                    const B=num?Number(bv):String(bv).toLowerCase(); 
-                    return dir==='asc'? (A>B?1:A<B?-1:0) : (A<B?1:A>B?-1:0); 
-                }); 
-                body.innerHTML=''; 
-                rows.forEach(r=>body.appendChild(r)); 
-            }; 
-        }); 
-        t.classList.add('sortable'); 
+    function setLoading(button,isLoading){
+      const spinner=button.querySelector('.loading-spinner');
+      const text=button.querySelector('.btn-text');
+      if(isLoading){ spinner.style.display='inline-block'; text.textContent='Loading...'; button.disabled=true; }
+      else{ spinner.style.display='none'; text.textContent = (button.id==='loadAnalyticsBtn'?'Load Range':'Load Evaluations'); button.disabled=false; }
     }
 
-    /* ====== Core metrics/render helpers ====== */
-    function getEvalPercent(e){
-      const p=e.totalScore||e.totalPercent||safeGet(e,'scoring.totalPercent')||safeGet(e,'oTotalPercent')||safeGet(e,'answers.totalScore');
-      if(p==null) return null; 
-      return p<=1? p*100 : p;
-    }
-    
-    function resolveUserName(id){ 
-        const u=state.users.find(x=>x.id===id); 
-        return u?u.name:(id||'(unknown)'); 
-    }
-    
-    function standardiseMedia(m){ 
-        const x=String(m||'').toUpperCase(); 
-        if(x.includes('EMAIL')) return 'Email'; 
-        if(x.includes('CALL')||x.includes('VOICE')||x==='CALL') return 'Voice'; 
-        if(x.includes('CHAT')||x.includes('MESSAGE')) return 'Message'; 
-        if(x.includes('SOCIAL')) return 'Social'; 
-        return 'Other'; 
-    }
-    
-    function guessMediaType(e){ 
-        return standardiseMedia(safeGet(e,'mediaType') || safeGet(e,'conversation.mediaType') || 'Other'); 
-    }
-    
-    function getPassSettings(){ 
-        const pass=parseFloat(document.getElementById('passTarget').value||'85'); 
-        const band=parseFloat(document.getElementById('amberBand').value||'5'); 
-        return {pass, band}; 
-    }
-    
-    function colourFor(score, pass, band){ 
-        if(score==null||!isFinite(score)) return 'var(--bad)'; 
-        if(score>=pass) return 'var(--ok)'; 
-        if(score>=pass-band) return 'var(--warn)'; 
-        return 'var(--bad)'; 
-    }
+    // ===== Checkbox dropdown =====
+    function createCheckboxDropdown(containerId,{placeholder,searchPlaceholder}){
+      const root=document.getElementById(containerId); root.innerHTML='';
+      const trigger=document.createElement('div'); trigger.className='cd-trigger';
+      trigger.innerHTML=`<span class="label">${placeholder}</span><span class="count">0 selected</span>`;
+      root.appendChild(trigger);
+      const panel=document.createElement('div'); panel.className='cd-panel';
+      panel.innerHTML=`
+        <div class="cd-header">
+          <input type="text" class="cd-search" placeholder="${searchPlaceholder}" />
+          <div class="cd-actions"><button type="button" data-cd="clear">Clear</button></div>
+        </div>
+        <div class="cd-selectall"><label><input type="checkbox" data-cd="selectall"/> Select all</label></div>
+        <div class="cd-list"></div>
+        <div class="cd-footer"><span data-cd="summary">0 selected</span><span>Click outside to close</span></div>`;
+      root.appendChild(panel);
 
-    /* ====== RENDER ALL functions ====== */
-    function renderAll(){ 
-        console.log('Rendering all tabs...');
-        renderOverview(); 
-        renderAnalytics(); 
-        renderDetails(); 
-        renderCritical(); 
-    }
+      const list=panel.querySelector('.cd-list');
+      const search=panel.querySelector('.cd-search');
+      const clearBtn=panel.querySelector('[data-cd="clear"]');
+      const selectAll=panel.querySelector('[data-cd="selectall"]');
+      const summary=panel.querySelector('[data-cd="summary"]');
 
-    function renderOverview(){
-        console.log('Rendering overview...');
-        const evals=state.evals;
-        const byAgent=new Map();
-        
-        evals.forEach(e=>{
-            const a=safeGet(e,'agent.id')||e.agentUserId||'(unknown)';
-            const p=getEvalPercent(e);
-            if(!byAgent.has(a)) byAgent.set(a,{count:0,sum:0});
-            const o=byAgent.get(a); 
-            o.count++; 
-            if(p!=null&&isFinite(p)) o.sum+=Number(p);
+      let options=[]; let selected=new Set();
+
+      function render(filter=''){
+        const ft=filter.trim().toLowerCase(); list.innerHTML='';
+        const filtered=!ft?options:options.filter(o=>(o.label||'').toLowerCase().includes(ft));
+        if(!filtered.length){ list.innerHTML=`<div class="cd-item" style="color:#6C757D">No matches</div>`; return; }
+        filtered.forEach(o=>{
+          const id=`${containerId}__${o.value}`;
+          const row=document.createElement('div'); row.className='cd-item';
+          row.innerHTML=`<label for="${id}"><input type="checkbox" id="${id}" value="${o.value}" ${selected.has(o.value)?'checked':''}/><span>${o.label||o.value}</span></label>`;
+          row.querySelector('input').addEventListener('change',(e)=>{ 
+            if(e.target.checked) selected.add(o.value); 
+            else selected.delete(o.value); 
+            updateSummary(); 
+            updateSelectAllState(); 
+            if(containerId !== 'analyticsTeamDropdown') updateLoadButtonState(); 
+          });
+          list.appendChild(row);
         });
-        
-        const rows=[]; 
-        let total=0;
-        for(const [aid,{count,sum}] of byAgent.entries()){
-            rows.push({
-                agent:resolveUserName(aid),
-                count,
-                avg:count?(sum/count):null
-            }); 
-            total+=count;
-        }
-        
-        rows.sort((a,b)=>a.agent.localeCompare(b.agent));
-        const overallAvg=(rows.length&&total)?(rows.reduce((s,r)=>s+(r.avg||0),0)/rows.length):null;
-        
-        document.getElementById('overviewKPIs').innerHTML=`
-            <div class="kpi"><div class="label">Month</div><div class="value">${document.getElementById('monthInput').value}</div></div>
-            <div class="kpi"><div class="label">Evaluations</div><div class="value">${evals.length}</div></div>
-            <div class="kpi"><div class="label">Agents</div><div class="value">${rows.length}</div></div>
-            <div class="kpi"><div class="label">Average Score (Agent Avg)</div><div class="value">${overallAvg==null?'-':pct(overallAvg,1)}</div></div>`;
-        
-        const tbl=document.getElementById('agentSummaryTable');
-        if (rows.length) {
-            tbl.innerHTML=`
-                <thead>
-                    <tr>
-                        <th>Agent</th>
-                        <th>Evaluations</th>
-                        <th>Average Score</th>
-                    </tr>
-                </thead>
-                <tbody>
-                    ${rows.map(r=>`
-                        <tr>
-                            <td>${r.agent}</td>
-                            <td>${r.count}</td>
-                            <td>${r.avg==null?'-':pct(r.avg,1)}</td>
-                        </tr>
-                    `).join('')}
-                </tbody>`;
-        } else {
-            tbl.innerHTML='<tr><td colspan="3" class="muted">No evaluation data available for the selected criteria.</td></tr>';
-        }
-    }
+      }
+      function updateSummary(){ trigger.querySelector('.count').textContent=`${selected.size} selected`; summary.textContent=`${selected.size} selected`; }
+      function updateSelectAllState(){ const total=options.length,count=selected.size; selectAll.indeterminate=count>0&&count<total; selectAll.checked=total>0&&count===total; }
 
-    function renderAnalytics(){
-        console.log('Rendering analytics...');
-        const evals = state.analyticsEvals || state.evals;
-        
-        if(!evals || !evals.length){
-            document.getElementById('analyticsKPIs').innerHTML='<div class="kpi"><div class="label">No Data</div><div class="value">-</div></div>';
-            document.getElementById('mediaTable').innerHTML='<tr><td class="muted">No data loaded yet.</td></tr>';
-            return;
-        }
+      trigger.addEventListener('click',()=>{ panel.classList.toggle('open'); search.focus(); });
+      document.addEventListener('click',(e)=>{ if(!root.contains(e.target)) panel.classList.remove('open'); });
+      search.addEventListener('input',()=>render(search.value));
+      clearBtn.addEventListener('click',()=>{ selected.clear(); render(search.value); updateSummary(); updateSelectAllState(); if(containerId !== 'analyticsTeamDropdown') updateLoadButtonState(); });
+      selectAll.addEventListener('change',()=>{ if(selectAll.checked) options.forEach(o=>selected.add(o.value)); else selected.clear(); render(search.value); updateSummary(); if(containerId !== 'analyticsTeamDropdown') updateLoadButtonState(); });
 
-        // Basic KPIs
-        let total=evals.length, sumScores=0, scored=0;
-        evals.forEach(e=>{
-            const p=getEvalPercent(e); 
-            if(p!=null&&isFinite(p)){ 
-                sumScores+=Number(p); 
-                scored++; 
-            }
-        });
-        
-        const avgOverall=scored?(sumScores/scored):null;
-        
-        document.getElementById('analyticsKPIs').innerHTML=`
-            <div class="kpi"><div class="label">Evaluations</div><div class="value">${total}</div></div>
-            <div class="kpi"><div class="label">Avg Score</div><div class="value">${avgOverall==null?'-':pct(avgOverall,1)}</div></div>
-            <div class="kpi"><div class="label">Scored Evals</div><div class="value">${scored}</div></div>`;
-    }
+      function setOptions(newOptions){ options=newOptions||[]; selected.forEach(v=>{ if(!options.some(o=>o.value===v)) selected.delete(v); }); render(search.value); updateSummary(); updateSelectAllState(); if(containerId !== 'analyticsTeamDropdown') updateLoadButtonState(); }
+      function getSelectedValues(){ return Array.from(selected); }
 
-    async function renderDetails(){
-        console.log('Rendering details...');
-        const c=document.getElementById('detailsContainer'); 
-        if(!state.evals.length){ 
-            c.innerHTML='<div class="muted">No evaluations loaded.</div>'; 
-            return; 
-        }
-        
-        c.innerHTML='<div class="info-message">Loading evaluation details...</div>';
-        
-        // Simplified details view for now
-        const elements = state.evals.map(e=>{
-            const agent=resolveUserName(safeGet(e,'agent.id')||e.agentUserId); 
-            const when=toUKDate(e.releaseDate||e.assignedDate||e.creationDate||e.evaluationDate||e.date||Date.now()); 
-            const score=getEvalPercent(e);
-            
-            return `<div class="evaluation">
-                <strong>${when}</strong> • ${agent} • Score: ${score==null?'-':pct(score,1)}
-            </div>`;
-        }).join('');
-        
-        c.innerHTML = elements;
-    }
-
-    async function renderCritical(){
-        console.log('Rendering critical...');
-        const tbl=document.getElementById('criticalTable'); 
-        if(!state.evals.length){ 
-            tbl.innerHTML='<tr><td class="muted">No evaluations loaded.</td></tr>'; 
-            return; 
-        }
-        
-        tbl.innerHTML='<tr><td class="muted">Critical/Fatal analysis would appear here.</td></tr>';
-    }
-
-    /* ====== Networking with backoff ====== */
-    async function rawFetch(url,options={}){ 
-        const now=Date.now(); 
-        const delta=now-lastApiCall; 
-        if(delta<API_DELAY) await sleep(API_DELAY-delta); 
-        lastApiCall=Date.now(); 
-        
-        const response = await fetch(url,{
-            ...options,
-            headers:{
-                'Authorization':'Bearer '+state.accessToken,
-                'Content-Type':'application/json',
-                ...(options.headers||{})
-            }
-        });
-        
-        return response;
-    }
-    
-    async function fetchJsonWithRetry(url, options={}, {retries=3, baseDelay=1000}={}){
-        let attempt=0;
-        while(attempt <= retries){
-            try {
-                const res=await rawFetch(url,options);
-                if(res.ok){ 
-                    return res.status===204 ? null : await res.json(); 
-                }
-                
-                const status=res.status;
-                if([400,401,403,404,405].includes(status)){ 
-                    const err=new Error(`HTTP ${status}`); 
-                    err.status=status; 
-                    throw err; 
-                }
-                
-                // Retry for 429/5xx
-                attempt++; 
-                if(attempt>retries){ 
-                    const err=new Error(`HTTP ${status} after ${retries} retries`); 
-                    err.status=status; 
-                    throw err; 
-                }
-                
-                const delay = Math.round(baseDelay*(2**(attempt-1))*(1+Math.random()*0.25));
-                console.log(`Retry ${attempt}/${retries} after ${delay}ms`);
-                await sleep(delay);
-                
-            } catch (error) {
-                if (attempt >= retries) throw error;
-                attempt++;
-                const delay = Math.round(baseDelay*(2**(attempt-1)));
-                await sleep(delay);
-            }
-        }
-    }
-
-    async function fetchPaginatedGET(url){
-        let all=[], next=url;
-        while(next){
-            try {
-                const data=await fetchJsonWithRetry(next,{method:'GET'});
-                if(Array.isArray(data.entities)) all=all.concat(data.entities);
-                else if(Array.isArray(data.users)) all=all.concat(data.users);
-                else if(Array.isArray(data)) all=all.concat(data);
-                else if(data?.entities) all=all.concat(data.entities);
-                
-                next=data?.nextUri ? `https://api.${config.REGION}${data.nextUri}` : null;
-            } catch (error) {
-                console.error('Error in fetchPaginatedGET:', error);
-                break;
-            }
-        }
-        return all;
-    }
-
-    /* ====== App UI boot ====== */
-    document.addEventListener('DOMContentLoaded',()=>{
-        console.log('DOM loaded, starting auth...');
-        const params=new URLSearchParams(window.location.hash.substring(1)); 
-        const token=params.get('access_token');
-        
-        if(token){ 
-            console.log('Token found in URL');
-            sessionStorage.setItem('purecloud_token',token); 
-            history.replaceState(null,document.title,window.location.pathname+window.location.search); 
-            startApp(token); 
-            return; 
-        }
-        
-        const tok=sessionStorage.getItem('purecloud_token');
-        if(tok){ 
-            console.log('Token found in sessionStorage');
-            startApp(tok); 
-            return; 
-        }
-        
-        if(DEBUG){
-            console.log('Debug mode enabled');
-            document.getElementById('authDebug').style.display='block';
-            document.getElementById('authDump').textContent='No token. Click Sign in.';
-            document.getElementById('signinBtn').onclick=()=>window.location.href=oauthUrl;
-            document.getElementById('auth-message').textContent='Debug mode: click Sign in with Genesys';
-        } else {
-            console.log('Redirecting to OAuth...');
-            document.getElementById('auth-message').textContent='Redirecting to Genesys Cloud for authentication...';
-            setTimeout(()=>window.location.href=oauthUrl,1200);
-        }
-    });
-
-    function startApp(token){
-        console.log('Starting app with token');
-        state.accessToken=token; 
-        document.getElementById('auth-message').textContent='Authenticated successfully!'; 
-        document.getElementById('auth-message').className='success-message';
-        
-        setTimeout(()=>{ 
-            document.getElementById('authCard').style.display='none'; 
-            document.getElementById('authDebug').style.display='none'; 
-        }, 800);
-        
-        document.getElementById('appContent').style.display='block';
-
-        // Initialize dropdowns
-        dropdowns.users=createCheckboxDropdown('userDropdown',{placeholder:'Select agents (optional)',searchPlaceholder:'Search agents...'});
-        dropdowns.teams=createCheckboxDropdown('teamDropdown',{placeholder:'Select work teams (optional)',searchPlaceholder:'Search teams...'});
-        dropdowns.forms=createCheckboxDropdown('formDropdown',{placeholder:'Select forms (optional)',searchPlaceholder:'Search forms...'});
-        dropdowns.analyticsTeams=createCheckboxDropdown('analyticsTeamDropdown',{placeholder:'Filter teams (optional)',searchPlaceholder:'Search teams...'});
-
-        // Tab handlers
-        document.getElementById('overviewTabButton').onclick=()=>setTab('overview');
-        document.getElementById('analyticsTabButton').onclick=()=>setTab('analytics');
-        document.getElementById('detailsTabButton').onclick=()=>setTab('details');
-        document.getElementById('criticalTabButton').onclick=()=>setTab('critical');
-
-        // Button handlers
-        document.getElementById('loadBtn').onclick=loadEvaluations;
-        document.getElementById('loadAnalyticsBtn').onclick=loadAnalyticsRange;
-        document.getElementById('applyAnalyticsFilters').onclick=renderAnalytics;
-
-        // Set default dates
-        const m=new Date(); 
-        const cur=`${m.getFullYear()}-${String(m.getMonth()+1).padStart(2,'0')}`;
-        document.getElementById('monthInput').value=cur; 
-        document.getElementById('anaFrom').value=cur; 
-        document.getElementById('anaTo').value=cur;
-        
-        updateMonthRange(); 
-        document.getElementById('monthInput').addEventListener('change',()=>{ 
-            updateMonthRange(); 
-            updateLoadButtonState(); 
-        });
-
-        // Load initial data
-        console.log('Loading initial data...');
-        Promise.all([fetchAllUsers(), fetchAllTeams(), fetchAllForms()])
-            .then(()=> {
-                console.log('Initial data loaded');
-                updateLoadButtonState();
-            })
-            .catch(e=>{
-                console.error('Initial load failed:', e);
-                msg('Initial load failed: '+e.message,'error');
-            });
-    }
-
-    function setTab(name){
-        console.log('Switching to tab:', name);
-        ['overview','analytics','details','critical'].forEach(n=>{
-            document.getElementById(`${n}Tab`).classList.toggle('active', n===name);
-            document.getElementById(`${n}TabButton`).classList.toggle('active', n===name);
-        });
-        if(name==='analytics') renderAnalytics();
-    }
-
-    function updateMonthRange(){
-        const v=document.getElementById('monthInput').value; 
-        if(!v) return;
-        const [y,m]=v.split('-').map(Number);
-        state.monthStart=new Date(Date.UTC(y,m-1,1,0,0,0));
-        state.monthEnd  =new Date(Date.UTC(y,m,0,23,59,59));
+      render(''); return { setOptions, getSelectedValues };
     }
 
     function updateLoadButtonState(){
-        const hasMonth=document.getElementById('monthInput').value;
-        const hasUsers=dropdowns.users && dropdowns.users.getSelectedValues().length>0;
-        const hasTeams=dropdowns.teams && dropdowns.teams.getSelectedValues().length>0;
-        const hasForms=dropdowns.forms && dropdowns.forms.getSelectedValues().length>0;
-        document.getElementById('loadBtn').disabled=!(hasMonth && (hasUsers || hasTeams || hasForms));
+      const hasMonth=document.getElementById('monthInput').value;
+      const hasUsers=dropdowns.users && dropdowns.users.getSelectedValues().length>0;
+      const hasTeams=dropdowns.teams && dropdowns.teams.getSelectedValues().length>0;
+      const hasForms=dropdowns.forms && dropdowns.forms.getSelectedValues().length>0;
+      document.getElementById('loadBtn').disabled=!(hasMonth && (hasUsers || hasTeams || hasForms));
     }
 
-    /* ====== Checkbox dropdown component ====== */
-    function createCheckboxDropdown(containerId,{placeholder,searchPlaceholder}){
-        const root=document.getElementById(containerId); 
-        root.innerHTML='';
-        
-        const trigger=document.createElement('div'); 
-        trigger.className='cd-trigger'; 
-        trigger.innerHTML=`<span class="label">${placeholder}</span><span class="count">0 selected</span>`; 
-        root.appendChild(trigger);
-        
-        const panel=document.createElement('div'); 
-        panel.className='cd-panel'; 
-        panel.innerHTML=`
-            <div class="cd-header">
-                <input type="text" class="cd-search" placeholder="${searchPlaceholder}" />
-                <div class="cd-actions">
-                    <button type="button" data-cd="clear">Clear</button>
-                </div>
-            </div>
-            <div class="cd-selectall">
-                <label><input type="checkbox" data-cd="selectall"/> Select all</label>
-            </div>
-            <div class="cd-list"></div>
-            <div class="cd-footer">
-                <span data-cd="summary">0 selected</span>
-                <span>Click outside to close</span>
-            </div>`;
-        root.appendChild(panel);
-        
-        const list=panel.querySelector('.cd-list'), 
-              search=panel.querySelector('.cd-search');
-        const clearBtn=panel.querySelector('[data-cd="clear"]'), 
-              selectAll=panel.querySelector('[data-cd="selectall"]'), 
-              summary=panel.querySelector('[data-cd="summary"]');
-        
-        let options=[], selected=new Set();
-        
-        function render(filter=''){
-            const ft=filter.trim().toLowerCase(); 
-            list.innerHTML='';
-            const filtered=!ft?options:options.filter(o=>(o.label||'').toLowerCase().includes(ft));
-            
-            if(!filtered.length){ 
-                list.innerHTML=`<div class="cd-item" style="color:#6C757D">No matches</div>`; 
-                return; 
-            }
-            
-            filtered.forEach(o=>{
-                const id=`${containerId}__${o.value}`; 
-                const row=document.createElement('div'); 
-                row.className='cd-item';
-                row.innerHTML=`<label for="${id}">
-                    <input type="checkbox" id="${id}" value="${o.value}" ${selected.has(o.value)?'checked':''}/>
-                    <span>${o.label||o.value}</span>
-                </label>`;
-                row.querySelector('input').addEventListener('change',(e)=>{ 
-                    if(e.target.checked) selected.add(o.value); 
-                    else selected.delete(o.value); 
-                    updateSummary(); 
-                    updateSelectAllState(); 
-                    if(containerId!=='analyticsTeamDropdown') updateLoadButtonState(); 
-                });
-                list.appendChild(row);
-            });
-        }
-        
-        function updateSummary(){ 
-            trigger.querySelector('.count').textContent=`${selected.size} selected`; 
-            summary.textContent=`${selected.size} selected`; 
-        }
-        
-        function updateSelectAllState(){ 
-            const total=options.length,count=selected.size; 
-            selectAll.indeterminate=count>0&&count<total; 
-            selectAll.checked=total>0&&count===total; 
-        }
-        
-        trigger.addEventListener('click',()=>{ 
-            panel.classList.toggle('open'); 
-            search.focus(); 
-        });
-        
-        document.addEventListener('click',(e)=>{ 
-            if(!root.contains(e.target)) panel.classList.remove('open'); 
-        });
-        
-        search.addEventListener('input',()=>render(search.value));
-        clearBtn.addEventListener('click',()=>{ 
-            selected.clear(); 
-            render(search.value); 
-            updateSummary(); 
-            updateSelectAllState(); 
-            if(containerId!=='analyticsTeamDropdown') updateLoadButtonState(); 
-        });
-        
-        selectAll.addEventListener('change',()=>{ 
-            if(selectAll.checked) options.forEach(o=>selected.add(o.value)); 
-            else selected.clear(); 
-            render(search.value); 
-            updateSummary(); 
-            if(containerId!=='analyticsTeamDropdown') updateLoadButtonState(); 
-        });
-        
-        function setOptions(newOptions){ 
-            options=newOptions||[]; 
-            selected.forEach(v=>{ 
-                if(!options.some(o=>o.value===v)) selected.delete(v); 
-            }); 
-            render(search.value); 
-            updateSummary(); 
-            updateSelectAllState(); 
-            if(containerId!=='analyticsTeamDropdown') updateLoadButtonState(); 
-        }
-        
-        function getSelectedValues(){ return Array.from(selected); }
-        
-        render(''); 
-        return { setOptions, getSelectedValues };
+    // ===== Boot =====
+    document.addEventListener('DOMContentLoaded',()=>{
+      const params=new URLSearchParams(window.location.hash.substring(1));
+      const tokenFromHash=params.get('access_token');
+      if(tokenFromHash){ sessionStorage.setItem('purecloud_token',tokenFromHash); history.replaceState(null,document.title,window.location.pathname+window.location.search); startApp(tokenFromHash); return; }
+      const tokenFromSession=sessionStorage.getItem('purecloud_token');
+      if(tokenFromSession){ startApp(tokenFromSession); return; }
+      if(DEBUG){
+        document.getElementById('authDebug').style.display='block';
+        document.getElementById('authDump').textContent='No token. Click Sign in.';
+        document.getElementById('signinBtn').onclick=()=>window.location.href=oauthUrl;
+        document.getElementById('auth-message').textContent='Debug mode: click Sign in with Genesys';
+      } else {
+        document.getElementById('auth-message').textContent='Redirecting to Genesys Cloud for authentication...';
+        setTimeout(()=>{ window.location.href=oauthUrl; }, 1200);
+      }
+    });
+
+    function startApp(token){
+      state.accessToken=token;
+      document.getElementById('auth-message').textContent='Authenticated successfully!';
+      document.getElementById('auth-message').className='success-message';
+      setTimeout(()=>{ document.getElementById('authCard').style.display='none'; document.getElementById('authDebug').style.display='none'; }, 800);
+      document.getElementById('appContent').style.display='block';
+
+      dropdowns.users=createCheckboxDropdown('userDropdown',{placeholder:'Select agents (optional)',searchPlaceholder:'Search agents...'});
+      dropdowns.teams=createCheckboxDropdown('teamDropdown',{placeholder:'Select work teams (optional)',searchPlaceholder:'Search teams...'});
+      dropdowns.forms=createCheckboxDropdown('formDropdown',{placeholder:'Select forms (optional)',searchPlaceholder:'Search forms...'});
+      // NEW: Analytics team filter
+      dropdowns.analyticsTeams=createCheckboxDropdown('analyticsTeamDropdown',{placeholder:'Filter teams (optional)',searchPlaceholder:'Search teams...'});
+
+      document.getElementById('overviewTabButton').onclick=()=>setTab('overview');
+      document.getElementById('analyticsTabButton').onclick=()=>setTab('analytics');
+      document.getElementById('detailsTabButton').onclick=()=>setTab('details');
+      document.getElementById('criticalTabButton').onclick=()=>setTab('critical');
+      document.getElementById('loadBtn').onclick=loadEvaluations;
+
+      document.getElementById('loadAnalyticsBtn').onclick=loadAnalyticsRange;
+      document.getElementById('insightsSort').onchange=renderAgentInsights;
+      // NEW: Analytics filter controls
+      document.getElementById('applyAnalyticsFilters').onclick=renderAnalytics;
+      document.getElementById('passTarget').addEventListener('change',renderAnalytics);
+      document.getElementById('amberBand').addEventListener('change',renderAnalytics);
+
+      const m=new Date();
+      const cur=`${m.getFullYear()}-${String(m.getMonth()+1).padStart(2,'0')}`;
+      document.getElementById('monthInput').value = cur;
+      document.getElementById('anaFrom').value = cur;
+      document.getElementById('anaTo').value = cur;
+
+      updateMonthRange();
+      document.getElementById('monthInput').addEventListener('change',()=>{ updateMonthRange(); updateLoadButtonState(); });
+
+      Promise.all([fetchAllUsers(), fetchAllTeams(), fetchAllForms()])
+        .then(()=> {
+          updateLoadButtonState();
+          // Set analytics team dropdown options
+          dropdowns.analyticsTeams.setOptions(state.teams.map(t=>({value:t.id,label:t.name})));
+        })
+        .catch(err => msg('Initial load failed: '+err.message,'error'));
     }
 
-    /* ====== Lookup data ====== */
+    function setTab(name){
+      ['overview','analytics','details','critical'].forEach(n=>{
+        document.getElementById(`${n}Tab`).classList.toggle('active', n===name);
+        document.getElementById(`${n}TabButton`).classList.toggle('active', n===name);
+      });
+      if(name==='analytics') renderAnalytics();
+    }
+
+    function updateMonthRange(){
+      const val=document.getElementById('monthInput').value;
+      if(!val) return;
+      const [y,m]=val.split('-').map(Number);
+      state.monthStart=new Date(Date.UTC(y, m-1, 1, 0,0,0));
+      state.monthEnd  =new Date(Date.UTC(y, m,   0, 23,59,59));
+    }
+
+    // ===== HTTP helper with spacing + retry/backoff =====
+    async function rawFetch(url,options={}){
+      const now=Date.now(); const delta=now-lastApiCall;
+      if(delta<API_DELAY) await sleep(API_DELAY-delta);
+      lastApiCall=Date.now();
+      return fetch(url,{...options,headers:{'Authorization':'Bearer '+state.accessToken,'Content-Type':'application/json',...(options.headers||{})}});
+    }
+
+    async function fetchJsonWithRetry(url, options={}, {retries=5, baseDelay=500}={}){
+      let attempt=0;
+      while(true){
+        const res = await rawFetch(url, options);
+        if(res.ok){
+          // 204
+          if(res.status===204) return null;
+          return await res.json();
+        }
+        // For method issues (400/401/403/404/405), bubble quickly so caller can fallback to another method
+        if([400,401,403,404,405].includes(res.status)){
+          const err=new Error(`HTTP ${res.status}`); err.status=res.status; throw err;
+        }
+        // Backoff for 429/408/5xx
+        attempt++;
+        if(attempt>retries){
+          const err=new Error(`HTTP ${res.status}`); err.status=res.status; throw err;
+        }
+        const retryAfter = Number(res.headers.get('Retry-After')) || null;
+        const delay = retryAfter ? retryAfter*1000 : Math.round(baseDelay * (2**(attempt-1)) * (1 + Math.random()*0.25));
+        await sleep(delay);
+      }
+    }
+
+    async function fetchPaginatedGET(url){
+      let all=[]; let next=url;
+      while(next){
+        const data = await fetchJsonWithRetry(next, {method:'GET'});
+        if(Array.isArray(data.entities)) all=all.concat(data.entities);
+        else if(Array.isArray(data.users)) all=all.concat(data.users);
+        else if(Array.isArray(data)) all=all.concat(data);
+        else if(data.entities) all=all.concat(data.entities);
+        next = data.nextUri ? `https://api.${config.REGION}${data.nextUri}` : null;
+      }
+      return all;
+    }
+
+    function safeGet(o,p,def=null){ try{ return p.split('.').reduce((x,k)=>(x && k in x)?x[k]:undefined ,o) ?? def; }catch{ return def; } }
+    function pct(n,d=1){ if(n==null||!isFinite(n)) return '-'; return (Math.round(n*10**d)/10**d).toFixed(d)+'%'; }
+    function fmt(n,d=1){ if(n==null||!isFinite(n)) return '-'; return (Math.round(n*10**d)/10**d).toFixed(d); }
+    function toUKDate(d){ const dt=new Date(d); return dt.toLocaleDateString('en-GB'); }
+    function dayKeyUTC(d){ const dt=new Date(d); return new Date(Date.UTC(dt.getUTCFullYear(),dt.getUTCMonth(),dt.getUTCDate())).toISOString().split('T')[0]; }
+
+    // NEW: Analytics helper functions
+    function getPassSettings(){ 
+      const pass=parseFloat(document.getElementById('passTarget').value||'85'); 
+      const band=parseFloat(document.getElementById('amberBand').value||'5'); 
+      return {pass, band}; 
+    }
+    
+    function colourFor(score, pass, band){ 
+      if(score==null||!isFinite(score)) return 'var(--bad)'; 
+      if(score>=pass) return 'var(--ok)'; 
+      if(score>=pass-band) return 'var(--warn)'; 
+      return 'var(--bad)'; 
+    }
+    
+    function standardiseMedia(m){ 
+      const x=String(m||'').toUpperCase(); 
+      if(x.includes('EMAIL')) return 'Email'; 
+      if(x.includes('CALL')||x.includes('VOICE')||x==='CALL') return 'Voice'; 
+      if(x.includes('CHAT')||x.includes('MESSAGE')) return 'Message'; 
+      if(x.includes('SOCIAL')) return 'Social'; 
+      return 'Other'; 
+    }
+
+    // NEW: Table sorter
+    function tableSorter(tableId){ 
+      const t=document.getElementById(tableId); 
+      if(!t||!t.tHead) return; 
+      const ths=[...t.tHead.querySelectorAll('th')]; 
+      ths.forEach((th,i)=>{ 
+        th.onclick=()=>{ 
+          const dir=th.dataset.dir==='asc'?'desc':'asc'; 
+          ths.forEach(h=>{
+            h.dataset.dir=''; 
+            const s=h.querySelector('.sort-ind'); 
+            if(s) s.remove();
+          }); 
+          th.dataset.dir=dir; 
+          const ind=document.createElement('span'); 
+          ind.className='sort-ind'; 
+          ind.textContent=dir==='asc'?'▲':'▼'; 
+          th.appendChild(ind);
+          const body=t.tBodies[0]; 
+          const rows=[...body.rows]; 
+          const num=th.dataset.type==='num'; 
+          rows.sort((a,b)=>{ 
+            const av=a.cells[i].getAttribute('data-sort') ?? a.cells[i].innerText; 
+            const bv=b.cells[i].getAttribute('data-sort') ?? b.cells[i].innerText; 
+            const A=num?Number(av):String(av).toLowerCase(); 
+            const B=num?Number(bv):String(bv).toLowerCase(); 
+            return dir==='asc'? (A>B?1:A<B?-1:0) : (A<B?1:A>B?-1:0); 
+          }); 
+          body.innerHTML=''; 
+          rows.forEach(r=>body.appendChild(r)); 
+        }; 
+      }); 
+      t.classList.add('sortable'); 
+    }
+
+    // ===== Lookups =====
     async function fetchAllUsers(){
-        try {
-            console.log('Fetching users...');
-            const url=`https://api.${config.REGION}/api/v2/users?pageSize=100`;
-            const users=await fetchPaginatedGET(url);
-            state.users=users.map(u=>({
-                id:u.id,
-                name:(u.name||`${u.givenName||''} ${u.familyName||''}`).trim(),
-                email:u.email||''
-            })).sort((a,b)=>a.name.localeCompare(b.name));
-            
-            dropdowns.users.setOptions(state.users.map(u=>({
-                value:u.id,
-                label:`${u.name}${u.email?` — ${u.email}`:''}`
-            })));
-            console.log('Users loaded:', state.users.length);
-        } catch (error) {
-            console.error('Error fetching users:', error);
-            throw error;
-        }
+      const url=`https://api.${config.REGION}/api/v2/users?pageSize=100`;
+      const users=await fetchPaginatedGET(url);
+      state.users=users.map(u=>({id:u.id,name:(u.name || `${u.givenName||''} ${u.familyName||''}`).trim(),email:u.email||''})).sort((a,b)=>a.name.localeCompare(b.name));
+      dropdowns.users.setOptions(state.users.map(u=>({value:u.id,label:`${u.name}${u.email?` — ${u.email}`:''}`})));
     }
 
     async function fetchAllTeams(){
-        try {
-            console.log('Fetching teams...');
-            const url=`https://api.${config.REGION}/api/v2/teams?pageSize=100`;
-            const teams=await fetchPaginatedGET(url);
-            state.teams=teams.map(t=>({
-                id:t.id,
-                name:t.name||'(Unnamed team)'
-            })).sort((a,b)=>a.name.localeCompare(b.name));
-            
-            state.teamsById=Object.fromEntries(state.teams.map(t=>[t.id,t]));
-            dropdowns.teams.setOptions(state.teams.map(t=>({value:t.id,label:t.name})));
-            dropdowns.analyticsTeams.setOptions(state.teams.map(t=>({value:t.id,label:t.name})));
-            console.log('Teams loaded:', state.teams.length);
-        } catch (error) {
-            console.error('Error fetching teams:', error);
-            throw error;
-        }
+      const url=`https://api.${config.REGION}/api/v2/teams?pageSize=100`;
+      const teams = await fetchPaginatedGET(url);
+      state.teams = teams.map(t=>({id:t.id,name:t.name||'(Unnamed team)'})).sort((a,b)=>a.name.localeCompare(b.name));
+      state.teamsById = Object.fromEntries(state.teams.map(t=>[t.id,t]));
+      dropdowns.teams.setOptions(state.teams.map(t=>({value:t.id,label:t.name})));
+    }
+
+    async function ensureTeamMembersLoaded(teamIds){
+      const missing = teamIds.filter(id=>!state.teamMembers.has(id));
+      if(!missing.length) return;
+      await Promise.all(missing.map(fetchTeamMembers));
+    }
+
+    async function fetchTeamMembers(teamId){
+      const url=`https://api.${config.REGION}/api/v2/teams/${teamId}/members?pageSize=100`;
+      const members=await fetchPaginatedGET(url);
+      const ids = Array.from(new Set(members.map(m => safeGet(m,'member.id') || safeGet(m,'member.user.id') || safeGet(m,'user.id') || safeGet(m,'id')).filter(Boolean)));
+      state.teamMembers.set(teamId, ids);
     }
 
     async function fetchAllForms(){
-        try {
-            console.log('Fetching forms...');
-            const url=`https://api.${config.REGION}/api/v2/quality/forms/evaluations?pageSize=100`;
-            const forms=await fetchPaginatedGET(url);
-            state.forms=forms.map(f=>({
-                id:f.id,
-                name:f.name||f.title||'(Unnamed form)'
-            })).sort((a,b)=>a.name.localeCompare(b.name));
-            
-            state.formsById=Object.fromEntries(state.forms.map(f=>[f.id,f]));
-            dropdowns.forms.setOptions(state.forms.map(f=>({value:f.id,label:f.name})));
-            console.log('Forms loaded:', state.forms.length);
-        } catch (error) {
-            console.error('Error fetching forms:', error);
-            throw error;
-        }
+      const url=`https://api.${config.REGION}/api/v2/quality/forms/evaluations?pageSize=100`;
+      const forms=await fetchPaginatedGET(url);
+      state.forms=forms.map(f=>({id:f.id,name:f.name||f.title||'(Unnamed form)'})).sort((a,b)=>a.name.localeCompare(b.name));
+      state.formsById=Object.fromEntries(state.forms.map(f=>[f.id,f]));
+      dropdowns.forms.setOptions(state.forms.map(f=>({value:f.id,label:f.name})));
     }
 
     async function computeSelectedAgentIds(){
-        const u=dropdowns.users.getSelectedValues(); 
-        const t=dropdowns.teams.getSelectedValues(); 
-        const set=new Set(u);
-        
-        // For now, just return user selections - team membership can be added later
-        return Array.from(set);
+      const userIds = dropdowns.users.getSelectedValues();
+      const teamIds = dropdowns.teams.getSelectedValues();
+      const set = new Set(userIds);
+      if(teamIds.length){
+        await ensureTeamMembersLoaded(teamIds);
+        teamIds.forEach(tid=>{
+          (state.teamMembers.get(tid)||[]).forEach(uid=>set.add(uid));
+        });
+      }
+      return Array.from(set);
     }
 
-    /* ====== Load evaluations - FIXED TO USE GET ====== */
-    async function getEvalQuery(agentIds, formIds, startDate, endDate){
-        const start=startDate.toISOString(), end=endDate.toISOString();
-        
-        // Build query parameters
-        const params = new URLSearchParams({
-            pageSize: PAGE_SIZE,
-            pageNumber: 1,
-            interval: `${start}/${end}`
-        });
-        
-        // Add agent IDs
-        agentIds.forEach(id => params.append('agentUserId', id));
-        
-        // Add form IDs if any
-        if(formIds && formIds.length) {
-            formIds.forEach(id => params.append('formId', id));
-        }
-        
-        const url = `https://api.${config.REGION}/api/v2/quality/evaluations/query?${params}`;
-        
-        console.log('Querying evaluations via GET:', { 
-            agentIds: agentIds.length, 
-            formIds: formIds?.length || 0, 
-            start, 
-            end 
-        });
-        
-        try {
-            const data = await fetchJsonWithRetry(url, { method: 'GET' });
-            return data?.entities || [];
-        } catch (error) {
-            console.error('Error in getEvalQuery:', error);
-            throw error;
-        }
+    // NEW: Helper for analytics team filtering
+    async function agentsForTeams(teamIds){ 
+      await ensureTeamMembersLoaded(teamIds); 
+      const ids=new Set(); 
+      teamIds.forEach(tid=>(state.teamMembers.get(tid)||[]).forEach(id=>ids.add(id))); 
+      return Array.from(ids); 
     }
 
+    // ===== Evaluations with GET/POST fallback + retry =====
     async function loadEvaluations(){
-        console.log('Loading evaluations...');
-        const agentIds = await computeSelectedAgentIds(); 
-        const formIds = dropdowns.forms.getSelectedValues();
-        
-        if(agentIds.length === 0 && formIds.length === 0){ 
-            msg('Please select at least one agent, team, or form.','error'); 
-            return; 
-        }
-        
-        if(!state.monthStart || !state.monthEnd){ 
-            msg('Please select a month.','error'); 
-            return; 
-        }
-        
-        const btn = document.getElementById('loadBtn'); 
-        setLoading(btn, true); 
-        msg('Loading evaluations…','info');
-        
-        try {
-            // Use selected agents or all users if none selected
-            const list = agentIds.length ? agentIds : state.users.map(u => u.id);
-            
-            console.log('Fetching evaluations for', list.length, 'agents');
-            state.evals = await getEvalQuery(list, formIds, state.monthStart, state.monthEnd);
-            
-            msg(`Loaded ${state.evals.length} evaluations.`,'success');
-            console.log('Evaluations loaded:', state.evals.length);
-            
-            // Render all tabs
-            renderAll();
-            
-        } catch(e) { 
-            console.error('Error loading evaluations:', e);
-            msg('Failed to load evaluations: ' + e.message,'error'); 
-        } finally { 
-            setLoading(btn, false); 
-        }
+      const agentIds = await computeSelectedAgentIds();
+      const formIds = dropdowns.forms.getSelectedValues();
+
+      if(agentIds.length===0 && formIds.length===0){
+        msg('Please select at least one agent, team, or form.','error');
+        return;
+      }
+      if(!state.monthStart || !state.monthEnd){
+        msg('Please select a month.','error');
+        return;
+      }
+
+      const btn=document.getElementById('loadBtn'); setLoading(btn,true); msg('Loading evaluations…','info');
+      try{
+        const agentList = agentIds.length ? agentIds : state.users.map(u=>u.id);
+        state.evals = await fetchDetailedEvaluations(agentList, formIds, state.monthStart, state.monthEnd);
+        msg(`Loaded ${state.evals.length} evaluations.`,'success');
+        renderAll();
+      }catch(e){ console.error(e); msg('Failed to load evaluations: '+e.message,'error'); }
+      finally{ setLoading(btn,false); }
     }
 
     async function loadAnalyticsRange(){
-        console.log('Loading analytics range...');
-        const from = document.getElementById('anaFrom').value;
-        const to = document.getElementById('anaTo').value; 
-        
-        if(!from || !to){ 
-            msg('Select both From and To months for Analytics.','error'); 
-            return; 
-        }
-        
-        const [fy, fm] = from.split('-').map(Number); 
-        const [ty, tm] = to.split('-').map(Number);
-        const start = new Date(Date.UTC(fy, fm-1, 1, 0, 0, 0)); 
-        const end = new Date(Date.UTC(ty, tm, 0, 23, 59, 59)); 
-        
-        if(start > end){ 
-            msg('The From month must be before the To month.','error'); 
-            return; 
-        }
-        
-        const formIds = dropdowns.forms.getSelectedValues(); 
-        const agentIds = await computeSelectedAgentIds(); 
-        
-        if(agentIds.length === 0 && formIds.length === 0){ 
-            msg('Please select at least one agent, team, or form.','error'); 
-            return; 
-        }
-        
-        const btn = document.getElementById('loadAnalyticsBtn'); 
-        setLoading(btn, true);
-        
-        try {
-            const list = agentIds.length ? agentIds : state.users.map(u => u.id);
-            const data = await getEvalQuery(list, formIds, start, end);
-            state.analyticsEvals = data; 
-            state.analyticsRange = {start, end};
-            msg(`Analytics range loaded: ${data.length} evaluations.`,'success');
-            renderAnalytics();
-        } catch(e) { 
-            console.error('Error loading analytics:', e);
-            msg('Failed to load analytics range: ' + e.message,'error'); 
-        } finally { 
-            setLoading(btn, false); 
-        }
+      const from=document.getElementById('anaFrom').value;
+      const to=document.getElementById('anaTo').value;
+      if(!from || !to){ msg('Select both From and To months for Analytics.','error'); return; }
+      const [fy,fm]=from.split('-').map(Number);
+      const [ty,tm]=to.split('-').map(Number);
+      const start=new Date(Date.UTC(fy, fm-1, 1, 0,0,0));
+      const end  =new Date(Date.UTC(ty, tm,   0, 23,59,59));
+      if(start>end){ msg('The From month must be before the To month.','error'); return; }
+
+      const formIds = dropdowns.forms.getSelectedValues();
+      const agentIds = await computeSelectedAgentIds();
+      if(agentIds.length===0 && formIds.length===0){
+        msg('Please select at least one agent, team, or form.','error'); return;
+      }
+
+      const btn=document.getElementById('loadAnalyticsBtn'); setLoading(btn,true);
+      try{
+        const agentList = agentIds.length ? agentIds : state.users.map(u=>u.id);
+        const data=await fetchDetailedEvaluations(agentList,formIds,start,end);
+        state.analyticsEvals=data; state.analyticsRange={start,end};
+        msg(`Analytics range loaded: ${data.length} evaluations.`, 'success');
+        renderAnalytics();
+      }catch(e){ console.error(e); msg('Failed to load analytics range: '+e.message,'error'); }
+      finally{ setLoading(btn,false); }
     }
 
-    // Add any missing helper functions
-    function renderAgentInsights() {
-        // Placeholder - implement as needed
-        console.log('renderAgentInsights called');
+    async function fetchDetailedEvaluations(agentIds,formIds,startDate,endDate){
+      const all=[];
+      for(let i=0;i<agentIds.length;i+=MAX_CONCURRENT_AGENT_BATCH){
+        const batch=agentIds.slice(i,i+MAX_CONCURRENT_AGENT_BATCH);
+        const res=await Promise.all(batch.map(id=>fetchEvaluationsForAgentInterval(id,formIds,startDate,endDate)));
+        res.forEach(items=>all.push(...items));
+        if(i+MAX_CONCURRENT_AGENT_BATCH<agentIds.length) await sleep(300); // small gap between batches
+      }
+      return all;
+    }
+
+    async function fetchEvaluationsForAgentInterval(agentId,formIds,startDate,endDate){
+      const start=startDate.toISOString(); const end=endDate.toISOString();
+      const base = `https://api.${config.REGION}/api/v2/quality/evaluations/query`;
+
+      // Helper: GET path
+      async function getViaGET(singleFormId){
+        const params = new URLSearchParams({
+          agentUserId: agentId,
+          startTime: start,
+          endTime: end,
+          expandAnswerTotalScores: 'true',
+          pageSize: '50'
+        });
+        if(singleFormId) params.set('formId', singleFormId);
+        const url = `${base}?${params.toString()}`;
+        // paginate via nextUri
+        let all=[]; let next=url;
+        while(next){
+          try{
+            const data = await fetchJsonWithRetry(next,{method:'GET'});
+            const entities = data?.entities || [];
+            all = all.concat(entities);
+            next = data?.nextUri ? `https://api.${config.REGION}${data.nextUri}` : null;
+          }catch(err){
+            // bubble only 400/401/403/404/405; others already retried
+            throw err;
+          }
+        }
+        return all;
+      }
+
+      // Helper: POST path
+      async function getViaPOST(){
+        const url = base;
+        const body = {
+          agentUserIds: [agentId],
+          interval: `${start}/${end}`,
+          expandAnswerTotalScores: true,
+          pageSize: 50
+        };
+        if(formIds && formIds.length>0) body.formIds = formIds;
+
+        let page=1, all=[];
+        while(true){
+          body.pageNumber = page;
+          try{
+            const data = await fetchJsonWithRetry(url,{method:'POST',body:JSON.stringify(body)});
+            const entities = data?.entities || [];
+            if(!entities.length) break;
+            all = all.concat(entities);
+            if(!data.nextUri && entities.length < body.pageSize) break;
+            page++;
+          }catch(err){
+            throw err; // bubble to outer to try fallback
+          }
+        }
+        return all;
+      }
+
+      // Strategy:
+      // - If 0/1 formId -> try GET first (usually allowed), else POST.
+      // - If chosen method 405s, fallback to the other.
+      if(!formIds || formIds.length<=1){
+        try{
+          return await getViaGET(formIds?.[0]);
+        }catch(err){
+          if(err.status===405 || err.status===400){ /* fallback */ }
+          else throw err;
+        }
+      }
+
+      try{
+        return await getViaPOST();
+      }catch(err){
+        if(err.status===405 || err.status===400){
+          // fallback: GET without form filter (server doesn't like POST or multiple)
+          return await getViaGET(undefined);
+        }
+        throw err;
+      }
+    }
+
+    // ===== Forms & lookups =====
+    function formKey(formId, versionId){ return (versionId === '__published__') ? `pub@${formId}` : `${formId}@${versionId || 'latest'}`; }
+    async function getFormDetails(formId, versionId){
+      const key=formKey(formId,versionId);
+      if(state.formDetailsCache.has(key)) return state.formDetailsCache.get(key);
+      let url;
+      if (versionId === '__published__') url = `https://api.${config.REGION}/api/v2/quality/publishedforms/evaluations/${formId}`;
+      else url = versionId
+        ? `https://api.${config.REGION}/api/v2/quality/forms/evaluations/${formId}/versions/${versionId}`
+        : `https://api.${config.REGION}/api/v2/quality/forms/evaluations/${formId}`;
+      try{
+        let data;
+        try{
+          data = await fetchJsonWithRetry(url,{method:'GET'});
+        }catch(err){
+          // fallback to latest if versioned lookup fails
+          if(versionId && versionId!=='__published__'){
+            data = await fetchJsonWithRetry(`https://api.${config.REGION}/api/v2/quality/forms/evaluations/${formId}`,{method:'GET'});
+          }else{
+            throw err;
+          }
+        }
+        state.formDetailsCache.set(key,data);
+        state.formLookupCache.set(key,buildFormLookup(data||{}));
+        return data;
+      }catch(e){ state.formDetailsCache.set(key,null); return null; }
+    }
+
+    function buildFormLookup(form){
+      const questionText=new Map(), answerText=new Map(), questionObj=new Map();
+      function addQ(q){
+        if(!q) return;
+        const qTxt=q.text || q.label || q.title || '';
+        [q.id,q.contextId,q.questionId,q.questionContextId].filter(Boolean).forEach(id=>{
+          questionText.set(id,qTxt); questionObj.set(id,q);
+        });
+        (q.answerOptions||[]).forEach(a=>{
+          const aTxt=a.text ?? String(a.value ?? '');
+          [a.id,a.contextId,a.answerId,a.answerOptionId].filter(Boolean).forEach(id=>{
+            answerText.set(id,aTxt);
+          });
+        });
+        (q.multipleSelectOptionQuestions||[]).forEach(addQ);
+      }
+      function walk(groups){ (groups||[]).forEach(g=>{ (g.questions||[]).forEach(addQ); (g.questionGroups||[]).forEach(walk); }); }
+      (form?.questions||[]).forEach(addQ); walk(form?.questionGroups);
+      return {questionText,answerText,questionObj};
+    }
+
+    async function getCombinedLookupForEval(e){
+      const pubId = safeGet(e,'evaluationForm.id');
+      const formId = safeGet(e,'form.id') || e.formId;
+      const formVersionId = safeGet(e,'form.versionId') || e.formVersionId || safeGet(e,'form.version');
+      const comboKey=[pubId?`pub:${pubId}`:'',formId?`form:${formId}`:'',formVersionId?`ver:${formVersionId}`:''].filter(Boolean).join('|')||'none';
+      if(state.combinedLookupCache.has(comboKey)) return state.combinedLookupCache.get(comboKey);
+      const details=(await Promise.all([
+        pubId?getFormDetails(pubId,'__published__'):null,
+        formId && formVersionId?getFormDetails(formId,formVersionId):null,
+        formId && !formVersionId?getFormDetails(formId,null):null
+      ])).filter(Boolean);
+      const merged={questionText:new Map(),answerText:new Map(),questionObj:new Map()};
+      const names=[];
+      details.forEach(d=>{
+        if(d?.name) names.push(d.name);
+        const lk=buildFormLookup(d||{});
+        lk.questionText.forEach((v,k)=>merged.questionText.set(k,v));
+        lk.answerText.forEach((v,k)=>merged.answerText.set(k,v));
+        lk.questionObj.forEach((v,k)=>merged.questionObj.set(k,v));
+      });
+      const formName = safeGet(e,'evaluationForm.name') || safeGet(e,'form.name') || names[0] || '(Form)';
+      const combined={...merged, formName};
+      state.combinedLookupCache.set(comboKey,combined);
+      return combined;
+    }
+
+    // ===== Helpers for Q/A text =====
+    function approx(a,b){ return Math.abs(Number(a)-Number(b))<1e-6; }
+    function resolveQuestionTextWithLookup(lookup,qScore){
+      const candidates=[qScore.questionId,qScore.questionContextId,safeGet(qScore,'question.id'),safeGet(qScore,'question.contextId')].filter(Boolean);
+      for(const id of candidates){ const t=lookup.questionText.get(id); if(t) return t; }
+      return safeGet(qScore,'question.text') || `Question ${candidates[0]||''}`.trim();
+    }
+
+    // ===== Renderers =====
+    function renderAll(){ renderOverview(); renderAnalytics(); renderDetails(); renderCritical(); }
+    function resolveUserName(id){ const u=state.users.find(x=>x.id===id); return u?u.name:(id||'(unknown)'); }
+    function getEvalPercent(e){
+      const p=e.totalScore || e.totalPercent || safeGet(e,'scoring.totalPercent') || safeGet(e,'oTotalPercent') || safeGet(e,'answers.totalScore');
+      if(p==null) return null; return p<=1 ? p*100 : p;
+    }
+
+    function renderOverview(){
+      const evals=state.evals;
+      const byAgent=new Map();
+      evals.forEach(e=>{
+        const a=safeGet(e,'agent.id') || e.agentUserId || e.userId || '(unknown)';
+        const p=getEvalPercent(e);
+        if(!byAgent.has(a)) byAgent.set(a,{count:0,sum:0});
+        const o=byAgent.get(a); o.count++; if(p!=null && isFinite(p)) o.sum+=Number(p);
+      });
+      const rows=[]; let total=0;
+      for(const [aid,{count,sum}] of byAgent.entries()){ rows.push({agent:resolveUserName(aid),count,avg:count?(sum/count):null}); total+=count; }
+      rows.sort((a,b)=>a.agent.localeCompare(b.agent));
+      const overallAvg=(rows.length && total)?(rows.reduce((s,r)=>s+(r.avg||0),0)/rows.length):null;
+
+      document.getElementById('overviewKPIs').innerHTML=`
+        <div class="kpi"><div class="label">Month</div><div class="value">${document.getElementById('monthInput').value}</div></div>
+        <div class="kpi"><div class="label">Evaluations</div><div class="value">${evals.length}</div></div>
+        <div class="kpi"><div class="label">Agents</div><div class="value">${rows.length}</div></div>
+        <div class="kpi"><div class="label">Average Score (Agent Avg)</div><div class="value">${overallAvg==null?'-':pct(overallAvg,1)}</div></div>`;
+      const tbl=document.getElementById('agentSummaryTable');
+      tbl.innerHTML = rows.length
+        ? `<thead><tr><th>Agent</th><th>Evaluations</th><th>Average Score</th></tr></thead>
+           <tbody>${rows.map(r=>`<tr><td>${r.agent}</td><td>${r.count}</td><td>${r.avg==null?'-':pct(r.avg,1)}</td></tr>`).join('')}</tbody>`
+        : '<tr><td colspan="3" class="muted">No evaluation data available for the selected criteria.</td></tr>';
+    }
+
+    // === Analytics - ENHANCED ===
+    function getAnalyticsSet(){ return (state.analyticsEvals && state.analyticsRange) ? state.analyticsEvals : state.evals; }
+    function guessMediaType(e){ return standardiseMedia(safeGet(e,'mediaType') || safeGet(e,'conversation.mediaType') || 'Unknown'); }
+    function buildDays(start,end){ const out=[]; for(let d=new Date(start); d<=end; d.setUTCDate(d.getUTCDate()+1)){ out.push(new Date(d)); } return out; }
+
+    async function renderAnalytics(){
+      const raw = getAnalyticsSet();
+      if(!raw || !raw.length){
+        document.getElementById('analyticsKPIs').innerHTML='';
+        document.getElementById('mediaTable').innerHTML='<tr><td class="muted">No data loaded yet.</td></tr>';
+        document.getElementById('repeatFailsTable').innerHTML='';
+        document.getElementById('agentInsights').innerHTML='';
+        document.getElementById('trendTable').innerHTML='';
+        document.getElementById('topAgentsTable').innerHTML='';
+        document.getElementById('bottomAgentsTable').innerHTML='';
+        document.getElementById('agentMediaChart').innerHTML='';
+        return;
+      }
+
+      // NEW: Apply team filter for analytics
+      const teamFilter = dropdowns.analyticsTeams.getSelectedValues();
+      let allowedAgents = null;
+      if(teamFilter.length){ 
+        allowedAgents = new Set(await agentsForTeams(teamFilter)); 
+      }
+      const evals = allowedAgents ? raw.filter(e => allowedAgents.has(safeGet(e,'agent.id')||e.agentUserId)) : raw;
+
+      let withFatal=0, withCritical=0, total=evals.length;
+      let sumScores=0, scored=0;
+      evals.forEach(e=>{
+        const qgs=safeGet(e,'answers.questionGroupScores')||[];
+        let fatal=false, crit=false;
+        qgs.forEach(g=> (g.questionScores||[]).forEach(q=>{
+          fatal = fatal || !!q.failedKillQuestion;
+          crit  = crit  || !!q.failedCriticalQuestion;
+        }));
+        if(fatal) withFatal++; if(crit) withCritical++;
+        const p=getEvalPercent(e); if(p!=null && isFinite(p)){ sumScores+=Number(p); scored++; }
+      });
+      const avgOverall = scored? (sumScores/scored): null;
+      const passRate = total? ((total - Math.max(withFatal, withCritical))/total): null;
+
+      document.getElementById('analyticsKPIs').innerHTML = `
+        <div class="kpi"><div class="label">Evaluations (range)</div><div class="value">${total}</div></div>
+        <div class="kpi"><div class="label">Avg Score</div><div class="value">${avgOverall==null?'-':pct(avgOverall,1)}</div></div>
+        <div class="kpi"><div class="label">With Critical</div><div class="value">${withCritical}</div></div>
+        <div class="kpi"><div class="label">With Fatal</div><div class="value">${withFatal}</div></div>
+        <div class="kpi"><div class="label">Pass Rate</div><div class="value">${passRate==null?'-':pct(passRate*100,1)}</div></div>
+      `;
+
+      // NEW: Agent media chart
+      const {pass, band} = getPassSettings();
+      const byAgent=new Map(); // agent -> media -> {count,sum,scored}
+      evals.forEach(e=>{
+        const aid=safeGet(e,'agent.id')||e.agentUserId||'(unknown)'; 
+        const name=resolveUserName(aid); 
+        const mt=guessMediaType(e);
+        if(!byAgent.has(aid)) byAgent.set(aid,{name,map:new Map()});
+        const m=byAgent.get(aid).map; 
+        if(!m.has(mt)) m.set(mt,{count:0,sum:0,scored:0});
+        const o=m.get(mt); 
+        o.count++; 
+        const p=getEvalPercent(e); 
+        if(p!=null&&isFinite(p)){ o.sum+=Number(p); o.scored++; }
+      });
+      const mediaOrder = ['Voice','Email','Message','Social','Other'];
+      const width=700, height=22;
+      const rowsHtml = Array.from(byAgent.values()).sort((a,b)=>a.name.localeCompare(b.name)).map(row=>{
+        const total=Array.from(row.map.values()).reduce((s,o)=>s+o.count,0)||1; 
+        let x=0;
+        const rects = mediaOrder.map(type=>{
+          const o=row.map.get(type); 
+          if(!o) return '';
+          const w=Math.max(1, Math.round((o.count/total)*width));
+          const avg = o.scored? (o.sum/o.scored) : null;
+          const fill = colourFor(avg, pass, band);
+          const tooltip = `${type}: ${o.count} evals · ${avg==null?'-':pct(avg,1)}`;
+          const rx=x; x+=w;
+          return `<rect x="${rx}" y="0" width="${w}" height="${height}" fill="${fill}"><title>${tooltip}</title></rect>`;
+        }).join('');
+        const label = Array.from(row.map.entries()).map(([t,o])=>`${t}:${o.count}`).join(' • ');
+        return `<div class="chart-row">
+                  <div class="chart-label" title="${row.name}">${row.name}</div>
+                  <svg class="chart-svg" viewBox="0 0 ${width} ${height}" preserveAspectRatio="none" width="100%" height="${height+2}">
+                    ${rects}
+                  </svg>
+                  <div class="muted" style="width:180px; text-align:right">${label}</div>
+                </div>`;
+      }).join('');
+      document.getElementById('agentMediaChart').innerHTML = rowsHtml || '<div class="muted">No data</div>';
+
+      const mediaMap=new Map();
+      evals.forEach(e=>{
+        const mt=guessMediaType(e);
+        if(!mediaMap.has(mt)) mediaMap.set(mt,{count:0,sum:0,scored:0});
+        const o=mediaMap.get(mt); o.count++;
+        const p=getEvalPercent(e); if(p!=null && isFinite(p)){ o.sum+=Number(p); o.scored++; }
+      });
+      const mediaRows = Array.from(mediaMap.entries()).map(([mt,o])=>{
+        const avg = o.scored? (o.sum/o.scored) : null;
+        return `<tr>
+          <td>${mt}</td>
+          <td data-sort="${o.count}">${o.count}</td>
+          <td data-sort="${avg==null?0:avg.toFixed(2)}">${avg==null?'-':pct(avg,1)}</td>
+        </tr>`;
+      }).join('');
+      document.getElementById('mediaTable').innerHTML = `
+        <thead><tr>
+          <th data-type="text">Media Type</th>
+          <th data-type="num">Evaluations</th>
+          <th data-type="num">Avg Score</th>
+        </tr></thead>
+        <tbody>${mediaRows}</tbody>
+      `;
+      tableSorter('mediaTable');
+
+      const failMap=new Map();
+      for(const e of evals){
+        const lookup = await getCombinedLookupForEval(e);
+        const qgs=safeGet(e,'answers.questionGroupScores')||[];
+        qgs.forEach(g=> (g.questionScores||[]).forEach(q=>{
+          if(q.failedKillQuestion || q.failedCriticalQuestion){
+            const qText = resolveQuestionTextWithLookup(lookup,q);
+            const key = `${lookup.formName}|${qText}`;
+            if(!failMap.has(key)) failMap.set(key,{formName:lookup.formName,qText,critical:0,fatal:0});
+            const o=failMap.get(key);
+            if(q.failedKillQuestion) o.fatal++;
+            else if(q.failedCriticalQuestion) o.critical++;
+          }
+        }));
+      }
+      const repeatRows = Array.from(failMap.values())
+        .sort((a,b)=>(b.fatal+b.critical)-(a.fatal+a.critical))
+        .map(r=>`<tr>
+          <td>${r.formName}</td><td>${r.qText}</td>
+          <td data-sort="${r.critical}">${r.critical}</td>
+          <td data-sort="${r.fatal}">${r.fatal}</td>
+          <td data-sort="${r.critical+r.fatal}">${r.critical+r.fatal}</td></tr>`)
+        .join('');
+      document.getElementById('repeatFailsTable').innerHTML = `
+        <thead><tr>
+          <th data-type="text">Form</th><th data-type="text">Question</th>
+          <th data-type="num">Critical</th><th data-type="num">Fatal</th><th data-type="num">Total</th>
+        </tr></thead>
+        <tbody>${repeatRows || `<tr><td colspan="5" class="muted">No critical/fatal marks found.</td></tr>`}</tbody>
+      `;
+      tableSorter('repeatFailsTable');
+
+      const byAgentInsight=new Map();
+      evals.forEach(e=>{
+        const id=safeGet(e,'agent.id')||e.agentUserId||'(unknown)';
+        const name=resolveUserName(id);
+        if(!byAgentInsight.has(id)) byAgentInsight.set(id,{name,count:0,sum:0,scored:0,fails:0});
+        const o=byAgentInsight.get(id);
+        o.count++;
+        const p=getEvalPercent(e); if(p!=null && isFinite(p)){ o.sum+=Number(p); o.scored++; }
+        const hasFail=(safeGet(e,'answers.questionGroupScores')||[]).some(g=>(g.questionScores||[]).some(q=>q.failedKillQuestion||q.failedCriticalQuestion));
+        if(hasFail) o.fails++;
+      });
+      const insightArr = Array.from(byAgentInsight.values()).map(o=>({ name:o.name, count:o.count, avg:o.scored?o.sum/o.scored:null, fails:o.fails }));
+      window._insightData = insightArr;
+      renderAgentInsights();
+
+      const start = state.analyticsRange?.start || state.monthStart;
+      const end   = state.analyticsRange?.end   || state.monthEnd;
+      const days = buildDays(start,end);
+      const dayKeys = days.map(d=> d.toISOString().split('T')[0]);
+      const agents = Array.from(new Set(evals.map(e=> safeGet(e,'agent.id') || e.agentUserId))).filter(Boolean);
+      const map = new Map();
+      evals.forEach(e=>{
+        const aid = safeGet(e,'agent.id') || e.agentUserId || '(unknown)';
+        const dk = dayKeyUTC(e.releaseDate || e.assignedDate || e.creationDate || e.evaluationDate || e.date || Date.now());
+        const p = getEvalPercent(e);
+        if(!map.has(aid)) map.set(aid, new Map());
+        const dm = map.get(aid);
+        if(!dm.has(dk)) dm.set(dk,{sum:0,count:0});
+        if (p!=null && isFinite(p)) { const o=dm.get(dk); o.sum+=Number(p); o.count++; }
+      });
+      const header = `<thead><tr><th>Agent</th>${dayKeys.map(k=>`<th>${toUKDate(k)}</th>`).join('')}</tr></thead>`;
+      const rows = agents.map(aid=>{
+        const dm = map.get(aid) || new Map();
+        const cells = dayKeys.map(k=>{
+          const v=dm.get(k);
+          if(!v||v.count===0) return '<td>-</td>';
+          return `<td>${pct(v.sum/v.count,1)}</td>`;
+        }).join('');
+        return `<tr><td>${resolveUserName(aid)}</td>${cells}</tr>`;
+      }).join('');
+      document.getElementById('trendTable').innerHTML = header + `<tbody>${rows}</tbody>`;
+
+      const byAvg = insightArr.filter(x=>x.avg!=null).sort((a,b)=>b.avg-a.avg);
+      const top = byAvg.slice(0,5).map(x=>`<tr><td>${x.name}</td><td>${x.count}</td><td>${pct(x.avg,1)}</td></tr>`).join('');
+      const bottom = byAvg.slice(-5).map(x=>`<tr><td>${x.name}</td><td>${x.count}</td><td>${pct(x.avg,1)}</td></tr>`).join('');
+      document.getElementById('topAgentsTable').innerHTML = `
+        <thead><tr><th>Top Agents</th><th>Evals</th><th>Avg</th></tr></thead><tbody>${top || '<tr><td colspan="3" class="muted">No data</td></tr>'}</tbody>`;
+      document.getElementById('bottomAgentsTable').innerHTML = `
+        <thead><tr><th>Bottom Agents</th><th>Evals</th><th>Avg</th></tr></thead><tbody>${bottom || '<tr><td colspan="3" class="muted">No data</td></tr>'}</tbody>`;
+    }
+
+    function renderAgentInsights(){
+      const data = window._insightData || [];
+      const mode = document.getElementById('insightsSort').value || 'avgDesc';
+      const arr = (function sort(mode, a){
+        const x=[...a];
+        if(mode==='avgAsc') x.sort((u,v)=>(u.avg??-1)-(v.avg??-1));
+        else if(mode==='avgDesc') x.sort((u,v)=>(v.avg??-1)-(u.avg??-1));
+        else if(mode==='failsDesc') x.sort((u,v)=>v.fails-u.fails);
+        else if(mode==='evalsDesc') x.sort((u,v)=>v.count-u.count);
+        return x;
+      })(mode, data);
+
+      const html = arr.map(a=>{
+        const w = a.avg==null?0:Math.max(0,Math.min(100,a.avg));
+        return `<div class="insight-row">
+          <div class="insight-name">${a.name}</div>
+          <div class="insight-bar-wrap"><div class="insight-bar" style="width:${w}%"></div></div>
+          <div class="insight-meta">${pct(a.avg??0,1)} <span class="pill">Evals ${a.count}</span><span class="pill">Fails ${a.fails}</span></div>
+        </div>`;
+      }).join('');
+      document.getElementById('agentInsights').innerHTML = html || '<div class="muted">No agent data.</div>';
+    }
+
+    // ===== Details =====
+    async function renderDetails(){
+      const c=document.getElementById('detailsContainer');
+      if (!state.evals.length){ c.innerHTML = '<div class="muted">No evaluations loaded.</div>'; return; }
+      c.innerHTML = '<div class="info-message">Loading evaluation details...</div>';
+
+      const evaluationElements = await Promise.all(state.evals.map(async (e) => {
+        const agent = resolveUserName(safeGet(e,'agent.id') || e.agentUserId);
+        const lookup = await getCombinedLookupForEval(e);
+        const formName = lookup.formName;
+        const when = toUKDate(e.releaseDate || e.assignedDate || e.creationDate || e.evaluationDate || e.date || Date.now());
+        const convo = e.conversationId || e.conversation?.id || '(n/a)';
+        const score = getEvalPercent(e);
+        const questionGroups = safeGet(e, 'answers.questionGroupScores') || [];
+
+        function resolveAnswerTextWithLookup(lookup,qScore){
+          const ids=new Set();
+          (qScore.selectedAnswerIds||[]).forEach(x=>ids.add(x));
+          (qScore.selectedAnswerOptionIds||[]).forEach(x=>ids.add(x));
+          if(qScore.selectedAnswerId) ids.add(qScore.selectedAnswerId);
+          if(qScore.answerOptionId) ids.add(qScore.answerOptionId);
+          if(qScore.answerId) ids.add(qScore.answerId);
+          const a=qScore.answer||{};
+          [a.id,a.contextId,a.answerId,a.answerOptionId].filter(Boolean).forEach(x=>ids.add(x));
+          (qScore.answers||[]).forEach(ans=>{ [ans.id,ans.contextId,ans.answerId,ans.answerOptionId].filter(Boolean).forEach(x=>ids.add(x)); });
+
+          const texts=[];
+          Array.from(ids).forEach(id=>{ const t=lookup.answerText.get(id); if(t) texts.push(t); });
+          if(texts.length) return texts.join(', ');
+
+          const qIds=[qScore.questionId,qScore.questionContextId,safeGet(qScore,'question.id'),safeGet(qScore,'question.contextId')].filter(Boolean);
+          const q = qIds.map(id=>lookup.questionObj.get(id)).find(Boolean);
+          if(q && Array.isArray(q.answerOptions) && q.answerOptions.length){
+            const s = Number(qScore.score);
+            const match = q.answerOptions.find(o => approx(s,o.value) || approx(s/100,o.value) || approx(s,o.value*100));
+            if(match){ return match.text ?? String(match.value ?? ''); }
+          }
+          if(qScore.freeTextAnswer) return String(qScore.freeTextAnswer);
+          if(qScore.numericAnswer!==undefined && qScore.numericAnswer!==null) return String(qScore.numericAnswer);
+          if(safeGet(qScore,'answer.text')) return qScore.answer.text;
+          return 'N/A';
+        }
+
+        let qRows = '';
+        questionGroups.forEach(group => {
+          (group.questionScores || []).forEach(qScore => {
+            const questionText = resolveQuestionTextWithLookup(lookup,qScore);
+            const answerText = resolveAnswerTextWithLookup(lookup,qScore);
+            const ansScore = qScore.score ?? null;
+            const isFat = !!qScore.failedKillQuestion;
+            const isCrit = !!qScore.failedCriticalQuestion;
+
+            let rowClass = '';
+            if (isFat) rowClass = 'fatal-question';
+            else if (isCrit) rowClass = 'critical-warning';
+
+            let allComments = '';
+            if (qScore.comments) { allComments += `<div class="comment-bubble"><strong>Evaluator Comments:</strong> ${qScore.comments}</div>`; }
+            if (qScore.aiAnswer && qScore.aiAnswer.explanation) { allComments += `<div class="comment-bubble"><strong>AI Analysis:</strong> ${qScore.aiAnswer.explanation}</div>`; }
+
+            qRows += `<tr class="${rowClass}">
+              <td>${questionText}</td>
+              <td>${answerText}</td>
+              <td>${ansScore === null ? '-' : fmt(ansScore, 1)}</td>
+              <td>${isFat ? '<span class="badge badge-fatal">Fatal</span>' : isCrit ? '<span class="badge badge-critical">Critical</span>' : '<span class="badge badge-ok">OK</span>'}</td>
+              <td>${allComments}</td>
+            </tr>`;
+          });
+        });
+
+        return `
+          <details class="evaluation">
+            <summary>${when} • <strong>${agent}</strong> — ${formName} &nbsp;&middot;&nbsp; Score: <strong>${score===null?'-':pct(score,1)}</strong> ${convo!=='(n/a)'?`&nbsp;&middot;&nbsp; Conversation: ${convo}`:''}</summary>
+            <div class="table-container">
+              <table class="details-table">
+                <thead><tr><th>Question</th><th>Answer</th><th>Score</th><th>Flags</th><th>Comments</th></tr></thead>
+                <tbody>${qRows || `<tr><td colspan="5" class="muted">No question data available.</td></tr>`}</tbody>
+              </table>
+            </div>
+          </details>
+        `;
+      }));
+      c.innerHTML = evaluationElements.join('');
+    }
+
+    // ===== Critical =====
+    async function renderCritical(){
+      const tbl=document.getElementById('criticalTable');
+      if(!state.evals.length){ tbl.innerHTML='<tr><td class="muted">No evaluations loaded.</td></tr>'; return; }
+
+      const fatalMap=new Map();  const critMap=new Map();
+      function add(map, formName, qText, agentName){
+        const key=formName+'|'+qText;
+        if(!map.has(key)) map.set(key,{formName,qText,count:0,agents:new Map()});
+        const o=map.get(key); o.count++; o.agents.set(agentName,(o.agents.get(agentName)||0)+1);
+      }
+
+      for (const e of state.evals){
+        const lookup = await getCombinedLookupForEval(e);
+        const formName = lookup.formName;
+        const agentName = resolveUserName(safeGet(e,'agent.id')||e.agentUserId);
+        const qGroups = safeGet(e,'answers.questionGroupScores') || [];
+        qGroups.forEach(g=>{
+          (g.questionScores||[]).forEach(qs=>{
+            const qText = resolveQuestionTextWithLookup(lookup,qs);
+            if(qs.failedKillQuestion) add(fatalMap, formName, qText, agentName);
+            if(qs.failedCriticalQuestion && !qs.failedKillQuestion) add(critMap, formName, qText, agentName);
+          });
+        });
+      }
+
+      const rows = [];
+      function rowsFrom(map, type){
+        Array.from(map.values())
+          .sort((a,b)=>b.count-a.count)
+          .forEach(r=>{
+            const agentsArr = Array.from(r.agents.entries()).sort((a,b)=>b[1]-a[1]);
+            const summaryText = `${agentsArr.length} agent${agentsArr.length!==1?'s':''} / ${r.count} mark${r.count!==1?'s':''}`;
+            const agentsHtml = `<details class="agent-list">
+                <summary>${summaryText}</summary>
+                <div class="agent-pills">
+                  ${agentsArr.map(([name,c])=>`<span class="pill">${name} × ${c}</span>`).join('')}
+                </div>
+              </details>`;
+            rows.push(`<tr>
+              <td>${r.formName}</td>
+              <td>${r.qText}</td>
+              <td>${type==='fatal'
+                    ? '<span class="badge badge-fatal">Fatal</span>'
+                    : '<span class="badge badge-critical">Critical</span>'}</td>
+              <td>${r.count}</td>
+              <td>${agentsHtml}</td>
+            </tr>`);
+          });
+      }
+      rowsFrom(fatalMap,'fatal'); rowsFrom(critMap,'critical');
+
+      tbl.innerHTML = `
+        <thead><tr>
+          <th>Form</th><th>Question</th><th>Type</th><th>Marks</th><th>Agents</th>
+        </tr></thead>
+        <tbody>${rows.join('') || `<tr><td colspan="5" class="muted">No critical or fatal marks found for the selected period.</td></tr>`}</tbody>`;
     }
   </script>
 </body>

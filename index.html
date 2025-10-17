@@ -173,7 +173,6 @@
       <div id="analyticsTab" class="tab-content">
         <h2 class="section-title">Analytics</h2>
 
-        <!-- Range controls (Analytics only) -->
         <div class="controls" style="margin-top:8px">
           <div>
             <label for="anaFrom">From (Month)</label>
@@ -194,10 +193,8 @@
           </div>
         </div>
 
-        <!-- KPI strip -->
         <div id="analyticsKPIs" class="kpis"></div>
 
-        <!-- Media + Fail tables -->
         <div class="table-container">
           <table id="mediaTable"></table>
         </div>
@@ -205,7 +202,6 @@
           <table id="repeatFailsTable"></table>
         </div>
 
-        <!-- Agent insights bars -->
         <div class="card" style="padding:16px;margin-top:16px">
           <div style="display:flex;align-items:center;gap:10px;justify-content:space-between">
             <h3 class="section-title" style="margin:0">Agent Insights</h3>
@@ -222,13 +218,11 @@
           <div id="agentInsights" style="margin-top:8px"></div>
         </div>
 
-        <!-- Keep daily percentage table -->
         <h3 class="section-title" style="margin-top:18px">Daily Trend by Agent (Selected Period)</h3>
         <div class="table-container">
           <table id="trendTable" class="trend-table"></table>
         </div>
 
-        <!-- Top/bottom tables -->
         <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(260px,1fr));gap:16px;margin-top:16px">
           <div class="table-container">
             <table id="topAgentsTable"></table>
@@ -268,25 +262,28 @@
       formsById: {},
       teams: [],
       teamsById: {},
-      teamMembers: new Map(),  // teamId -> [userId,...]
+      teamMembers: new Map(),
 
       evals: [],
       monthStart: null,
       monthEnd: null,
 
-      // analytics range
       analyticsEvals: null,
-      analyticsRange: null, // {start,end}
+      analyticsRange: null,
 
-      // form caches
       formDetailsCache: new Map(),
       formLookupCache: new Map(),
       combinedLookupCache: new Map()
     };
 
     const dropdowns = { users:null, teams:null, forms:null };
+
+    // Throttle + backoff
     let lastApiCall = 0;
-    const API_DELAY = 100;
+    const API_DELAY = 120;                  // min spacing between calls
+    const MAX_CONCURRENT_AGENT_BATCH = 3;   // lower concurrency to be gentle
+
+    function sleep(ms){ return new Promise(r=>setTimeout(r,ms)); }
 
     function msg(html,type='info'){
       const box=document.getElementById('messageContainer');
@@ -362,7 +359,7 @@
       document.getElementById('loadBtn').disabled=!(hasMonth && (hasUsers || hasTeams || hasForms));
     }
 
-    // ===== Bootstrapping =====
+    // ===== Boot =====
     document.addEventListener('DOMContentLoaded',()=>{
       const params=new URLSearchParams(window.location.hash.substring(1));
       const tokenFromHash=params.get('access_token');
@@ -409,7 +406,6 @@
       updateMonthRange();
       document.getElementById('monthInput').addEventListener('change',()=>{ updateMonthRange(); updateLoadButtonState(); });
 
-      // Load lookups
       Promise.all([fetchAllUsers(), fetchAllTeams(), fetchAllForms()])
         .then(()=> updateLoadButtonState())
         .catch(err => msg('Initial load failed: '+err.message,'error'));
@@ -431,27 +427,51 @@
       state.monthEnd  =new Date(Date.UTC(y, m,   0, 23,59,59));
     }
 
-    // ===== API helpers =====
-    async function rateLimitedFetch(url,options={}){
+    // ===== HTTP helper with spacing + retry/backoff =====
+    async function rawFetch(url,options={}){
       const now=Date.now(); const delta=now-lastApiCall;
-      if(delta<API_DELAY) await new Promise(r=>setTimeout(r,API_DELAY-delta));
+      if(delta<API_DELAY) await sleep(API_DELAY-delta);
       lastApiCall=Date.now();
-      return fetch(url,{...options,headers:{'Authorization':'Bearer '+state.accessToken,'Content-Type':'application/json',...options.headers}});
+      return fetch(url,{...options,headers:{'Authorization':'Bearer '+state.accessToken,'Content-Type':'application/json',...(options.headers||{})}});
     }
+
+    async function fetchJsonWithRetry(url, options={}, {retries=5, baseDelay=500}={}){
+      let attempt=0;
+      while(true){
+        const res = await rawFetch(url, options);
+        if(res.ok){
+          // 204
+          if(res.status===204) return null;
+          return await res.json();
+        }
+        // For method issues (400/401/403/404/405), bubble quickly so caller can fallback to another method
+        if([400,401,403,404,405].includes(res.status)){
+          const err=new Error(`HTTP ${res.status}`); err.status=res.status; throw err;
+        }
+        // Backoff for 429/408/5xx
+        attempt++;
+        if(attempt>retries){
+          const err=new Error(`HTTP ${res.status}`); err.status=res.status; throw err;
+        }
+        const retryAfter = Number(res.headers.get('Retry-After')) || null;
+        const delay = retryAfter ? retryAfter*1000 : Math.round(baseDelay * (2**(attempt-1)) * (1 + Math.random()*0.25));
+        await sleep(delay);
+      }
+    }
+
     async function fetchPaginatedGET(url){
       let all=[]; let next=url;
       while(next){
-        const res=await rateLimitedFetch(next);
-        if(!res.ok) throw new Error(`HTTP ${res.status} for ${next}`);
-        const data=await res.json();
+        const data = await fetchJsonWithRetry(next, {method:'GET'});
         if(Array.isArray(data.entities)) all=all.concat(data.entities);
         else if(Array.isArray(data.users)) all=all.concat(data.users);
         else if(Array.isArray(data)) all=all.concat(data);
         else if(data.entities) all=all.concat(data.entities);
-        next=data.nextUri?`https://api.${config.REGION}${data.nextUri}`:null;
+        next = data.nextUri ? `https://api.${config.REGION}${data.nextUri}` : null;
       }
       return all;
     }
+
     function safeGet(o,p,def=null){ try{ return p.split('.').reduce((x,k)=>(x && k in x)?x[k]:undefined ,o) ?? def; }catch{ return def; } }
     function pct(n,d=1){ if(n==null||!isFinite(n)) return '-'; return (Math.round(n*10**d)/10**d).toFixed(d)+'%'; }
     function fmt(n,d=1){ if(n==null||!isFinite(n)) return '-'; return (Math.round(n*10**d)/10**d).toFixed(d); }
@@ -483,7 +503,6 @@
     async function fetchTeamMembers(teamId){
       const url=`https://api.${config.REGION}/api/v2/teams/${teamId}/members?pageSize=100`;
       const members=await fetchPaginatedGET(url);
-      // Try common shapes: member.user.id OR user.id OR just id
       const ids = Array.from(new Set(members.map(m => safeGet(m,'member.id') || safeGet(m,'member.user.id') || safeGet(m,'user.id') || safeGet(m,'id')).filter(Boolean)));
       state.teamMembers.set(teamId, ids);
     }
@@ -496,7 +515,6 @@
       dropdowns.forms.setOptions(state.forms.map(f=>({value:f.id,label:f.name})));
     }
 
-    // ===== Agent selection from Users + Teams =====
     async function computeSelectedAgentIds(){
       const userIds = dropdowns.users.getSelectedValues();
       const teamIds = dropdowns.teams.getSelectedValues();
@@ -510,7 +528,7 @@
       return Array.from(set);
     }
 
-    // ===== Evaluations =====
+    // ===== Evaluations with GET/POST fallback + retry =====
     async function loadEvaluations(){
       const agentIds = await computeSelectedAgentIds();
       const formIds = dropdowns.forms.getSelectedValues();
@@ -526,7 +544,7 @@
 
       const btn=document.getElementById('loadBtn'); setLoading(btn,true); msg('Loading evaluations…','info');
       try{
-        const agentList = agentIds.length ? agentIds : state.users.map(u=>u.id); // if only forms selected, pull all users
+        const agentList = agentIds.length ? agentIds : state.users.map(u=>u.id);
         state.evals = await fetchDetailedEvaluations(agentList, formIds, state.monthStart, state.monthEnd);
         msg(`Loaded ${state.evals.length} evaluations.`,'success');
         renderAll();
@@ -562,34 +580,99 @@
     }
 
     async function fetchDetailedEvaluations(agentIds,formIds,startDate,endDate){
-      const all=[]; const batchSize=5;
-      for(let i=0;i<agentIds.length;i+=batchSize){
-        const batch=agentIds.slice(i,i+batchSize);
+      const all=[];
+      for(let i=0;i<agentIds.length;i+=MAX_CONCURRENT_AGENT_BATCH){
+        const batch=agentIds.slice(i,i+MAX_CONCURRENT_AGENT_BATCH);
         const res=await Promise.all(batch.map(id=>fetchEvaluationsForAgentInterval(id,formIds,startDate,endDate)));
         res.forEach(items=>all.push(...items));
-        if(i+batchSize<agentIds.length) await new Promise(r=>setTimeout(r,200));
+        if(i+MAX_CONCURRENT_AGENT_BATCH<agentIds.length) await sleep(300); // small gap between batches
       }
       return all;
     }
 
     async function fetchEvaluationsForAgentInterval(agentId,formIds,startDate,endDate){
       const start=startDate.toISOString(); const end=endDate.toISOString();
-      const url=`https://api.${config.REGION}/api/v2/quality/evaluations/query`;
-      const body={agentUserIds:[agentId],interval:`${start}/${end}`,expandAnswerTotalScores:true,pageSize:50};
-      if(formIds && formIds.length>0) body.formIds=formIds;
-      let all=[]; let page=1;
-      while(true){
-        body.pageNumber=page;
-        const res=await rateLimitedFetch(url,{method:'POST',body:JSON.stringify(body)});
-        if(!res.ok) throw new Error(`Eval query failed: ${res.status}`);
-        const data=await res.json(); const items=data.entities||[];
-        if(items.length===0) break; all=all.concat(items);
-        if(!data.nextUri && items.length<body.pageSize) break; page++;
+      const base = `https://api.${config.REGION}/api/v2/quality/evaluations/query`;
+
+      // Helper: GET path
+      async function getViaGET(singleFormId){
+        const params = new URLSearchParams({
+          agentUserId: agentId,
+          startTime: start,
+          endTime: end,
+          expandAnswerTotalScores: 'true',
+          pageSize: '50'
+        });
+        if(singleFormId) params.set('formId', singleFormId);
+        const url = `${base}?${params.toString()}`;
+        // paginate via nextUri
+        let all=[]; let next=url;
+        while(next){
+          try{
+            const data = await fetchJsonWithRetry(next,{method:'GET'});
+            const entities = data?.entities || [];
+            all = all.concat(entities);
+            next = data?.nextUri ? `https://api.${config.REGION}${data.nextUri}` : null;
+          }catch(err){
+            // bubble only 400/401/403/404/405; others already retried
+            throw err;
+          }
+        }
+        return all;
       }
-      return all;
+
+      // Helper: POST path
+      async function getViaPOST(){
+        const url = base;
+        const body = {
+          agentUserIds: [agentId],
+          interval: `${start}/${end}`,
+          expandAnswerTotalScores: true,
+          pageSize: 50
+        };
+        if(formIds && formIds.length>0) body.formIds = formIds;
+
+        let page=1, all=[];
+        while(true){
+          body.pageNumber = page;
+          try{
+            const data = await fetchJsonWithRetry(url,{method:'POST',body:JSON.stringify(body)});
+            const entities = data?.entities || [];
+            if(!entities.length) break;
+            all = all.concat(entities);
+            if(!data.nextUri && entities.length < body.pageSize) break;
+            page++;
+          }catch(err){
+            throw err; // bubble to outer to try fallback
+          }
+        }
+        return all;
+      }
+
+      // Strategy:
+      // - If 0/1 formId -> try GET first (usually allowed), else POST.
+      // - If chosen method 405s, fallback to the other.
+      if(!formIds || formIds.length<=1){
+        try{
+          return await getViaGET(formIds?.[0]);
+        }catch(err){
+          if(err.status===405 || err.status===400){ /* fallback */ }
+          else throw err;
+        }
+      }
+
+      try{
+        return await getViaPOST();
+      }catch(err){
+        if(err.status===405 || err.status===400){
+          // fallback: GET without form filter (server doesn't like POST or multiple)
+          return await getViaGET(undefined);
+        }
+        throw err;
+      }
     }
 
-    // ===== Forms & lookup (same as earlier build) =====
+    // ===== Forms & lookups =====
     function formKey(formId, versionId){ return (versionId === '__published__') ? `pub@${formId}` : `${formId}@${versionId || 'latest'}`; }
     async function getFormDetails(formId, versionId){
       const key=formKey(formId,versionId);
@@ -600,15 +683,20 @@
         ? `https://api.${config.REGION}/api/v2/quality/forms/evaluations/${formId}/versions/${versionId}`
         : `https://api.${config.REGION}/api/v2/quality/forms/evaluations/${formId}`;
       try{
-        let res=await rateLimitedFetch(url);
-        if(!res.ok && versionId && versionId !== '__published__'){
-          res=await rateLimitedFetch(`https://api.${config.REGION}/api/v2/quality/forms/evaluations/${formId}`);
+        let data;
+        try{
+          data = await fetchJsonWithRetry(url,{method:'GET'});
+        }catch(err){
+          // fallback to latest if versioned lookup fails
+          if(versionId && versionId!=='__published__'){
+            data = await fetchJsonWithRetry(`https://api.${config.REGION}/api/v2/quality/forms/evaluations/${formId}`,{method:'GET'});
+          }else{
+            throw err;
+          }
         }
-        if(!res.ok){ state.formDetailsCache.set(key,null); return null; }
-        const json=await res.json();
-        state.formDetailsCache.set(key,json);
-        state.formLookupCache.set(key,buildFormLookup(json||{}));
-        return json;
+        state.formDetailsCache.set(key,data);
+        state.formLookupCache.set(key,buildFormLookup(data||{}));
+        return data;
       }catch(e){ state.formDetailsCache.set(key,null); return null; }
     }
 
@@ -659,27 +747,15 @@
       return combined;
     }
 
-    // ===== Utility for answers/text (as before) =====
+    // ===== Helpers for Q/A text =====
     function approx(a,b){ return Math.abs(Number(a)-Number(b))<1e-6; }
-    function collectAnswerIds(qScore){
-      const ids=new Set();
-      (qScore.selectedAnswerIds||[]).forEach(x=>ids.add(x));
-      (qScore.selectedAnswerOptionIds||[]).forEach(x=>ids.add(x));
-      if(qScore.selectedAnswerId) ids.add(qScore.selectedAnswerId);
-      if(qScore.answerOptionId) ids.add(qScore.answerOptionId);
-      if(qScore.answerId) ids.add(qScore.answerId);
-      const a=qScore.answer||{};
-      [a.id,a.contextId,a.answerId,a.answerOptionId].filter(Boolean).forEach(x=>ids.add(x));
-      (qScore.answers||[]).forEach(ans=>{ [ans.id,ans.contextId,ans.answerId,ans.answerOptionId].filter(Boolean).forEach(x=>ids.add(x)); });
-      return Array.from(ids);
-    }
     function resolveQuestionTextWithLookup(lookup,qScore){
       const candidates=[qScore.questionId,qScore.questionContextId,safeGet(qScore,'question.id'),safeGet(qScore,'question.contextId')].filter(Boolean);
       for(const id of candidates){ const t=lookup.questionText.get(id); if(t) return t; }
       return safeGet(qScore,'question.text') || `Question ${candidates[0]||''}`.trim();
     }
 
-    // ===== Renderers (Overview / Analytics / Details / Critical) =====
+    // ===== Renderers =====
     function renderAll(){ renderOverview(); renderAnalytics(); renderDetails(); renderCritical(); }
     function resolveUserName(id){ const u=state.users.find(x=>x.id===id); return u?u.name:(id||'(unknown)'); }
     function getEvalPercent(e){
@@ -713,7 +789,7 @@
         : '<tr><td colspan="3" class="muted">No evaluation data available for the selected criteria.</td></tr>';
     }
 
-    // === Analytics (uses current state.analyticsEvals if loaded, else state.evals) ===
+    // === Analytics ===
     function getAnalyticsSet(){ return (state.analyticsEvals && state.analyticsRange) ? state.analyticsEvals : state.evals; }
     function guessMediaType(e){ return (safeGet(e,'mediaType') || safeGet(e,'conversation.mediaType') || 'Unknown'); }
     function buildDays(start,end){ const out=[]; for(let d=new Date(start); d<=end; d.setUTCDate(d.getUTCDate()+1)){ out.push(new Date(d)); } return out; }
@@ -731,7 +807,6 @@
         return;
       }
 
-      // KPIs
       let withFatal=0, withCritical=0, total=evals.length;
       let sumScores=0, scored=0;
       evals.forEach(e=>{
@@ -755,7 +830,6 @@
         <div class="kpi"><div class="label">Pass Rate</div><div class="value">${passRate==null?'-':pct(passRate*100,1)}</div></div>
       `;
 
-      // Media table
       const mediaMap=new Map();
       evals.forEach(e=>{
         const mt=guessMediaType(e);
@@ -772,7 +846,6 @@
         <tbody>${mediaRows}</tbody>
       `;
 
-      // Repeated fails by question
       const failMap=new Map();
       for(const e of evals){
         const lookup = await getCombinedLookupForEval(e);
@@ -798,7 +871,6 @@
         <tbody>${repeatRows || `<tr><td colspan="5" class="muted">No critical/fatal marks found.</td></tr>`}</tbody>
       `;
 
-      // Agent insights
       const byAgent=new Map();
       evals.forEach(e=>{
         const id=safeGet(e,'agent.id')||e.agentUserId||'(unknown)';
@@ -814,7 +886,6 @@
       window._insightData = insightArr;
       renderAgentInsights();
 
-      // Trend table
       const start = state.analyticsRange?.start || state.monthStart;
       const end   = state.analyticsRange?.end   || state.monthEnd;
       const days = buildDays(start,end);
@@ -842,7 +913,6 @@
       }).join('');
       document.getElementById('trendTable').innerHTML = header + `<tbody>${rows}</tbody>`;
 
-      // Top/bottom tables
       const byAvg = insightArr.filter(x=>x.avg!=null).sort((a,b)=>b.avg-a.avg);
       const top = byAvg.slice(0,5).map(x=>`<tr><td>${x.name}</td><td>${x.count}</td><td>${pct(x.avg,1)}</td></tr>`).join('');
       const bottom = byAvg.slice(-5).map(x=>`<tr><td>${x.name}</td><td>${x.count}</td><td>${pct(x.avg,1)}</td></tr>`).join('');
@@ -875,7 +945,7 @@
       document.getElementById('agentInsights').innerHTML = html || '<div class="muted">No agent data.</div>';
     }
 
-    // ===== Details (unchanged core display) =====
+    // ===== Details =====
     async function renderDetails(){
       const c=document.getElementById('detailsContainer');
       if (!state.evals.length){ c.innerHTML = '<div class="muted">No evaluations loaded.</div>'; return; }
@@ -960,7 +1030,7 @@
       c.innerHTML = evaluationElements.join('');
     }
 
-    // ===== Critical view (with agent dropdowns) =====
+    // ===== Critical =====
     async function renderCritical(){
       const tbl=document.getElementById('criticalTable');
       if(!state.evals.length){ tbl.innerHTML='<tr><td class="muted">No evaluations loaded.</td></tr>'; return; }

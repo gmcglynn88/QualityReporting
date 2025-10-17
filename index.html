@@ -47,6 +47,7 @@
     .kpi .label{color:var(--text-light);font-size:12px}
     .kpi .value{font-size:20px;font-weight:700;margin-top:4px}
 
+    /* Checkbox dropdown */
     .checkbox-dropdown{position:relative;min-width:220px;width:100%}
     .cd-trigger{display:flex;align-items:center;justify-content:space-between;border:1px solid var(--border-color);border-radius:6px;background:#fff;padding:10px;cursor:pointer;width:100%;box-sizing:border-box}
     .cd-trigger .label{white-space:nowrap;overflow:hidden;text-overflow:ellipsis;flex:1}
@@ -67,10 +68,28 @@
     @keyframes spin{0%{transform:rotate(0deg)}100%{transform:rotate(360deg)}}
 
     .comment-bubble{background:#f8f9fa;border:1px solid #dee2e6;border-radius:12px;padding:8px 12px;margin-top:4px;font-size:12px;color:#6c757d}
+
     tr.critical-warning{background-color:#fffbeb!important;border-left:4px solid #f59e0b}
     tr.fatal-question{background-color:#fef2f2!important;border-left:4px solid #dc2626}
     tr.critical-warning:hover{background-color:#fef3c7!important}
     tr.fatal-question:hover{background-color:#fecaca!important}
+
+    /* Details table: keep question column roomy */
+    .details-table th:nth-child(1),
+    .details-table td:nth-child(1){ width:32%; min-width:280px }
+    .details-table th:nth-child(2),
+    .details-table td:nth-child(2){ width:14% }
+    .details-table th:nth-child(3),
+    .details-table td:nth-child(3){ width:8%; white-space:nowrap }
+    .details-table th:nth-child(4),
+    .details-table td:nth-child(4){ width:10%; white-space:nowrap }
+    .details-table th:nth-child(5),
+    .details-table td:nth-child(5){ width:auto }
+
+    /* Critical/Fatal agent dropdown styling */
+    details.agent-list summary{cursor:pointer}
+    .agent-pills{margin-top:6px;display:flex;flex-wrap:wrap;gap:6px}
+    .pill{display:inline-block;border:1px solid var(--border-color);border-radius:999px;padding:2px 8px;font-size:12px;background:#fff}
   </style>
 </head>
 <body>
@@ -176,10 +195,8 @@
       evals: [],
       monthStart: null,
       monthEnd: null,
-      // caches keyed by "formId@version" or "pub@publishedFormId"
-      formDetailsCache: new Map(),
+      formDetailsCache: new Map(),   // "formId@version" or "pub@publishedFormId"
       formLookupCache: new Map(),
-      // merged lookup per evaluation-form combo
       combinedLookupCache: new Map()
     };
 
@@ -330,7 +347,7 @@
     function toUKDate(d){ const dt=new Date(d); return dt.toLocaleDateString('en-GB'); }
     function dayKeyUTC(d){ const dt=new Date(d); return new Date(Date.UTC(dt.getUTCFullYear(),dt.getUTCMonth(),dt.getUTCDate())).toISOString().split('T')[0]; }
 
-    // ===== Lookups =====
+    // ===== Global lookups =====
     async function fetchAllUsers(){
       const url=`https://api.${config.REGION}/api/v2/users?pageSize=100`;
       const users=await fetchPaginatedGET(url);
@@ -411,7 +428,7 @@
       return all;
     }
 
-    // ===== Form fetching (design version, latest, and published) =====
+    // ===== Form fetching & lookups =====
     function formKey(formId, versionId){
       return (versionId === '__published__') ? `pub@${formId}` : `${formId}@${versionId || 'latest'}`;
     }
@@ -478,7 +495,6 @@
       return {questionText, answerText, questionObj};
     }
 
-    // Build a *merged* lookup for the exact evaluation (published + any design form/version)
     async function getCombinedLookupForEval(e){
       const pubId = safeGet(e,'evaluationForm.id');
       const formId = safeGet(e,'form.id') || e.formId;
@@ -492,17 +508,14 @@
 
       if(state.combinedLookupCache.has(comboKey)) return state.combinedLookupCache.get(comboKey);
 
-      // Fetch what we can
-      const detailPromises = [];
-      if(pubId) detailPromises.push(getFormDetails(pubId,'__published__'));
-      if(formId && formVersionId) detailPromises.push(getFormDetails(formId,formVersionId));
-      if(formId && !formVersionId) detailPromises.push(getFormDetails(formId,null));
-      const details = (await Promise.all(detailPromises)).filter(Boolean);
+      const promises = [];
+      if(pubId) promises.push(getFormDetails(pubId,'__published__'));
+      if(formId && formVersionId) promises.push(getFormDetails(formId,formVersionId));
+      if(formId && !formVersionId) promises.push(getFormDetails(formId,null));
+      const details = (await Promise.all(promises)).filter(Boolean);
 
-      // Merge the lookups
       const merged = { questionText:new Map(), answerText:new Map(), questionObj:new Map() };
       const names = [];
-
       details.forEach(d=>{
         if(d?.name) names.push(d.name);
         const lk = buildFormLookup(d||{});
@@ -544,14 +557,11 @@
     }
 
     function resolveAnswerTextWithLookup(lookup,qScore){
-      // 1) by id/contextId
       const ids=collectAnswerIds(qScore);
       if(ids.length){
-        const texts=[];
-        ids.forEach(id=>{ const t=lookup.answerText.get(id); if(t) texts.push(t); });
+        const texts=[]; ids.forEach(id=>{ const t=lookup.answerText.get(id); if(t) texts.push(t); });
         if(texts.length) return texts.join(', ');
       }
-      // 2) by score → option.value
       const qIds=[qScore.questionId,qScore.questionContextId,safeGet(qScore,'question.id'),safeGet(qScore,'question.contextId')].filter(Boolean);
       const q = qIds.map(id=>lookup.questionObj.get(id)).find(Boolean);
       if(q && Array.isArray(q.answerOptions) && q.answerOptions.length){
@@ -559,7 +569,6 @@
         const match = q.answerOptions.find(o => approx(s,o.value) || approx(s/100,o.value) || approx(s,o.value*100));
         if(match){ return match.text ?? String(match.value ?? ''); }
       }
-      // 3) other fields
       if(qScore.freeTextAnswer) return String(qScore.freeTextAnswer);
       if(qScore.numericAnswer!==undefined && qScore.numericAnswer!==null) return String(qScore.numericAnswer);
       if(safeGet(qScore,'answer.text')) return qScore.answer.text;
@@ -665,7 +674,7 @@
           <details class="evaluation">
             <summary>${when} • <strong>${agent}</strong> — ${lookup.formName} &nbsp;&middot;&nbsp; Score: <strong>${score==null?'-':pct(score,1)}</strong> ${convo!=='(n/a)'?`&nbsp;&middot;&nbsp; Conversation: ${convo}`:''}</summary>
             <div class="table-container">
-              <table>
+              <table class="details-table">
                 <thead><tr><th>Question</th><th>Answer</th><th>Score</th><th>Flags</th><th>Comments</th></tr></thead>
                 <tbody>${qRows || `<tr><td colspan="5" class="muted">No question data available.</td></tr>`}</tbody>
               </table>
@@ -677,42 +686,74 @@
       c.innerHTML = blocks.join('');
     }
 
+    // New: Critical/Fatal view with agent dropdowns
     async function renderCritical(){
-      const rows = await Promise.all(state.evals.map(async e=>{
+      const tbl=document.getElementById('criticalTable');
+      if(!state.evals.length){ tbl.innerHTML='<tr><td class="muted">No evaluations loaded.</td></tr>'; return; }
+
+      // Aggregate
+      const fatalMap=new Map();  // key -> {formName,qText,count,agents:Map(name->count)}
+      const critMap=new Map();
+
+      function add(map, formName, qText, agentName){
+        const key=formName+'|'+qText;
+        if(!map.has(key)) map.set(key,{formName,qText,count:0,agents:new Map()});
+        const o=map.get(key); o.count++; o.agents.set(agentName,(o.agents.get(agentName)||0)+1);
+      }
+
+      // Collect from evals (need lookups for question text)
+      for (const e of state.evals){
         const lookup = await getCombinedLookupForEval(e);
-        const out=[];
-        const qGroups=safeGet(e,'answers.questionGroupScores')||[];
+        const formName = lookup.formName;
+        const agentName = resolveUserName(safeGet(e,'agent.id')||e.agentUserId);
+        const qGroups = safeGet(e,'answers.questionGroupScores') || [];
         qGroups.forEach(g=>{
-          (g.questionScores||[]).forEach(qScore=>{
-            if(qScore.failedKillQuestion || qScore.failedCriticalQuestion){
-              out.push({
-                formName: lookup.formName,
-                qText: resolveQuestionTextWithLookup(lookup,qScore),
-                fatal: qScore.failedKillQuestion?1:0,
-                critical: qScore.failedCriticalQuestion?1:0
-              });
-            }
+          (g.questionScores||[]).forEach(qs=>{
+            const qText = resolveQuestionTextWithLookup(lookup,qs);
+            if(qs.failedKillQuestion) add(fatalMap, formName, qText, agentName);
+            if(qs.failedCriticalQuestion && !qs.failedKillQuestion) add(critMap, formName, qText, agentName);
           });
         });
-        return out;
-      }));
+      }
 
-      const flat=rows.flat();
-      const map=new Map();
-      flat.forEach(r=>{
-        const key=r.formName+'|'+r.qText;
-        if(!map.has(key)) map.set(key,{formName:r.formName,qText:r.qText,critical:0,fatal:0});
-        const o=map.get(key); o.critical+=r.critical; o.fatal+=r.fatal;
-      });
+      // Build rows
+      const rows = [];
+      function rowsFrom(map, type){
+        Array.from(map.values())
+          .sort((a,b)=>b.count-a.count)
+          .forEach(r=>{
+            const agentsArr = Array.from(r.agents.entries()).sort((a,b)=>b[1]-a[1]);
+            const summaryText = `${agentsArr.length} agent${agentsArr.length!==1?'s':''} / ${r.count} mark${r.count!==1?'s':''}`;
+            const agentsHtml = `<details class="agent-list">
+                <summary>${summaryText}</summary>
+                <div class="agent-pills">
+                  ${agentsArr.map(([name,c])=>`<span class="pill">${name} × ${c}</span>`).join('')}
+                </div>
+              </details>`;
+            rows.push(`<tr>
+              <td>${r.formName}</td>
+              <td>${r.qText}</td>
+              <td>${type==='fatal'
+                    ? '<span class="badge badge-fatal">Fatal</span>'
+                    : '<span class="badge badge-critical">Critical</span>'}</td>
+              <td>${r.count}</td>
+              <td>${agentsHtml}</td>
+            </tr>`);
+          });
+      }
+      rowsFrom(fatalMap,'fatal');
+      rowsFrom(critMap,'critical');
 
-      const body = Array.from(map.values())
-        .sort((a,b)=>(b.fatal+b.critical)-(a.fatal+a.critical))
-        .map(r=>`<tr><td>${r.formName}</td><td>${r.qText}</td><td>${r.critical}</td><td>${r.fatal}</td><td>${r.critical+r.fatal}</td></tr>`)
-        .join('');
-
-      document.getElementById('criticalTable').innerHTML=`
-        <thead><tr><th>Form</th><th>Question</th><th>Critical</th><th>Fatal/Kill</th><th>Total</th></tr></thead>
-        <tbody>${body || `<tr><td colspan="5" class="muted">No critical/fatal marks found for the selected period.</td></tr>`}</tbody>`;
+      tbl.innerHTML = `
+        <thead><tr>
+          <th>Form</th>
+          <th>Question</th>
+          <th>Type</th>
+          <th>Marks</th>
+          <th>Agents</th>
+        </tr></thead>
+        <tbody>${rows.join('') || `<tr><td colspan="5" class="muted">No critical or fatal marks found for the selected period.</td></tr>`}</tbody>
+      `;
     }
   </script>
 </body>

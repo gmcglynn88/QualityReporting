@@ -47,7 +47,6 @@
     .kpi .label{color:var(--text-light);font-size:12px}
     .kpi .value{font-size:20px;font-weight:700;margin-top:4px}
 
-    /* Checkbox dropdown */
     .checkbox-dropdown{position:relative;min-width:220px;width:100%}
     .cd-trigger{display:flex;align-items:center;justify-content:space-between;border:1px solid var(--border-color);border-radius:6px;background:#fff;padding:10px;cursor:pointer;width:100%;box-sizing:border-box}
     .cd-trigger .label{white-space:nowrap;overflow:hidden;text-overflow:ellipsis;flex:1}
@@ -62,7 +61,7 @@
     .cd-list{max-height:260px;overflow:auto}
     .cd-item{display:flex;align-items:center;gap:10px;padding:8px 12px;border-bottom:1px solid #f1f3f5}
     .cd-item label{display:flex;align-items:center;gap:10px;cursor:pointer;width:100%}
-    .cd-footer{padding:8px 12px;background:#fafafa;border-top:1px solid var(--border-color);font-size:12px;color:var(--text-light);display:flex;justify-content:space-between}
+    .cd-footer{padding:8px 12px;background:#fafafa;border-top:1px solid var(--border-color);font-size:12px;color:#6c757d;display:flex;justify-content:space-between}
 
     .loading-spinner{display:inline-block;width:20px;height:20px;border:2px solid #f3f3f3;border-top:2px solid var(--primary-color);border-radius:50%;animation:spin 1s linear infinite;margin-right:8px}
     @keyframes spin{0%{transform:rotate(0deg)}100%{transform:rotate(360deg)}}
@@ -177,7 +176,7 @@
       evals: [],
       monthStart: null,
       monthEnd: null,
-      // caches keyed by "formId@version" (version may be "latest")
+      // caches keyed by "formId@version" or "pub@publishedFormId"
       formDetailsCache: new Map(),
       formLookupCache: new Map()
     };
@@ -266,8 +265,15 @@
       if(tokenFromHash){ sessionStorage.setItem('purecloud_token',tokenFromHash); history.replaceState(null,document.title,window.location.pathname+window.location.search); startApp(tokenFromHash); return; }
       const tokenFromSession=sessionStorage.getItem('purecloud_token');
       if(tokenFromSession){ startApp(tokenFromSession); return; }
-      if(DEBUG){ document.getElementById('authDebug').style.display='block'; document.getElementById('authDump').textContent='No token. Click Sign in.'; document.getElementById('signinBtn').onclick=()=>window.location.href=oauthUrl; document.getElementById('auth-message').textContent='Debug mode: click Sign in with Genesys'; }
-      else{ document.getElementById('auth-message').textContent='Redirecting to Genesys Cloud for authentication...'; setTimeout(()=>{ window.location.href=oauthUrl; },1200); }
+      if(DEBUG){
+        document.getElementById('authDebug').style.display='block';
+        document.getElementById('authDump').textContent='No token. Click Sign in.';
+        document.getElementById('signinBtn').onclick=()=>window.location.href=oauthUrl;
+        document.getElementById('auth-message').textContent='Debug mode: click Sign in with Genesys';
+      } else {
+        document.getElementById('auth-message').textContent='Redirecting to Genesys Cloud for authentication...';
+        setTimeout(()=>{ window.location.href=oauthUrl; }, 1200);
+      }
     });
 
     function startApp(token){
@@ -403,36 +409,46 @@
       return all;
     }
 
-    // ===== Version-aware form details + robust lookups =====
-    function formKey(formId,versionId){ return `${formId}@${versionId||'latest'}`; }
+    // ===== Version/published-aware form details + robust lookups =====
+    function formKey(formId, versionId){
+      return (versionId === '__published__') ? `pub@${formId}` : `${formId}@${versionId || 'latest'}`;
+    }
 
-    async function getFormDetails(formId,versionId){
+    async function getFormDetails(formId, versionId){
       const key=formKey(formId,versionId);
       if(state.formDetailsCache.has(key)) return state.formDetailsCache.get(key);
 
-      let url = versionId
-        ? `https://api.${config.REGION}/api/v2/quality/forms/evaluations/${formId}/versions/${versionId}`
-        : `https://api.${config.REGION}/api/v2/quality/forms/evaluations/${formId}`;
+      let url;
+      if (versionId === '__published__') {
+        url = `https://api.${config.REGION}/api/v2/quality/publishedforms/evaluations/${formId}`;
+      } else {
+        url = versionId
+          ? `https://api.${config.REGION}/api/v2/quality/forms/evaluations/${formId}/versions/${versionId}`
+          : `https://api.${config.REGION}/api/v2/quality/forms/evaluations/${formId}`;
+      }
 
-      let details=null;
       try{
         let res=await rateLimitedFetch(url);
-        if(!res.ok && versionId){
+        if(!res.ok && versionId && versionId !== '__published__'){
           // fallback to latest
           res=await rateLimitedFetch(`https://api.${config.REGION}/api/v2/quality/forms/evaluations/${formId}`);
         }
-        if(res.ok){ details=await res.json(); }
-      }catch(e){ console.warn('Form fetch error',e); }
-
-      state.formDetailsCache.set(key,details);
-      if(details) state.formLookupCache.set(key,buildLookup(details));
-      return details;
+        if(!res.ok){ state.formDetailsCache.set(key,null); return null; }
+        const json=await res.json();
+        state.formDetailsCache.set(key,json);
+        state.formLookupCache.set(key,buildFormLookup(json||{}));
+        return json;
+      }catch(e){
+        console.warn('Form details fetch error:',e);
+        state.formDetailsCache.set(key,null);
+        return null;
+      }
     }
 
-    function buildLookup(form){
-      const questionText=new Map();      // any question id/contextId -> text
-      const answerText=new Map();        // any answer id/contextId   -> text
-      const questionObj=new Map();       // any question id/contextId -> full question (for value matching)
+    function buildFormLookup(form){
+      const questionText=new Map(); // any question id/contextId -> text
+      const answerText=new Map();   // any answer id/contextId   -> text
+      const questionObj=new Map();  // any question id/contextId -> full question
 
       function addQuestion(q){
         if(!q) return;
@@ -442,7 +458,7 @@
           questionObj.set(id,q);
         });
         (q.answerOptions||[]).forEach(a=>{
-          const aTxt = a.text ?? String(a.value ?? '');
+          const aTxt=a.text ?? String(a.value ?? '');
           [a.id,a.contextId,a.answerId,a.answerOptionId].filter(Boolean).forEach(id=>{
             answerText.set(id,aTxt);
           });
@@ -457,15 +473,14 @@
       }
       (form?.questions||[]).forEach(addQuestion);
       walkGroups(form?.questionGroups);
-
-      return { questionText, answerText, questionObj };
+      return {questionText,answerText,questionObj};
     }
 
     function ensureLookup(formId,versionId){
       const key=formKey(formId,versionId);
       if(!state.formLookupCache.has(key)){
-        const d=state.formDetailsCache.get(key) || {};
-        state.formLookupCache.set(key,buildLookup(d));
+        const d=state.formDetailsCache.get(key)||{};
+        state.formLookupCache.set(key,buildFormLookup(d));
       }
       return state.formLookupCache.get(key);
     }
@@ -489,29 +504,26 @@
       const lookup=ensureLookup(formId,versionId);
       const candidates=[qScore.questionId,qScore.questionContextId,safeGet(qScore,'question.id'),safeGet(qScore,'question.contextId')].filter(Boolean);
       for(const id of candidates){ const t=lookup.questionText.get(id); if(t) return t; }
-      // fallback to any embedded text
       return safeGet(qScore,'question.text') || `Question ${candidates[0]||''}`.trim();
     }
 
     function resolveAnswerText(formId,versionId,qScore){
       const lookup=ensureLookup(formId,versionId);
-      // 1) try direct id/contextId mapping
+      // 1) direct id/contextId mapping
       const ids=collectAnswerIds(qScore);
       if(ids.length){
         const texts=[];
         ids.forEach(id=>{ const t=lookup.answerText.get(id); if(t) texts.push(t); });
         if(texts.length) return texts.join(', ');
       }
-      // 2) try value→option match (AI-only often returns just score)
+      // 2) value→option match as fallback
       const qIds=[qScore.questionId,qScore.questionContextId,safeGet(qScore,'question.id'),safeGet(qScore,'question.contextId')].filter(Boolean);
       const q = qIds.map(id=>lookup.questionObj.get(id)).find(Boolean);
       if(q && Array.isArray(q.answerOptions) && q.answerOptions.length){
         const s = Number(qScore.score);
-        // match exact, or 0/1 vs 0/100
         const match = q.answerOptions.find(o => approx(s,o.value) || approx(s/100,o.value) || approx(s,o.value*100));
         if(match){ return match.text ?? String(match.value ?? ''); }
       }
-      // 3) free text / numeric
       if(qScore.freeTextAnswer) return String(qScore.freeTextAnswer);
       if(qScore.numericAnswer!==undefined && qScore.numericAnswer!==null) return String(qScore.numericAnswer);
       if(safeGet(qScore,'answer.text')) return qScore.answer.text;
@@ -581,24 +593,36 @@
       if(!state.evals.length){ c.innerHTML='<div class="muted">No evaluations loaded.</div>'; return; }
       c.innerHTML='<div class="info-message">Loading evaluation details...</div>';
 
-      // Prefetch form details (version-aware when available)
+      // Prefetch form details (published/version-aware)
       const needed=new Set();
       state.evals.forEach(e=>{
-        const fid=safeGet(e,'form.id') || e.formId;
-        const ver=safeGet(e,'form.versionId') || e.formVersionId || safeGet(e,'form.version');
+        const pubId = safeGet(e,'evaluationForm.id');
+        const fid   = pubId || safeGet(e,'form.id') || e.formId;
+        const ver   = pubId ? '__published__' : (safeGet(e,'form.versionId') || e.formVersionId || safeGet(e,'form.version'));
         needed.add(formKey(fid,ver));
       });
       await Promise.all(Array.from(needed).map(async key=>{
-        const [fid,verStr]=key.split('@'); const ver = verStr==='latest'?null:verStr;
-        if(!state.formDetailsCache.has(key)){ await getFormDetails(fid,ver); }
+        const [prefix,rest] = key.startsWith('pub@') ? ['pub', key.slice(4)] : ['norm', key];
+        if(prefix==='pub'){ if(!state.formDetailsCache.has(key)) await getFormDetails(rest,'__published__'); }
+        else{
+          const [fid,verStr]=rest.split('@'); const ver = verStr==='latest'?null:verStr;
+          if(!state.formDetailsCache.has(key)) await getFormDetails(fid,ver);
+        }
       }));
 
       const rows = await Promise.all(state.evals.map(async e=>{
-        const formId=safeGet(e,'form.id') || e.formId;
-        const formVersionId=safeGet(e,'form.versionId') || e.formVersionId || safeGet(e,'form.version');
+        const pubId = safeGet(e,'evaluationForm.id');
+        const formId = pubId || safeGet(e,'form.id') || e.formId;
+        const formVersionId = pubId ? '__published__' : (safeGet(e,'form.versionId') || e.formVersionId || safeGet(e,'form.version'));
+        await getFormDetails(formId, formVersionId);
         const key=formKey(formId,formVersionId);
         const details=state.formDetailsCache.get(key);
-        const formName = safeGet(e,'form.name') || resolveForm(formId)?.name || details?.name || '(Form)';
+
+        const formName =
+          safeGet(e,'evaluationForm.name') ||
+          safeGet(e,'form.name') ||
+          resolveForm(formId)?.name ||
+          (details?.name || '(Form)');
 
         const agent=resolveUserName(safeGet(e,'agent.id')||e.agentUserId);
         const when=toUKDate(e.releaseDate || e.assignedDate || e.creationDate || e.evaluationDate || e.date || Date.now());
@@ -649,14 +673,16 @@
     function renderCritical(){
       const counts=new Map();
       state.evals.forEach(e=>{
-        const formId=safeGet(e,'form.id')||e.formId;
-        const formVersionId=safeGet(e,'form.versionId')||e.formVersionId||safeGet(e,'form.version');
-        const formName=safeGet(e,'form.name') || resolveForm(formId)?.name || '(Form)';
+        const pubId = safeGet(e,'evaluationForm.id');
+        const formId = pubId || safeGet(e,'form.id') || e.formId;
+        const formVersionId = pubId ? '__published__' : (safeGet(e,'form.versionId') || e.formVersionId || safeGet(e,'form.version'));
+
+        const formName = safeGet(e,'evaluationForm.name') || safeGet(e,'form.name') || resolveForm(formId)?.name || '(Form)';
         const qGroups=safeGet(e,'answers.questionGroupScores')||[];
         qGroups.forEach(g=>{
           (g.questionScores||[]).forEach(qScore=>{
             const qText=resolveQuestionText(formId,formVersionId,qScore)||'(Question)';
-            const key=`${formId}@${formVersionId}|${qText}`;
+            const key=`${formKey(formId,formVersionId)}|${qText}`;
             if(!counts.has(key)) counts.set(key,{formName,qText,critical:0,fatal:0});
             const o=counts.get(key);
             if(qScore.failedKillQuestion) o.fatal++;

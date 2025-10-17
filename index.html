@@ -113,6 +113,11 @@
 
     /* Stacked bar chart styling */
     .stacked-bar-container { position: relative; height: 400px; margin: 20px 0; }
+
+    /* Header actions */
+    .header-actions{display:flex;gap:8px;align-items:center;justify-content:flex-end;margin-top:8px}
+    .link-btn{background:transparent;border:1px solid var(--border-color);color:var(--text-color)}
+    .link-btn:hover{background:#f8fafc}
   </style>
   <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
 </head>
@@ -123,9 +128,16 @@
 
   <h1>QA Evaluations – Monthly View</h1>
 
-  <div id="authCard" class="card">
+  <div class="header-actions">
+
+    <div id="authCard" class="card">
     <div id="auth-message" class="info-message">Authenticating with PureCloud...</div>
-    <button id="signinBtn" style="display:none;margin-top:10px;">Sign in with Genesys</button>
+  </div>
+
+  <div id="authDebug" class="card" style="display:none">
+    <h2 class="section-title">Auth debug</h2>
+    <pre id="authDump" style="background:#f6f8fa;border:1px solid #eee;padding:12px;border-radius:8px;overflow:auto"></pre>
+    <button id="signinBtn">Sign in with Genesys</button>
   </div>
 
   <div id="appContent" style="display:none;">
@@ -304,6 +316,7 @@
     // ===== OAuth Configuration =====
     const clientId = 'fe305808-b368-4547-8af9-325d28d552bb';
     const config = { REGION: 'mypurecloud.ie' };
+    const DEBUG = new URLSearchParams(window.location.search).has('debug');
     const redirectUri = 'https://gmcglynn88.github.io/QualityReporting/'; // must exactly match your OAuth app
     const oauthUrl = `https://login.${config.REGION}/oauth/authorize?client_id=${encodeURIComponent(clientId)}&response_type=token&redirect_uri=${encodeURIComponent(redirectUri)}&state=qa`;
 
@@ -330,7 +343,7 @@
 
     const dropdowns = { users:null, teams:null, forms:null, analyticsTeams:null };
 
-    // Chart colours resolved from CSS vars
+    // Chart colours resolved from CSS vars (Chart.js can't read CSS vars directly)
     const cssVar = k => getComputedStyle(document.documentElement).getPropertyValue(k).trim();
     let COLORS = { OK: '#22c55e', WARN: '#f59e0b', BAD: '#ef4444', TEXT: '#2C3E50' };
     function resolveColors() {
@@ -427,20 +440,28 @@
       document.getElementById('loadBtn').disabled=!(hasMonth && (hasUsers || hasTeams || hasForms));
     }
 
-    // ===== Minimal reauth handler (no debug UI) =====
+    // ===== Robust OAuth handling =====
     function forceReauth(reason){
       sessionStorage.removeItem('purecloud_token');
       sessionStorage.removeItem('purecloud_token_exp');
       state.accessToken = null;
       document.getElementById('appContent').style.display='none';
       document.getElementById('authCard').style.display='block';
-      const msgEl = document.getElementById('auth-message');
-      msgEl.className = 'error-message';
-      msgEl.textContent = reason || 'Session expired. Please sign in again.';
-      const btn = document.getElementById('signinBtn');
-      btn.style.display = 'inline-block';
-      btn.onclick = () => window.location.href = oauthUrl;
+      const dbg = document.getElementById('authDebug');
+      const dump = document.getElementById('authDump');
+      dbg.style.display = 'block';
+      dump.textContent = (reason||'Sign-in required') + `\n\nRedirect URI: ${redirectUri}`;
+      document.getElementById('auth-message').textContent='Please sign in.';
     }
+
+    document.getElementById('signOutBtn').onclick = () => {
+      forceReauth('Signed out.');
+      document.getElementById('auth-message').textContent='Signed out. Click "Sign in with Genesys".';
+    };
+    document.getElementById('openDebugBtn').onclick = () => {
+      const dbg = document.getElementById('authDebug');
+      dbg.style.display = dbg.style.display === 'none' ? 'block' : 'none';
+    };
 
     // ===== Boot (handles errors + expiry, avoids redirect loops) =====
     document.addEventListener('DOMContentLoaded', () => {
@@ -449,16 +470,24 @@
       const rawHash = (window.location.hash || '').replace(/^#/, '');
       const params = new URLSearchParams(rawHash);
 
-      // OAuth error -> show retry button
+      // 1) OAuth error (prevents infinite redirect)
       const oauthError = params.get('error');
       if (oauthError) {
         const desc = decodeURIComponent(params.get('error_description') || '');
         history.replaceState(null, document.title, window.location.pathname + window.location.search);
-        forceReauth(`Sign-in failed. ${desc || ''}`.trim());
+        sessionStorage.removeItem('purecloud_token');
+        sessionStorage.removeItem('purecloud_token_exp');
+
+        const dbg = document.getElementById('authDebug');
+        const dump = document.getElementById('authDump');
+        dbg.style.display = 'block';
+        dump.textContent = `OAuth error: ${oauthError}\n${desc}`;
+        document.getElementById('auth-message').textContent = 'Sign-in failed. See Auth debug below.';
+        document.getElementById('signinBtn').onclick = () => window.location.href = oauthUrl;
         return;
       }
 
-      // Token in hash
+      // 2) Token in hash
       const tokenFromHash = params.get('access_token');
       if (tokenFromHash) {
         const expiresIn = parseInt(params.get('expires_in') || '0', 10);
@@ -470,7 +499,7 @@
         return;
       }
 
-      // Token from session (if not expired)
+      // 3) Token from session (if not expired)
       const tokenFromSession = sessionStorage.getItem('purecloud_token');
       const exp = parseInt(sessionStorage.getItem('purecloud_token_exp') || '0', 10);
       if (tokenFromSession && (!exp || Date.now() < exp)) {
@@ -478,17 +507,23 @@
         return;
       }
 
-      // No token: auto-redirect to OAuth
-      document.getElementById('auth-message').textContent = 'Redirecting to Genesys Cloud for authentication...';
-      setTimeout(() => { window.location.href = oauthUrl; }, 400);
+      // 4) No token yet
+      if (DEBUG) {
+        document.getElementById('authDebug').style.display = 'block';
+        document.getElementById('authDump').textContent = 'No token. Click Sign in.';
+        document.getElementById('signinBtn').onclick = () => window.location.href = oauthUrl;
+        document.getElementById('auth-message').textContent = 'Debug mode: click Sign in with Genesys';
+      } else {
+        document.getElementById('auth-message').textContent = 'Redirecting to Genesys Cloud for authentication...';
+        setTimeout(() => { window.location.href = oauthUrl; }, 400);
+      }
     });
 
     function startApp(token){
       state.accessToken=token;
-      const am = document.getElementById('auth-message');
-      am.textContent='Authenticated successfully!';
-      am.className='success-message';
-      setTimeout(()=>{ document.getElementById('authCard').style.display='none'; }, 800);
+      document.getElementById('auth-message').textContent='Authenticated successfully!';
+      document.getElementById('auth-message').className='success-message';
+      setTimeout(()=>{ document.getElementById('authCard').style.display='none'; document.getElementById('authDebug').style.display='none'; }, 800);
       document.getElementById('appContent').style.display='block';
 
       dropdowns.users=createCheckboxDropdown('userDropdown',{placeholder:'Select agents (optional)',searchPlaceholder:'Search agents...'});
@@ -887,7 +922,7 @@
         try{ data = await fetchJsonWithRetry(url,{method:'GET'}); }
         catch(err){
           if(versionId && versionId!=='__published__'){
-            data = await fetchJsonWithRetry(`https://api.${config.REGION}/api/v2/quality/forms/evaluations/${formId]}`,{method:'GET'});
+            data = await fetchJsonWithRetry(`https://api.${config.REGION}/api/v2/quality/forms/evaluations/${formId}`,{method:'GET'});
           }else{ throw err; }
         }
         state.formDetailsCache.set(key,data);

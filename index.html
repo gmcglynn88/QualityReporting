@@ -194,7 +194,7 @@
       <div id="analyticsTab" class="tab-content">
         <h2 class="section-title">Analytics</h2>
 
-        <!-- UPDATED: Improved Analytics Layout -->
+        <!-- FIXED: Analytics controls -->
         <div class="controls" style="margin-top:8px">
           <div>
             <label for="anaFrom">From (Month)</label>
@@ -209,14 +209,9 @@
           <div>
             <label for="analyticsTeamDropdown">Filter by Work Team (local)</label>
             <div id="analyticsTeamDropdown" class="checkbox-dropdown"></div>
-            <div class="muted" style="margin-top: 4px;">
-              <input type="checkbox" id="selectedOnly" checked>
-              <label for="selectedOnly" style="display: inline; font-weight: normal;">ⓒ selected only</label>
-            </div>
           </div>
         </div>
 
-        <!-- UPDATED: Targets in a row -->
         <div class="controls" style="margin-top:8px">
           <div>
             <label for="passTarget">Pass target (%)</label>
@@ -241,7 +236,7 @@
 
         <div id="analyticsKPIs" class="kpis"></div>
 
-        <!-- NEW: Stacked Bar Chart for Daily Trend -->
+        <!-- FIXED: Stacked Bar Chart with better styling -->
         <div class="card" style="padding:16px;margin-top:10px">
           <h3 class="section-title" style="margin:0 0 8px">Daily Trend</h3>
           <div class="stacked-bar-container">
@@ -254,7 +249,7 @@
           </div>
         </div>
 
-        <!-- Rest of your existing analytics content -->
+        <!-- Rest of analytics content -->
         <div class="card" style="padding:16px;margin-top:10px">
           <h3 class="section-title" style="margin:0 0 8px">Scores by Media Type per Agent</h3>
           <div id="agentMediaChart"></div>
@@ -463,7 +458,7 @@
       dropdowns.users=createCheckboxDropdown('userDropdown',{placeholder:'Select agents (optional)',searchPlaceholder:'Search agents...'});
       dropdowns.teams=createCheckboxDropdown('teamDropdown',{placeholder:'Select work teams (optional)',searchPlaceholder:'Search teams...'});
       dropdowns.forms=createCheckboxDropdown('formDropdown',{placeholder:'Select forms (optional)',searchPlaceholder:'Search forms...'});
-      // NEW: Analytics team filter
+      // Analytics team filter
       dropdowns.analyticsTeams=createCheckboxDropdown('analyticsTeamDropdown',{placeholder:'Filter teams (optional)',searchPlaceholder:'Search teams...'});
 
       document.getElementById('overviewTabButton').onclick=()=>setTab('overview');
@@ -474,7 +469,7 @@
 
       document.getElementById('loadAnalyticsBtn').onclick=loadAnalyticsRange;
       document.getElementById('insightsSort').onchange=renderAgentInsights;
-      // NEW: Analytics filter controls
+      // Analytics filter controls
       document.getElementById('applyAnalyticsFilters').onclick=renderAnalytics;
 
       const m=new Date();
@@ -562,7 +557,7 @@
     function toUKDate(d){ const dt=new Date(d); return dt.toLocaleDateString('en-GB'); }
     function dayKeyUTC(d){ const dt=new Date(d); return new Date(Date.UTC(dt.getUTCFullYear(),dt.getUTCMonth(),dt.getUTCDate())).toISOString().split('T')[0]; }
 
-    // NEW: Analytics helper functions
+    // Analytics helper functions
     function getPassSettings(){ 
       const pass=parseFloat(document.getElementById('passTarget').value||'85'); 
       const band=parseFloat(document.getElementById('amberBand').value||'5'); 
@@ -585,7 +580,7 @@
       return 'Other'; 
     }
 
-    // NEW: Stacked bar chart initialization
+    // FIXED: Stacked bar chart initialization with better styling
     function initializeStackedBarChart() {
       const ctx = document.getElementById('dailyTrendChart').getContext('2d');
       return new Chart(ctx, {
@@ -597,16 +592,22 @@
               label: 'Passed',
               data: [65, 59, 80, 81, 56, 55, 40],
               backgroundColor: 'var(--ok)',
+              borderColor: 'var(--ok)',
+              borderWidth: 1
             },
             {
               label: 'Amber',
               data: [28, 48, 40, 19, 86, 27, 90],
               backgroundColor: 'var(--warn)',
+              borderColor: 'var(--warn)',
+              borderWidth: 1
             },
             {
               label: 'Failed',
               data: [12, 15, 10, 8, 12, 18, 5],
               backgroundColor: 'var(--bad)',
+              borderColor: 'var(--bad)',
+              borderWidth: 1
             }
           ]
         },
@@ -616,6 +617,9 @@
           scales: {
             x: {
               stacked: true,
+              grid: {
+                color: 'rgba(0,0,0,0.1)'
+              }
             },
             y: {
               stacked: true,
@@ -623,16 +627,23 @@
               title: {
                 display: true,
                 text: 'Number of Evaluations'
+              },
+              grid: {
+                color: 'rgba(0,0,0,0.1)'
               }
             }
           },
           plugins: {
             legend: {
               position: 'top',
+              labels: {
+                color: 'var(--text-color)'
+              }
             },
             title: {
               display: true,
-              text: 'Daily Performance Trend'
+              text: 'Daily Performance Trend',
+              color: 'var(--text-color)'
             }
           }
         }
@@ -641,7 +652,7 @@
 
     let dailyTrendChart = null;
 
-    // NEW: Table sorter
+    // Table sorter
     function tableSorter(tableId){ 
       const t=document.getElementById(tableId); 
       if(!t||!t.tHead) return; 
@@ -726,7 +737,7 @@
       return Array.from(set);
     }
 
-    // NEW: Helper for analytics team filtering
+    // Helper for analytics team filtering
     async function agentsForTeams(teamIds){ 
       await ensureTeamMembersLoaded(teamIds); 
       const ids=new Set(); 
@@ -1019,7 +1030,7 @@
         dailyTrendChart = initializeStackedBarChart();
       }
 
-      // NEW: Apply team filter for analytics
+      // Apply team filter for analytics
       const teamFilter = dropdowns.analyticsTeams.getSelectedValues();
       let allowedAgents = null;
       if(teamFilter.length){ 
@@ -1050,7 +1061,7 @@
         <div class="kpi"><div class="label">Pass Rate</div><div class="value">${passRate==null?'-':pct(passRate*100,1)}</div></div>
       `;
 
-      // NEW: Agent media chart
+      // Agent media chart
       const {pass, band} = getPassSettings();
       const byAgent=new Map(); // agent -> media -> {count,sum,scored}
       evals.forEach(e=>{
@@ -1314,7 +1325,7 @@
 
       const fatalMap=new Map();  const critMap=new Map();
       function add(map, formName, qText, agentName){
-        const key=formName+'|'+qText';
+        const key=formName+'|'+qText;
         if(!map.has(key)) map.set(key,{formName,qText,count:0,agents:new Map()});
         const o=map.get(key); o.count++; o.agents.set(agentName,(o.agents.get(agentName)||0)+1);
       }

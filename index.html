@@ -178,7 +178,9 @@
       monthEnd: null,
       // caches keyed by "formId@version" or "pub@publishedFormId"
       formDetailsCache: new Map(),
-      formLookupCache: new Map()
+      formLookupCache: new Map(),
+      // merged lookup per evaluation-form combo
+      combinedLookupCache: new Map()
     };
 
     const dropdowns = { users:null, forms:null };
@@ -409,7 +411,7 @@
       return all;
     }
 
-    // ===== Version/published-aware form details + robust lookups =====
+    // ===== Form fetching (design version, latest, and published) =====
     function formKey(formId, versionId){
       return (versionId === '__published__') ? `pub@${formId}` : `${formId}@${versionId || 'latest'}`;
     }
@@ -446,11 +448,11 @@
     }
 
     function buildFormLookup(form){
-      const questionText=new Map(); // any question id/contextId -> text
-      const answerText=new Map();   // any answer id/contextId   -> text
-      const questionObj=new Map();  // any question id/contextId -> full question
+      const questionText=new Map(); // id/contextId/questionId/questionContextId -> text
+      const answerText=new Map();   // id/contextId/answerId/answerOptionId     -> text
+      const questionObj=new Map();  // ids -> question object
 
-      function addQuestion(q){
+      function addQ(q){
         if(!q) return;
         const qTxt=q.text || q.label || q.title || '';
         [q.id,q.contextId,q.questionId,q.questionContextId].filter(Boolean).forEach(id=>{
@@ -463,28 +465,63 @@
             answerText.set(id,aTxt);
           });
         });
-        (q.multipleSelectOptionQuestions||[]).forEach(addQuestion);
+        (q.multipleSelectOptionQuestions||[]).forEach(addQ);
       }
       function walkGroups(groups){
         (groups||[]).forEach(g=>{
-          (g.questions||[]).forEach(addQuestion);
+          (g.questions||[]).forEach(addQ);
           (g.questionGroups||[]).forEach(walkGroups);
         });
       }
-      (form?.questions||[]).forEach(addQuestion);
+      (form?.questions||[]).forEach(addQ);
       walkGroups(form?.questionGroups);
-      return {questionText,answerText,questionObj};
+      return {questionText, answerText, questionObj};
     }
 
-    function ensureLookup(formId,versionId){
-      const key=formKey(formId,versionId);
-      if(!state.formLookupCache.has(key)){
-        const d=state.formDetailsCache.get(key)||{};
-        state.formLookupCache.set(key,buildFormLookup(d));
-      }
-      return state.formLookupCache.get(key);
+    // Build a *merged* lookup for the exact evaluation (published + any design form/version)
+    async function getCombinedLookupForEval(e){
+      const pubId = safeGet(e,'evaluationForm.id');
+      const formId = safeGet(e,'form.id') || e.formId;
+      const formVersionId = safeGet(e,'form.versionId') || e.formVersionId || safeGet(e,'form.version');
+
+      const comboKey = [
+        pubId ? `pub:${pubId}` : '',
+        formId ? `form:${formId}` : '',
+        formVersionId ? `ver:${formVersionId}` : ''
+      ].filter(Boolean).join('|') || 'none';
+
+      if(state.combinedLookupCache.has(comboKey)) return state.combinedLookupCache.get(comboKey);
+
+      // Fetch what we can
+      const detailPromises = [];
+      if(pubId) detailPromises.push(getFormDetails(pubId,'__published__'));
+      if(formId && formVersionId) detailPromises.push(getFormDetails(formId,formVersionId));
+      if(formId && !formVersionId) detailPromises.push(getFormDetails(formId,null));
+      const details = (await Promise.all(detailPromises)).filter(Boolean);
+
+      // Merge the lookups
+      const merged = { questionText:new Map(), answerText:new Map(), questionObj:new Map() };
+      const names = [];
+
+      details.forEach(d=>{
+        if(d?.name) names.push(d.name);
+        const lk = buildFormLookup(d||{});
+        lk.questionText.forEach((v,k)=>merged.questionText.set(k,v));
+        lk.answerText.forEach((v,k)=>merged.answerText.set(k,v));
+        lk.questionObj.forEach((v,k)=>merged.questionObj.set(k,v));
+      });
+
+      const formName =
+        safeGet(e,'evaluationForm.name') ||
+        safeGet(e,'form.name') ||
+        names[0] || '(Form)';
+
+      const combined = { ...merged, formName };
+      state.combinedLookupCache.set(comboKey, combined);
+      return combined;
     }
 
+    // ===== Resolution helpers =====
     function approx(a,b){ return Math.abs(Number(a)-Number(b)) < 1e-6; }
 
     function collectAnswerIds(qScore){
@@ -500,23 +537,21 @@
       return Array.from(ids);
     }
 
-    function resolveQuestionText(formId,versionId,qScore){
-      const lookup=ensureLookup(formId,versionId);
+    function resolveQuestionTextWithLookup(lookup,qScore){
       const candidates=[qScore.questionId,qScore.questionContextId,safeGet(qScore,'question.id'),safeGet(qScore,'question.contextId')].filter(Boolean);
       for(const id of candidates){ const t=lookup.questionText.get(id); if(t) return t; }
       return safeGet(qScore,'question.text') || `Question ${candidates[0]||''}`.trim();
     }
 
-    function resolveAnswerText(formId,versionId,qScore){
-      const lookup=ensureLookup(formId,versionId);
-      // 1) direct id/contextId mapping
+    function resolveAnswerTextWithLookup(lookup,qScore){
+      // 1) by id/contextId
       const ids=collectAnswerIds(qScore);
       if(ids.length){
         const texts=[];
         ids.forEach(id=>{ const t=lookup.answerText.get(id); if(t) texts.push(t); });
         if(texts.length) return texts.join(', ');
       }
-      // 2) value→option match as fallback
+      // 2) by score → option.value
       const qIds=[qScore.questionId,qScore.questionContextId,safeGet(qScore,'question.id'),safeGet(qScore,'question.contextId')].filter(Boolean);
       const q = qIds.map(id=>lookup.questionObj.get(id)).find(Boolean);
       if(q && Array.isArray(q.answerOptions) && q.answerOptions.length){
@@ -524,6 +559,7 @@
         const match = q.answerOptions.find(o => approx(s,o.value) || approx(s/100,o.value) || approx(s,o.value*100));
         if(match){ return match.text ?? String(match.value ?? ''); }
       }
+      // 3) other fields
       if(qScore.freeTextAnswer) return String(qScore.freeTextAnswer);
       if(qScore.numericAnswer!==undefined && qScore.numericAnswer!==null) return String(qScore.numericAnswer);
       if(safeGet(qScore,'answer.text')) return qScore.answer.text;
@@ -593,48 +629,19 @@
       if(!state.evals.length){ c.innerHTML='<div class="muted">No evaluations loaded.</div>'; return; }
       c.innerHTML='<div class="info-message">Loading evaluation details...</div>';
 
-      // Prefetch form details (published/version-aware)
-      const needed=new Set();
-      state.evals.forEach(e=>{
-        const pubId = safeGet(e,'evaluationForm.id');
-        const fid   = pubId || safeGet(e,'form.id') || e.formId;
-        const ver   = pubId ? '__published__' : (safeGet(e,'form.versionId') || e.formVersionId || safeGet(e,'form.version'));
-        needed.add(formKey(fid,ver));
-      });
-      await Promise.all(Array.from(needed).map(async key=>{
-        const [prefix,rest] = key.startsWith('pub@') ? ['pub', key.slice(4)] : ['norm', key];
-        if(prefix==='pub'){ if(!state.formDetailsCache.has(key)) await getFormDetails(rest,'__published__'); }
-        else{
-          const [fid,verStr]=rest.split('@'); const ver = verStr==='latest'?null:verStr;
-          if(!state.formDetailsCache.has(key)) await getFormDetails(fid,ver);
-        }
-      }));
-
-      const rows = await Promise.all(state.evals.map(async e=>{
-        const pubId = safeGet(e,'evaluationForm.id');
-        const formId = pubId || safeGet(e,'form.id') || e.formId;
-        const formVersionId = pubId ? '__published__' : (safeGet(e,'form.versionId') || e.formVersionId || safeGet(e,'form.version'));
-        await getFormDetails(formId, formVersionId);
-        const key=formKey(formId,formVersionId);
-        const details=state.formDetailsCache.get(key);
-
-        const formName =
-          safeGet(e,'evaluationForm.name') ||
-          safeGet(e,'form.name') ||
-          resolveForm(formId)?.name ||
-          (details?.name || '(Form)');
-
+      const blocks = await Promise.all(state.evals.map(async e=>{
+        const lookup = await getCombinedLookupForEval(e);
         const agent=resolveUserName(safeGet(e,'agent.id')||e.agentUserId);
         const when=toUKDate(e.releaseDate || e.assignedDate || e.creationDate || e.evaluationDate || e.date || Date.now());
         const convo=e.conversationId || e.conversation?.id || '(n/a)';
         const score=getEvalPercent(e);
-        const questionGroups = safeGet(e,'answers.questionGroupScores') || [];
+        const qGroups = safeGet(e,'answers.questionGroupScores') || [];
 
         let qRows='';
-        questionGroups.forEach(g=>{
+        qGroups.forEach(g=>{
           (g.questionScores||[]).forEach(qScore=>{
-            const qText=resolveQuestionText(formId,formVersionId,qScore);
-            const aText=resolveAnswerText(formId,formVersionId,qScore);
+            const qText=resolveQuestionTextWithLookup(lookup,qScore);
+            const aText=resolveAnswerTextWithLookup(lookup,qScore);
             const ansScore=qScore.score ?? null;
             const isFat=!!qScore.failedKillQuestion;
             const isCrit=!!qScore.failedCriticalQuestion;
@@ -656,7 +663,7 @@
 
         return `
           <details class="evaluation">
-            <summary>${when} • <strong>${agent}</strong> — ${formName} &nbsp;&middot;&nbsp; Score: <strong>${score==null?'-':pct(score,1)}</strong> ${convo!=='(n/a)'?`&nbsp;&middot;&nbsp; Conversation: ${convo}`:''}</summary>
+            <summary>${when} • <strong>${agent}</strong> — ${lookup.formName} &nbsp;&middot;&nbsp; Score: <strong>${score==null?'-':pct(score,1)}</strong> ${convo!=='(n/a)'?`&nbsp;&middot;&nbsp; Conversation: ${convo}`:''}</summary>
             <div class="table-container">
               <table>
                 <thead><tr><th>Question</th><th>Answer</th><th>Score</th><th>Flags</th><th>Comments</th></tr></thead>
@@ -667,39 +674,45 @@
         `;
       }));
 
-      c.innerHTML = rows.join('');
+      c.innerHTML = blocks.join('');
     }
 
-    function renderCritical(){
-      const counts=new Map();
-      state.evals.forEach(e=>{
-        const pubId = safeGet(e,'evaluationForm.id');
-        const formId = pubId || safeGet(e,'form.id') || e.formId;
-        const formVersionId = pubId ? '__published__' : (safeGet(e,'form.versionId') || e.formVersionId || safeGet(e,'form.version'));
-
-        const formName = safeGet(e,'evaluationForm.name') || safeGet(e,'form.name') || resolveForm(formId)?.name || '(Form)';
+    async function renderCritical(){
+      const rows = await Promise.all(state.evals.map(async e=>{
+        const lookup = await getCombinedLookupForEval(e);
+        const out=[];
         const qGroups=safeGet(e,'answers.questionGroupScores')||[];
         qGroups.forEach(g=>{
           (g.questionScores||[]).forEach(qScore=>{
-            const qText=resolveQuestionText(formId,formVersionId,qScore)||'(Question)';
-            const key=`${formKey(formId,formVersionId)}|${qText}`;
-            if(!counts.has(key)) counts.set(key,{formName,qText,critical:0,fatal:0});
-            const o=counts.get(key);
-            if(qScore.failedKillQuestion) o.fatal++;
-            else if(qScore.failedCriticalQuestion) o.critical++;
+            if(qScore.failedKillQuestion || qScore.failedCriticalQuestion){
+              out.push({
+                formName: lookup.formName,
+                qText: resolveQuestionTextWithLookup(lookup,qScore),
+                fatal: qScore.failedKillQuestion?1:0,
+                critical: qScore.failedCriticalQuestion?1:0
+              });
+            }
           });
         });
+        return out;
+      }));
+
+      const flat=rows.flat();
+      const map=new Map();
+      flat.forEach(r=>{
+        const key=r.formName+'|'+r.qText;
+        if(!map.has(key)) map.set(key,{formName:r.formName,qText:r.qText,critical:0,fatal:0});
+        const o=map.get(key); o.critical+=r.critical; o.fatal+=r.fatal;
       });
 
-      const rows=Array.from(counts.values())
-        .filter(r=>r.fatal>0||r.critical>0)
+      const body = Array.from(map.values())
         .sort((a,b)=>(b.fatal+b.critical)-(a.fatal+a.critical))
         .map(r=>`<tr><td>${r.formName}</td><td>${r.qText}</td><td>${r.critical}</td><td>${r.fatal}</td><td>${r.critical+r.fatal}</td></tr>`)
         .join('');
 
       document.getElementById('criticalTable').innerHTML=`
         <thead><tr><th>Form</th><th>Question</th><th>Critical</th><th>Fatal/Kill</th><th>Total</th></tr></thead>
-        <tbody>${rows || `<tr><td colspan="5" class="muted">No critical/fatal marks found for the selected period.</td></tr>`}</tbody>`;
+        <tbody>${body || `<tr><td colspan="5" class="muted">No critical/fatal marks found for the selected period.</td></tr>`}</tbody>`;
     }
   </script>
 </body>

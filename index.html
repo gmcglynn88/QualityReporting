@@ -117,11 +117,6 @@
       height: 400px;
       margin: 20px 0;
     }
-
-    /* FIXED: Chart.js bar colors */
-    #dailyTrendChart {
-      /* This ensures our CSS variables are used by Chart.js */
-    }
   </style>
   <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
 </head>
@@ -585,7 +580,7 @@
       return 'Other'; 
     }
 
-    // FIXED: Stacked bar chart initialization with better styling
+    // FIXED: Stacked bar chart initialization with proper syntax
     function initializeStackedBarChart() {
       const ctx = document.getElementById('dailyTrendChart').getContext('2d');
       return new Chart(ctx, {
@@ -596,22 +591,22 @@
             {
               label: 'Passed',
               data: [65, 59, 80, 81, 56, 55, 40],
-              backgroundColor: 'var(--ok)',
-              borderColor: 'var(--ok)',
+              backgroundColor: '#22c55e',
+              borderColor: '#22c55e',
               borderWidth: 1
             },
             {
               label: 'Amber',
               data: [28, 48, 40, 19, 86, 27, 90],
-              backgroundColor: 'var(--warn)',
-              borderColor: 'var(--warn)',
+              backgroundColor: '#f59e0b',
+              borderColor: '#f59e0b',
               borderWidth: 1
             },
             {
               label: 'Failed',
               data: [12, 15, 10, 8, 12, 18, 5],
-              backgroundColor: 'var(--bad)',
-              borderColor: 'var(--bad)',
+              backgroundColor: '#ef4444',
+              borderColor: '#ef4444',
               borderWidth: 1
             }
           ]
@@ -642,13 +637,13 @@
             legend: {
               position: 'top',
               labels: {
-                color: 'var(--text-color)'
+                color: '#2C3E50'
               }
             },
             title: {
               display: true,
               text: 'Daily Performance Trend',
-              color: 'var(--text-color)'
+              color: '#2C3E50'
             }
           }
         }

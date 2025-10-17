@@ -111,57 +111,6 @@
     .sortable th{cursor:pointer}
     .sortable th .sort-ind{margin-left:6px;opacity:.8;font-weight:700}
 
-    /* NEW: Analytics layout improvements */
-    .analytics-filters-grid {
-      display: grid;
-      grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
-      gap: 16px;
-      margin: 16px 0;
-    }
-    .analytics-targets {
-      display: flex;
-      gap: 16px;
-      margin: 16px 0;
-    }
-    .target-box {
-      flex: 1;
-      background: var(--card-bg);
-      border: 1px solid var(--border-color);
-      border-radius: 8px;
-      padding: 16px;
-    }
-    .target-box h3 {
-      margin: 0 0 8px 0;
-      font-size: 14px;
-      color: var(--text-color);
-      font-weight: 600;
-    }
-    .target-value {
-      font-size: 24px;
-      font-weight: 700;
-      color: var(--primary-color);
-    }
-    .amber-band {
-      color: var(--warn);
-    }
-    .analytics-actions {
-      display: flex;
-      gap: 12px;
-      margin: 16px 0;
-    }
-    .chart-container {
-      background: var(--card-bg);
-      border: 1px solid var(--border-color);
-      border-radius: 8px;
-      padding: 20px;
-      margin: 16px 0;
-    }
-    .chart-title {
-      margin: 0 0 16px 0;
-      color: var(--secondary-color);
-      font-size: 18px;
-    }
-
     /* Stacked bar chart styling */
     .stacked-bar-container {
       position: relative;
@@ -245,8 +194,8 @@
       <div id="analyticsTab" class="tab-content">
         <h2 class="section-title">Analytics</h2>
 
-        <!-- Improved Analytics Layout -->
-        <div class="analytics-filters-grid">
+        <!-- UPDATED: Improved Analytics Layout -->
+        <div class="controls" style="margin-top:8px">
           <div>
             <label for="anaFrom">From (Month)</label>
             <input id="anaFrom" type="month">
@@ -267,30 +216,34 @@
           </div>
         </div>
 
-        <div class="analytics-targets">
-          <div class="target-box">
-            <h3>Pass target (%)</h3>
-            <div class="target-value">85</div>
+        <!-- UPDATED: Targets in a row -->
+        <div class="controls" style="margin-top:8px">
+          <div>
+            <label for="passTarget">Pass target (%)</label>
+            <input id="passTarget" type="number" min="0" max="100" value="85">
           </div>
-          <div class="target-box">
-            <h3>Amber band (±%)</h3>
-            <div class="target-value amber-band">5</div>
+          <div>
+            <label for="amberBand">Amber band (±%)</label>
+            <input id="amberBand" type="number" min="0" max="20" value="5">
           </div>
-        </div>
-
-        <div class="analytics-actions">
-          <button id="loadAnalyticsBtn" class="full-width-btn">
-            <span class="loading-spinner" style="display:none"></span>
-            <span class="btn-text">Load Range</span>
-          </button>
-          <button id="applyAnalyticsFilters" class="full-width-btn">Apply Filters</button>
+          <div>
+            <label>&nbsp;</label>
+            <button id="loadAnalyticsBtn" class="full-width-btn">
+              <span class="loading-spinner" style="display:none"></span>
+              <span class="btn-text">Load Range</span>
+            </button>
+          </div>
+          <div>
+            <label>&nbsp;</label>
+            <button id="applyAnalyticsFilters" class="full-width-btn">Apply Filters</button>
+          </div>
         </div>
 
         <div id="analyticsKPIs" class="kpis"></div>
 
-        <!-- Stacked Bar Chart for Daily Trend -->
-        <div class="chart-container">
-          <h3 class="chart-title">Daily Trend</h3>
+        <!-- NEW: Stacked Bar Chart for Daily Trend -->
+        <div class="card" style="padding:16px;margin-top:10px">
+          <h3 class="section-title" style="margin:0 0 8px">Daily Trend</h3>
           <div class="stacked-bar-container">
             <canvas id="dailyTrendChart"></canvas>
           </div>
@@ -301,7 +254,7 @@
           </div>
         </div>
 
-        <!-- Existing Analytics Content -->
+        <!-- Rest of your existing analytics content -->
         <div class="card" style="padding:16px;margin-top:10px">
           <h3 class="section-title" style="margin:0 0 8px">Scores by Media Type per Agent</h3>
           <div id="agentMediaChart"></div>
@@ -1361,7 +1314,7 @@
 
       const fatalMap=new Map();  const critMap=new Map();
       function add(map, formName, qText, agentName){
-        const key=formName+'|'+qText;
+        const key=formName+'|'+qText';
         if(!map.has(key)) map.set(key,{formName,qText,count:0,agents:new Map()});
         const o=map.get(key); o.count++; o.agents.set(agentName,(o.agents.get(agentName)||0)+1);
       }

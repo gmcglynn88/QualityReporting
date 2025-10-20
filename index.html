@@ -48,6 +48,16 @@
     .kpi .label{color:var(--text-light);font-size:12px}
     .kpi .value{font-size:20px;font-weight:700;margin-top:4px}
 
+    /* Critical/Fatal summary boxes */
+    .critical-summary-kpis{display:grid;grid-template-columns:repeat(auto-fit,minmax(200px,1fr));gap:16px;margin-bottom:20px}
+    .critical-kpi{background:#fff;border:2px solid var(--border-color);border-radius:12px;padding:20px;text-align:center}
+    .critical-kpi.critical{border-color:#f59e0b}
+    .critical-kpi.fatal{border-color:#ef4444}
+    .critical-kpi .number{font-size:32px;font-weight:800;line-height:1}
+    .critical-kpi.critical .number{color:#f59e0b}
+    .critical-kpi.fatal .number{color:#ef4444}
+    .critical-kpi .label{color:var(--text-light);margin-top:8px;font-size:14px;font-weight:600}
+
     /* Checkbox dropdown */
     .checkbox-dropdown{position:relative;min-width:220px;width:100%}
     .cd-trigger{display:flex;align-items:center;justify-content:space-between;border:1px solid var(--border-color);border-radius:6px;background:#fff;padding:10px;cursor:pointer;width:100%;box-sizing:border-box}
@@ -129,8 +139,8 @@
   <h1>QA Evaluations – Monthly View</h1>
 
   <div class="header-actions">
-    <button id="signOutBtn" class="link-btn" title="Clear token and sign in again">Sign out</button>
-    <button id="openDebugBtn" class="link-btn" title="Show auth debug">Auth debug</button>
+    <button id="signOutBtn" class="link-btn">Sign out</button>
+    <button id="openDebugBtn" class="link-btn">Auth debug</button>
   </div>
 
   <div id="authCard" class="card">
@@ -150,24 +160,20 @@
       <h2 class="section-title">Configuration</h2>
       <div class="controls">
         <div>
-          <label for="userDropdown">Agents (Optional)</label>
+          <label for="userDropdown">Agents</label>
           <div id="userDropdown" class="checkbox-dropdown"></div>
-          <div class="muted">Select agents to filter by, or leave empty for all</div>
         </div>
         <div>
-          <label for="teamDropdown">Work Teams (Optional)</label>
+          <label for="teamDropdown">Work Teams</label>
           <div id="teamDropdown" class="checkbox-dropdown"></div>
-          <div class="muted">Select teams to filter by, or leave empty for all</div>
         </div>
         <div>
-          <label for="formDropdown">Evaluation Forms (Optional)</label>
+          <label for="formDropdown">Evaluation Forms</label>
           <div id="formDropdown" class="checkbox-dropdown"></div>
-          <div class="muted">Select forms to filter by, or leave empty for all</div>
         </div>
         <div>
           <label for="monthInput">Month</label>
           <input id="monthInput" type="month">
-          <div class="muted">Evaluations within the selected month</div>
         </div>
         <div>
           <label>&nbsp;</label>
@@ -204,15 +210,13 @@
           <div>
             <label for="anaFrom">From (Month)</label>
             <input id="anaFrom" type="month">
-            <div class="muted">Start of range (inclusive)</div>
           </div>
           <div>
             <label for="anaTo">To (Month)</label>
             <input id="anaTo" type="month">
-            <div class="muted">End of range (inclusive)</div>
           </div>
           <div>
-            <label for="analyticsTeamDropdown">Filter by Work Team (local)</label>
+            <label for="analyticsTeamDropdown">Filter by Work Team</label>
             <div id="analyticsTeamDropdown" class="checkbox-dropdown"></div>
           </div>
         </div>
@@ -308,6 +312,7 @@
 
       <div id="criticalTab" class="tab-content">
         <h2 class="section-title">Critical / Kill Question Counts</h2>
+        <div id="criticalSummaryKPIs" class="critical-summary-kpis"></div>
         <div class="table-container">
           <table id="criticalTable"></table>
         </div>
@@ -656,17 +661,24 @@
       return 'Other';
     }
 
-    // Stacked bar chart init
-    function initializeStackedBarChart() {
+    // Stacked bar chart init - now uses actual data
+    function initializeStackedBarChart(dailyData) {
       const ctx = document.getElementById('dailyTrendChart').getContext('2d');
+      
+      // Prepare data from actual evaluations
+      const labels = dailyData.map(d => d.date);
+      const passedData = dailyData.map(d => d.passed);
+      const amberData = dailyData.map(d => d.amber);
+      const failedData = dailyData.map(d => d.failed);
+      
       return new Chart(ctx, {
         type: 'bar',
         data: {
-          labels: ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'],
+          labels: labels,
           datasets: [
-            { label: 'Passed', data: [65,59,80,81,56,55,40], backgroundColor: COLORS.OK,   borderColor: COLORS.OK,   borderWidth: 1 },
-            { label: 'Amber',  data: [28,48,40,19,86,27,90], backgroundColor: COLORS.WARN, borderColor: COLORS.WARN, borderWidth: 1 },
-            { label: 'Failed', data: [12,15,10, 8,12,18, 5], backgroundColor: COLORS.BAD,  borderColor: COLORS.BAD,  borderWidth: 1 }
+            { label: 'Passed', data: passedData, backgroundColor: COLORS.OK,   borderColor: COLORS.OK,   borderWidth: 1 },
+            { label: 'Amber',  data: amberData, backgroundColor: COLORS.WARN, borderColor: COLORS.WARN, borderWidth: 1 },
+            { label: 'Failed', data: failedData, backgroundColor: COLORS.BAD,  borderColor: COLORS.BAD,  borderWidth: 1 }
           ]
         },
         options: {
@@ -1027,6 +1039,40 @@
     function guessMediaType(e){ return standardiseMedia(safeGet(e,'mediaType') || safeGet(e,'conversation.mediaType') || 'Unknown'); }
     function buildDays(start,end){ const out=[]; for(let d=new Date(start); d<=end; d.setUTCDate(d.getUTCDate()+1)){ out.push(new Date(d)); } return out; }
 
+    // New function to calculate daily trend data from actual evaluations
+    function calculateDailyTrendData(evals, start, end) {
+      const {pass, band} = getPassSettings();
+      const dailyMap = new Map();
+      
+      // Initialize all days in range
+      const days = buildDays(start, end);
+      days.forEach(day => {
+        const dayKey = dayKeyUTC(day);
+        dailyMap.set(dayKey, { date: toUKDate(day), passed: 0, amber: 0, failed: 0 });
+      });
+      
+      // Count evaluations by day and status
+      evals.forEach(e => {
+        const dayKey = dayKeyUTC(e.releaseDate || e.assignedDate || e.creationDate || e.evaluationDate || e.date || Date.now());
+        if (dailyMap.has(dayKey)) {
+          const score = getEvalPercent(e);
+          const dayData = dailyMap.get(dayKey);
+          
+          if (score === null || !isFinite(score)) {
+            dayData.failed++;
+          } else if (score >= pass) {
+            dayData.passed++;
+          } else if (score >= pass - band) {
+            dayData.amber++;
+          } else {
+            dayData.failed++;
+          }
+        }
+      });
+      
+      return Array.from(dailyMap.values());
+    }
+
     async function renderAnalytics(){
       const raw = getAnalyticsSet();
       if(!raw || !raw.length){
@@ -1041,13 +1087,22 @@
         return;
       }
 
-      if (!dailyTrendChart) dailyTrendChart = initializeStackedBarChart();
-
       // Apply team filter for analytics
       const teamFilter = dropdowns.analyticsTeams.getSelectedValues();
       let allowedAgents = null;
       if(teamFilter.length){ allowedAgents = new Set(await agentsForTeams(teamFilter)); }
       const evals = allowedAgents ? raw.filter(e => allowedAgents.has(safeGet(e,'agent.id')||e.agentUserId)) : raw;
+
+      // Calculate daily trend data from actual evaluations
+      const start = state.analyticsRange?.start || state.monthStart;
+      const end   = state.analyticsRange?.end   || state.monthEnd;
+      const dailyTrendData = calculateDailyTrendData(evals, start, end);
+      
+      // Update or create the chart with actual data
+      if (dailyTrendChart) {
+        dailyTrendChart.destroy();
+      }
+      dailyTrendChart = initializeStackedBarChart(dailyTrendData);
 
       let withFatal=0, withCritical=0, total=evals.length;
       let sumScores=0, scored=0;
@@ -1184,22 +1239,19 @@
       window._insightData = insightArr;
       renderAgentInsights();
 
-      const start = state.analyticsRange?.start || state.monthStart;
-      const end   = state.analyticsRange?.end   || state.monthEnd;
-      const days = buildDays(start,end);
-      const dayKeys = days.map(d=> d.toISOString().split('T')[0]);
+      const dayKeys = dailyTrendData.map(d => d.date);
       const agents = Array.from(new Set(evals.map(e=> safeGet(e,'agent.id') || e.agentUserId))).filter(Boolean);
       const map = new Map();
       evals.forEach(e=>{
         const aid = safeGet(e,'agent.id') || e.agentUserId || '(unknown)';
-        const dk = dayKeyUTC(e.releaseDate || e.assignedDate || e.creationDate || e.evaluationDate || e.date || Date.now());
+        const dk = toUKDate(e.releaseDate || e.assignedDate || e.creationDate || e.evaluationDate || e.date || Date.now());
         const p = getEvalPercent(e);
         if(!map.has(aid)) map.set(aid, new Map());
         const dm = map.get(aid);
         if(!dm.has(dk)) dm.set(dk,{sum:0,count:0});
         if (p!=null && isFinite(p)) { const o=dm.get(dk); o.sum+=Number(p); o.count++; }
       });
-      const header = `<thead><tr><th>Agent</th>${dayKeys.map(k=>`<th>${toUKDate(k)}</th>`).join('')}</tr></thead>`;
+      const header = `<thead><tr><th>Agent</th>${dayKeys.map(k=>`<th>${k}</th>`).join('')}</tr></thead>`;
       const rows = agents.map(aid=>{
         const dm = map.get(aid) || new Map();
         const cells = dayKeys.map(k=>{
@@ -1331,9 +1383,17 @@
     // ===== Critical =====
     async function renderCritical(){
       const tbl=document.getElementById('criticalTable');
-      if(!state.evals.length){ tbl.innerHTML='<tr><td class="muted">No evaluations loaded.</td></tr>'; return; }
+      if(!state.evals.length){ 
+        document.getElementById('criticalSummaryKPIs').innerHTML = '';
+        tbl.innerHTML='<tr><td class="muted">No evaluations loaded.</td></tr>'; 
+        return; 
+      }
 
-      const fatalMap=new Map();  const critMap=new Map();
+      let totalCritical = 0;
+      let totalFatal = 0;
+      const fatalMap=new Map();  
+      const critMap=new Map();
+      
       function add(map, formName, qText, agentName){
         const key=formName+'|'+qText;
         if(!map.has(key)) map.set(key,{formName,qText,count:0,agents:new Map()});
@@ -1348,11 +1408,29 @@
         qGroups.forEach(g=>{
           (g.questionScores||[]).forEach(qs=>{
             const qText = resolveQuestionTextWithLookup(lookup,qs);
-            if(qs.failedKillQuestion) add(fatalMap, formName, qText, agentName);
-            if(qs.failedCriticalQuestion && !qs.failedKillQuestion) add(critMap, formName, qText, agentName);
+            if(qs.failedKillQuestion) {
+              add(fatalMap, formName, qText, agentName);
+              totalFatal++;
+            }
+            if(qs.failedCriticalQuestion && !qs.failedKillQuestion) {
+              add(critMap, formName, qText, agentName);
+              totalCritical++;
+            }
           });
         });
       }
+
+      // Render the summary boxes
+      document.getElementById('criticalSummaryKPIs').innerHTML = `
+        <div class="critical-kpi critical">
+          <div class="number">${totalCritical}</div>
+          <div class="label">Total Critical Marks</div>
+        </div>
+        <div class="critical-kpi fatal">
+          <div class="number">${totalFatal}</div>
+          <div class="label">Total Fatal Marks</div>
+        </div>
+      `;
 
       const rows = [];
       function rowsFrom(map, type){
@@ -1378,7 +1456,8 @@
             </tr>`);
           });
       }
-      rowsFrom(fatalMap,'fatal'); rowsFrom(critMap,'critical');
+      rowsFrom(fatalMap,'fatal'); 
+      rowsFrom(critMap,'critical');
 
       tbl.innerHTML = `
         <thead><tr>

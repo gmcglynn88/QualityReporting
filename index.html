@@ -32,12 +32,12 @@
     .table-container{overflow-x:auto;border:1px solid var(--border-color);border-radius:6px;padding:1px;margin-top:10px}
 
     /* Frozen column styling for analytics table */
-    .frozen-table-container { position: relative; overflow: auto; border: 1px solid var(--border-color); border-radius: 6px; margin-top: 10px; max-height: 600px; }
-    .frozen-table { border-collapse: collapse; width: auto; min-width: 100%; }
-    .frozen-table th, .frozen-table td { padding: 10px 12px; text-align: left; border-bottom: 1px solid var(--border-color); vertical-align: top; white-space: nowrap; background: var(--card-bg); }
-    .frozen-table th { background-color: var(--primary-color); color: white; font-weight: 600; position: sticky; top: 0; z-index: 10; }
-    .frozen-table th:first-child, .frozen-table td:first-child { position: sticky; left: 0; background: var(--card-bg); z-index: 5; border-right: 2px solid var(--border-color); min-width: 200px; }
-    .frozen-table th:first-child { z-index: 15; background: var(--primary-color); }
+    .frozen-table-container { position: relative; overflow: auto; border: 1px solid var(--border-color); border-radius: 6px; margin-top: 10px; max-height: 600px; -webkit-overflow-scrolling: touch; }
+    .frozen-table { border-collapse: separate; border-spacing: 0; width: max-content; min-width: 100%; }
+    .frozen-table th, .frozen-table td { padding: 10px 12px; text-align: left; border-bottom: 1px solid var(--border-color); vertical-align: top; white-space: nowrap; background: var(--card-bg); position: relative; }
+    .frozen-table thead th { background-color: var(--primary-color); color: white; font-weight: 600; position: sticky; top: 0; z-index: 10; }
+    .frozen-table th:first-child, .frozen-table td:first-child { position: sticky; left: 0; background: var(--card-bg); background-clip: padding-box; z-index: 12; border-right: 2px solid var(--border-color); min-width: 220px; }
+    .frozen-table thead th:first-child { z-index: 20; background: var(--primary-color); }
     .frozen-table tr:hover td { background-color: rgba(99,171,143,.05); }
     .frozen-table tr:hover td:first-child { background: rgba(99,171,143,.1); }
 
@@ -614,12 +614,7 @@
     }
 
     // Improved critical/fatal detection
-    function detectCriticalFatalQuestions(qScore, questionObj) {
-        const isFatal = !!qScore.failedKillQuestion;
-        const isCritical = !!qScore.failedCriticalQuestion;
-        
-        if (isFatal || isCritical) {
-            return { isFatal, isCritical };
+    function detectCriticalFatalQuestions(qScore, questionObj) { const isFatal = !!(qScore.failedKillQuestion || qScore.isKill || qScore.isFatal); // explicit API flags const explicitCritFail = !!(qScore.failedCriticalQuestion); // Genesys flag // If the question/evaluation explicitly marked N/A, don't treat as markdown if (qScore.notApplicable) { return { isFatal, isCritical: explicitCritFail }; } // Determine whether this is a critical question in the schema or payload const criticalFlag = !!( qScore.isCritical || safeGet(qScore,'question.isCritical') || safeGet(questionObj,'criticalQuestion') || safeGet(questionObj,'isCritical') ); // Compare score vs max for markdown const maxScore = getMaxScoreForQuestion(questionObj || {}); let currentScore = Number(qScore.score); if (!isFinite(currentScore)) currentScore = 0; const markdownByScore = criticalFlag && maxScore > 0 && currentScore < maxScore; return { isFatal, isCritical: explicitCritFail || markdownByScore }; };
         }
         
         if (questionObj && questionObj.criticalQuestion) {
@@ -634,10 +629,7 @@
         return { isFatal: false, isCritical: false };
     }
 
-    function getMaxScoreForQuestion(questionObj) {
-        if (questionObj.answerOptions && questionObj.answerOptions.length > 0) {
-            return Math.max(...questionObj.answerOptions.map(opt => opt.value || 0));
-        }
+    function getMaxScoreForQuestion(questionObj) { const opts = [...(questionObj?.answerOptions || []), ...(questionObj?.options || [])]; if (opts.length > 0) { return Math.max(...opts.map(opt => Number(opt.value) || 0)); } return Number(questionObj?.maxScore) || 1; }
         return questionObj.maxScore || 1;
     }
 

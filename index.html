@@ -979,12 +979,15 @@
       function addQ(q){
         if(!q) return;
         const qTxt=q.text || q.label || q.title || '';
-        [q.id,q.contextId,q.questionId,q.questionContextId].filter(Boolean).forEach(id=>{
-          questionText.set(id,qTxt); questionObj.set(id,q);
+        // Map ALL possible IDs to the question text
+        [q.id, q.contextId, q.questionId, q.questionContextId].filter(Boolean).forEach(id=>{
+          questionText.set(id,qTxt); 
+          questionObj.set(id,q);
         });
         (q.answerOptions||[]).forEach(a=>{
           const aTxt=a.text ?? String(a.value ?? '');
-          [a.id,a.contextId,a.answerId,a.answerOptionId].filter(Boolean).forEach(id=>{
+          // Map ALL possible answer IDs to the answer text
+          [a.id, a.contextId, a.answerId, a.answerOptionId].filter(Boolean).forEach(id=>{
             answerText.set(id,aTxt);
           });
         });
@@ -999,69 +1002,110 @@
       const pubId = safeGet(e,'evaluationForm.id');
       const formId = safeGet(e,'form.id') || e.formId;
       const formVersionId = safeGet(e,'form.versionId') || e.formVersionId || safeGet(e,'form.version');
-      const comboKey=[pubId?`pub:${pubId}`:'',formId?`form:${formId}`:'',formVersionId?`ver:${formVersionId}`:''].filter(Boolean).join('|')||'none';
+      
+      // Create a more comprehensive combo key
+      const comboKey = [
+        pubId ? `pub:${pubId}` : '',
+        formId ? `form:${formId}` : '',
+        formVersionId ? `ver:${formVersionId}` : ''
+      ].filter(Boolean).join('|') || 'none';
+      
       if(state.combinedLookupCache.has(comboKey)) return state.combinedLookupCache.get(comboKey);
-      const details=(await Promise.all([
-        pubId?getFormDetails(pubId,'__published__'):null,
-        formId && formVersionId?getFormDetails(formId,formVersionId):null,
-        formId && !formVersionId?getFormDetails(formId,null):null
-      ])).filter(Boolean);
-      const merged={questionText:new Map(),answerText:new Map(),questionObj:new Map()};
-      const names=[];
-      details.forEach(d=>{
+      
+      // Try to get form details from multiple sources
+      const detailsPromises = [];
+      
+      if (pubId) {
+        detailsPromises.push(getFormDetails(pubId, '__published__'));
+      }
+      
+      if (formId && formVersionId) {
+        detailsPromises.push(getFormDetails(formId, formVersionId));
+      }
+      
+      if (formId && !formVersionId) {
+        detailsPromises.push(getFormDetails(formId, null));
+      }
+      
+      // Also try to get the form by ID directly if we have formId but no version
+      if (formId) {
+        detailsPromises.push(getFormDetails(formId, null));
+      }
+      
+      const details = (await Promise.all(detailsPromises)).filter(Boolean);
+      
+      const merged = {
+        questionText: new Map(),
+        answerText: new Map(), 
+        questionObj: new Map()
+      };
+      
+      const names = [];
+      details.forEach(d => {
         if(d?.name) names.push(d.name);
-        const lk=buildFormLookup(d||{});
-        lk.questionText.forEach((v,k)=>merged.questionText.set(k,v));
-        lk.answerText.forEach((v,k)=>merged.answerText.set(k,v));
-        lk.questionObj.forEach((v,k)=>merged.questionObj.set(k,v));
+        const lk = buildFormLookup(d || {});
+        // Merge all lookups
+        lk.questionText.forEach((v,k) => merged.questionText.set(k,v));
+        lk.answerText.forEach((v,k) => merged.answerText.set(k,v));
+        lk.questionObj.forEach((v,k) => merged.questionObj.set(k,v));
       });
+      
       const formName = safeGet(e,'evaluationForm.name') || safeGet(e,'form.name') || names[0] || '(Form)';
-      const combined={...merged, formName};
-      state.combinedLookupCache.set(comboKey,combined);
+      const combined = {...merged, formName};
+      
+      state.combinedLookupCache.set(comboKey, combined);
       return combined;
     }
 
-    // ===== Helpers for Q/A text =====
+    // ===== IMPROVED Helpers for Q/A text =====
     function approx(a,b){ return Math.abs(Number(a)-Number(b))<1e-6; }
     
     function resolveQuestionTextWithLookup(lookup, qScore) {
+      // Try all possible ID fields from the question score
       const candidates = [
         qScore.questionId, 
         qScore.questionContextId,
         safeGet(qScore, 'question.id'), 
-        safeGet(qScore, 'question.contextId')
+        safeGet(qScore, 'question.contextId'),
+        safeGet(qScore, 'question.questionId')
       ].filter(Boolean);
       
+      // Try each candidate ID in the lookup
       for (const id of candidates) {
         const t = lookup.questionText.get(id);
         if (t) return t;
       }
       
-      // Fallback to direct question text
-      const questionText = safeGet(qScore, 'question.text');
+      // Fallback: try to get text directly from question object
+      const questionText = safeGet(qScore, 'question.text') || safeGet(qScore, 'question.label');
       if (questionText) return questionText;
       
-      return `Question ${candidates[0] || ''}`.trim();
+      // Last resort: if we have any ID, show it, otherwise generic text
+      return candidates.length > 0 ? `Question (${candidates[0]})` : 'Question';
     }
 
     function resolveAnswerTextWithLookup(lookup, qScore) {
       const ids = new Set();
       
-      // Collect all possible answer IDs
+      // Collect ALL possible answer IDs from various structures
       (qScore.selectedAnswerIds || []).forEach(x => ids.add(x));
       (qScore.selectedAnswerOptionIds || []).forEach(x => ids.add(x));
+      
+      // Single answer IDs
       if (qScore.selectedAnswerId) ids.add(qScore.selectedAnswerId);
       if (qScore.answerOptionId) ids.add(qScore.answerOptionId);
       if (qScore.answerId) ids.add(qScore.answerId);
       
+      // From answer object
       const a = qScore.answer || {};
       [a.id, a.contextId, a.answerId, a.answerOptionId].filter(Boolean).forEach(x => ids.add(x));
       
+      // From answers array
       (qScore.answers || []).forEach(ans => {
         [ans.id, ans.contextId, ans.answerId, ans.answerOptionId].filter(Boolean).forEach(x => ids.add(x));
       });
 
-      // Try to find answer text from the lookup
+      // Try to find answer text from the lookup using collected IDs
       const texts = [];
       Array.from(ids).forEach(id => {
         const t = lookup.answerText.get(id);
@@ -1070,29 +1114,38 @@
       
       if (texts.length) return texts.join(', ');
 
-      // If no answer text found in lookup, try to get from question's answer options
-      const qIds = [qScore.questionId, qScore.questionContextId, 
-                   safeGet(qScore, 'question.id'), safeGet(qScore, 'question.contextId')].filter(Boolean);
+      // If no answer text found in lookup, try to get from question's answer options using score matching
+      const qIds = [
+        qScore.questionId, 
+        qScore.questionContextId,
+        safeGet(qScore, 'question.id'), 
+        safeGet(qScore, 'question.contextId')
+      ].filter(Boolean);
+      
       const q = qIds.map(id => lookup.questionObj.get(id)).find(Boolean);
       
       if (q && Array.isArray(q.answerOptions) && q.answerOptions.length) {
         const s = Number(qScore.score);
+        
+        // Try to find matching answer option by score value
         const match = q.answerOptions.find(o => 
           approx(s, o.value) || 
           approx(s / 100, o.value) || 
-          approx(s, o.value * 100)
+          approx(s, o.value * 100) ||
+          (o.value === 0 && s === 0)
         );
+        
         if (match) {
           return match.text ?? String(match.value ?? '');
         }
         
-        // If no match found but there are answer options, return the score value
+        // If no match found but we have a score, show the score
         if (qScore.score !== null && qScore.score !== undefined) {
-          return String(qScore.score);
+          return `Score: ${qScore.score}`;
         }
       }
 
-      // Fallback to various answer fields
+      // Fallback to various answer fields in the question score
       if (qScore.freeTextAnswer) return String(qScore.freeTextAnswer);
       if (qScore.numericAnswer !== undefined && qScore.numericAnswer !== null) return String(qScore.numericAnswer);
       if (safeGet(qScore, 'answer.text')) return qScore.answer.text;
@@ -1102,7 +1155,7 @@
         return `Score: ${qScore.score}`;
       }
 
-      return 'N/A';
+      return 'No answer';
     }
 
     // ===== Renderers =====

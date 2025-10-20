@@ -74,11 +74,13 @@
         z-index: 5;
         border-right: 2px solid var(--border-color);
         min-width: 200px;
+        box-shadow: 2px 0 4px rgba(0,0,0,0.1);
     }
 
     .frozen-table th:first-child {
         z-index: 15;
         background: var(--primary-color);
+        box-shadow: 2px 0 4px rgba(0,0,0,0.1);
     }
 
     .frozen-table tr:hover td {
@@ -87,6 +89,7 @@
 
     .frozen-table tr:hover td:first-child {
         background: rgba(99,171,143,.1);
+        z-index: 6;
     }
 
     .tab{display:inline-block;padding:12px 20px;margin-right:10px;background:#eee;cursor:pointer;border-radius:6px;font-weight:500}
@@ -674,7 +677,8 @@
             const maxScore = getMaxScoreForQuestion(questionObj);
             const currentScore = qScore.score || 0;
             
-            if (maxScore > 0 && currentScore === 0) {
+            // Critical question markdown: maximum score was not given
+            if (maxScore > 0 && currentScore < maxScore) {
                 return { isFatal: false, isCritical: true };
             }
         }
@@ -1132,7 +1136,7 @@
       }
       dailyTrendChart = initializeStackedBarChart(dailyTrendData);
 
-      let withFatal=0, withCritical=0, totalCriticalMarks=0, totalFatalMarks=0;
+      let withFatal=0, withCritical=0;
       let sumScores=0, scored=0;
       
       for (const e of evals) {
@@ -1147,14 +1151,8 @@
             
             const { isFatal, isCritical } = detectCriticalFatalQuestions(q, questionObj);
             
-            if (isFatal) {
-              evalHasFatal = true;
-              totalFatalMarks++;
-            }
-            if (isCritical) {
-              evalHasCritical = true;
-              totalCriticalMarks++;
-            }
+            if (isFatal) evalHasFatal = true;
+            if (isCritical) evalHasCritical = true;
           }
         }
         
@@ -1168,14 +1166,13 @@
       const avgOverall = scored? (sumScores/scored): null;
       const passRate = evals.length? ((evals.length - Math.max(withFatal, withCritical))/evals.length): null;
 
+      // Updated KPIs - removed critical/fatal marks counts
       document.getElementById('analyticsKPIs').innerHTML = `
         <div class="kpi"><div class="label">Evaluations (range)</div><div class="value">${evals.length}</div></div>
         <div class="kpi"><div class="label">Avg Score</div><div class="value">${avgOverall==null?'-':pct(avgOverall,1)}</div></div>
         <div class="kpi"><div class="label">With Critical</div><div class="value">${withCritical}</div></div>
         <div class="kpi"><div class="label">With Fatal</div><div class="value">${withFatal}</div></div>
         <div class="kpi"><div class="label">Pass Rate</div><div class="value">${passRate==null?'-':pct(passRate*100,1)}</div></div>
-        <div class="kpi"><div class="label">Critical Marks</div><div class="value">${totalCriticalMarks}</div></div>
-        <div class="kpi"><div class="label">Fatal Marks</div><div class="value">${totalFatalMarks}</div></div>
       `;
 
       const {pass, band} = getPassSettings();

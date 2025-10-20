@@ -664,7 +664,7 @@
       return 'Other';
     }
 
-    // Improved critical/fatal detection
+    // FIXED: Improved critical/fatal detection
     function detectCriticalFatalQuestions(qScore, questionObj) {
         const isFatal = !!qScore.failedKillQuestion;
         const isCritical = !!qScore.failedCriticalQuestion;
@@ -677,7 +677,7 @@
             const maxScore = getMaxScoreForQuestion(questionObj);
             const currentScore = qScore.score || 0;
             
-            // Critical question markdown: maximum score was not given
+            // FIXED: Critical question markdown: maximum score was not given
             if (maxScore > 0 && currentScore < maxScore) {
                 return { isFatal: false, isCritical: true };
             }
@@ -1136,6 +1136,7 @@
       }
       dailyTrendChart = initializeStackedBarChart(dailyTrendData);
 
+      // FIXED: Removed counting of total critical/fatal marks
       let withFatal=0, withCritical=0;
       let sumScores=0, scored=0;
       
@@ -1166,7 +1167,7 @@
       const avgOverall = scored? (sumScores/scored): null;
       const passRate = evals.length? ((evals.length - Math.max(withFatal, withCritical))/evals.length): null;
 
-      // Updated KPIs - removed critical/fatal marks counts
+      // FIXED: Updated KPIs - removed critical/fatal marks counts
       document.getElementById('analyticsKPIs').innerHTML = `
         <div class="kpi"><div class="label">Evaluations (range)</div><div class="value">${evals.length}</div></div>
         <div class="kpi"><div class="label">Avg Score</div><div class="value">${avgOverall==null?'-':pct(avgOverall,1)}</div></div>

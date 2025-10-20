@@ -443,8 +443,48 @@
 
     // ===== Boot (handles errors + expiry, avoids redirect loops) =====
     document.addEventListener('DOMContentLoaded', () => {
-      try {
-        resolveColors();
+      resolveColors();
+
+      const rawHash = (window.location.hash || '').replace(/^#/, '');
+      const params = new URLSearchParams(rawHash);
+
+      // 1) OAuth error (prevents infinite redirect)
+      const oauthError = params.get('error');
+      if (oauthError) {
+        const desc = decodeURIComponent(params.get('error_description') || '');
+        history.replaceState(null, document.title, window.location.pathname + window.location.search);
+        sessionStorage.removeItem('purecloud_token');
+        sessionStorage.removeItem('purecloud_token_exp');
+
+        document.getElementById('auth-message').textContent = 'Sign-in failed. Please refresh the page to try again.';
+        document.getElementById('auth-message').className = 'error-message';
+        return;
+      }
+
+      // 2) Token in hash
+      const tokenFromHash = params.get('access_token');
+      if (tokenFromHash) {
+        const expiresIn = parseInt(params.get('expires_in') || '0', 10);
+        const expAt = expiresIn ? Date.now() + (expiresIn - 60) * 1000 : 0; // pad by 60s
+        sessionStorage.setItem('purecloud_token', tokenFromHash);
+        if (expAt) sessionStorage.setItem('purecloud_token_exp', String(expAt));
+        history.replaceState(null, document.title, window.location.pathname + window.location.search);
+        startApp(tokenFromHash);
+        return;
+      }
+
+      // 3) Token from session (if not expired)
+      const tokenFromSession = sessionStorage.getItem('purecloud_token');
+      const exp = parseInt(sessionStorage.getItem('purecloud_token_exp') || '0', 10);
+      if (tokenFromSession && (!exp || Date.now() < exp)) {
+        startApp(tokenFromSession);
+        return;
+      }
+
+      // 4) No token yet - redirect to OAuth
+      document.getElementById('auth-message').textContent = 'Redirecting to Genesys Cloud for authentication...';
+      setTimeout(() => { window.location.href = oauthUrl; }, 400);
+    });
 
         const rawHash = (window.location.hash || '').replace(/^#/, '');
         const params = new URLSearchParams(rawHash);

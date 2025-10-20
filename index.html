@@ -137,6 +137,11 @@
 
   <div id="authCard" class="card">
     <div id="auth-message" class="info-message">Authenticating with PureCloud...</div>
+    <div style="margin-top:10px; display:flex; gap:8px; align-items:center">
+      <button id="signinBtn" style="display:none">Sign in</button>
+      <button id="resetSessionBtn" style="display:none; background:#6c757d">Reset session</button>
+    </div>
+  </div>
   </div>
 
   <div id="appContent" style="display:none;">
@@ -305,6 +310,11 @@
   </div>
 
   <script>
+    // === Global JS error surface ===
+    window.addEventListener('error', (e) => {
+      const el = document.getElementById('auth-message');
+      if (el) { el.textContent = 'Error: ' + (e?.message || 'Script failed to load'); el.className = 'error-message'; }
+    });
     // ===== OAuth Configuration =====
     const clientId = 'fe305808-b368-4547-8af9-325d28d552bb';
     const config = { REGION: 'mypurecloud.ie' };
@@ -433,7 +443,70 @@
 
     // ===== Boot (handles errors + expiry, avoids redirect loops) =====
     document.addEventListener('DOMContentLoaded', () => {
-      resolveColors();
+      try {
+        resolveColors();
+
+        const rawHash = (window.location.hash || '').replace(/^#/, '');
+        const params = new URLSearchParams(rawHash);
+
+        const signinBtn = document.getElementById('signinBtn');
+        const resetBtn = document.getElementById('resetSessionBtn');
+        const doRedirect = () => { document.getElementById('auth-message').textContent = 'Redirecting to Genesys Cloud for authentication...'; setTimeout(() => { window.location.href = oauthUrl; }, 250); };
+        signinBtn.onclick = doRedirect;
+        resetBtn.onclick = () => { sessionStorage.removeItem('purecloud_token'); sessionStorage.removeItem('purecloud_token_exp'); doRedirect(); };
+
+        // 1) OAuth error (prevents infinite redirect)
+        const oauthError = params.get('error');
+        if (oauthError) {
+          history.replaceState(null, document.title, window.location.pathname + window.location.search);
+          sessionStorage.removeItem('purecloud_token');
+          sessionStorage.removeItem('purecloud_token_exp');
+          document.getElementById('auth-message').textContent = 'Sign-in failed. Please click “Sign in”.';
+          document.getElementById('auth-message').className = 'error-message';
+          signinBtn.style.display = 'inline-block';
+          resetBtn.style.display = 'inline-block';
+          return;
+        }
+
+        // 2) Token in hash
+        const tokenFromHash = params.get('access_token');
+        if (tokenFromHash) {
+          const expiresIn = parseInt(params.get('expires_in') || '0', 10);
+          const expAt = expiresIn ? Date.now() + (expiresIn - 60) * 1000 : 0; // pad by 60s
+          sessionStorage.setItem('purecloud_token', tokenFromHash);
+          if (expAt) sessionStorage.setItem('purecloud_token_exp', String(expAt));
+          history.replaceState(null, document.title, window.location.pathname + window.location.search);
+          startApp(tokenFromHash);
+          return;
+        }
+
+        // 3) Token from session (if not expired)
+        const tokenFromSession = sessionStorage.getItem('purecloud_token');
+        const exp = parseInt(sessionStorage.getItem('purecloud_token_exp') || '0', 10);
+        if (tokenFromSession && (!exp || Date.now() < exp)) {
+          startApp(tokenFromSession);
+          return;
+        }
+
+        // 4) No token yet - redirect to OAuth
+        document.getElementById('auth-message').textContent = 'Redirecting to Genesys Cloud for authentication...';
+        // Show manual buttons in case redirects are blocked
+        signinBtn.style.display = 'inline-block';
+        resetBtn.style.display = 'inline-block';
+        setTimeout(doRedirect, 400);
+
+        // Safety: if still not redirected after a bit, enable manual sign-in visibly
+        setTimeout(() => { signinBtn.style.display = 'inline-block'; resetBtn.style.display = 'inline-block'; }, 1500);
+      } catch (err) {
+        console.error(err);
+        const el = document.getElementById('auth-message');
+        if (el) { el.textContent = 'Startup error: ' + (err?.message || err); el.className = 'error-message'; }
+        const signinBtn = document.getElementById('signinBtn');
+        const resetBtn = document.getElementById('resetSessionBtn');
+        if (signinBtn) signinBtn.style.display = 'inline-block';
+        if (resetBtn) resetBtn.style.display = 'inline-block';
+      }
+    });
 
       const rawHash = (window.location.hash || '').replace(/^#/, '');
       const params = new URLSearchParams(rawHash);

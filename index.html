@@ -445,4 +445,995 @@
         const desc = decodeURIComponent(params.get('error_description') || '');
         history.replaceState(null, document.title, window.location.pathname + window.location.search);
         sessionStorage.removeItem('purecloud_token');
-        sessionStorage.removeItem('pure
+        sessionStorage.removeItem('purecloud_token_exp');
+
+        document.getElementById('auth-message').textContent = 'Sign-in failed. Please refresh the page to try again.';
+        document.getElementById('auth-message').className = 'error-message';
+        return;
+      }
+
+      // 2) Token in hash
+      const tokenFromHash = params.get('access_token');
+      if (tokenFromHash) {
+        const expiresIn = parseInt(params.get('expires_in') || '0', 10);
+        const expAt = expiresIn ? Date.now() + (expiresIn - 60) * 1000 : 0; // pad by 60s
+        sessionStorage.setItem('purecloud_token', tokenFromHash);
+        if (expAt) sessionStorage.setItem('purecloud_token_exp', String(expAt));
+        history.replaceState(null, document.title, window.location.pathname + window.location.search);
+        startApp(tokenFromHash);
+        return;
+      }
+
+      // 3) Token from session (if not expired)
+      const tokenFromSession = sessionStorage.getItem('purecloud_token');
+      const exp = parseInt(sessionStorage.getItem('purecloud_token_exp') || '0', 10);
+      if (tokenFromSession && (!exp || Date.now() < exp)) {
+        startApp(tokenFromSession);
+        return;
+      }
+
+      // 4) No token yet - redirect to OAuth
+      document.getElementById('auth-message').textContent = 'Redirecting to Genesys Cloud for authentication...';
+      setTimeout(function(){ window.location.href = oauthUrl; }, 200);
+    });
+
+    function startApp(token){
+      state.accessToken=token;
+      document.getElementById('auth-message').textContent='Authenticated successfully!';
+      document.getElementById('auth-message').className='success-message';
+      setTimeout(()=>{ document.getElementById('authCard').style.display='none'; }, 800);
+      document.getElementById('appContent').style.display='block';
+
+      dropdowns.users=createCheckboxDropdown('userDropdown',{placeholder:'Select agents (optional)',searchPlaceholder:'Search agents...'});
+      dropdowns.teams=createCheckboxDropdown('teamDropdown',{placeholder:'Select work teams (optional)',searchPlaceholder:'Search teams...'});
+      dropdowns.forms=createCheckboxDropdown('formDropdown',{placeholder:'Select forms (optional)',searchPlaceholder:'Search forms...'});
+      dropdowns.analyticsTeams=createCheckboxDropdown('analyticsTeamDropdown',{placeholder:'Filter teams (optional)',searchPlaceholder:'Search teams...'});
+
+      document.getElementById('overviewTabButton').onclick=()=>setTab('overview');
+      document.getElementById('analyticsTabButton').onclick=()=>setTab('analytics');
+      document.getElementById('detailsTabButton').onclick=()=>setTab('details');
+      document.getElementById('criticalTabButton').onclick=()=>setTab('critical');
+      document.getElementById('loadBtn').onclick=loadEvaluations;
+
+      document.getElementById('loadAnalyticsBtn').onclick=loadAnalyticsRange;
+      document.getElementById('insightsSort').onchange=renderAgentInsights;
+      document.getElementById('applyAnalyticsFilters').onclick=renderAnalytics;
+
+      const m=new Date();
+      const cur=`${m.getFullYear()}-${String(m.getMonth()+1).padStart(2,'0')}`;
+      document.getElementById('monthInput').value = cur;
+      document.getElementById('anaFrom').value = cur;
+      document.getElementById('anaTo').value = cur;
+
+      updateMonthRange();
+      document.getElementById('monthInput').addEventListener('change',()=>{ updateMonthRange(); updateLoadButtonState(); });
+
+      Promise.all([fetchAllUsers(), fetchAllTeams(), fetchAllForms()])
+        .then(()=> {
+          updateLoadButtonState();
+          dropdowns.analyticsTeams.setOptions(state.teams.map(t=>({value:t.id,label:t.name})));
+        })
+        .catch(err => msg('Initial load failed: '+err.message,'error'));
+    }
+
+    function setTab(name){
+      ['overview','analytics','details','critical'].forEach(n=>{
+        document.getElementById(`${n}Tab`).classList.toggle('active', n===name);
+        document.getElementById(`${n}TabButton`).classList.toggle('active', n===name);
+      });
+      if(name==='analytics') renderAnalytics();
+    }
+
+    function updateMonthRange(){
+      const val=document.getElementById('monthInput').value;
+      if(!val) return;
+      const [y,m]=val.split('-').map(Number);
+      state.monthStart=new Date(Date.UTC(y, m-1, 1, 0,0,0));
+      state.monthEnd  =new Date(Date.UTC(y, m,   0, 23,59,59));
+    }
+
+    // ===== HTTP helper with spacing + retry/backoff =====
+    async function rawFetch(url,options={}){
+      const now=Date.now(); const delta=now-lastApiCall;
+      if(delta<API_DELAY) await sleep(API_DELAY-delta);
+      lastApiCall=Date.now();
+      return fetch(url,{...options,headers:{'Authorization':'Bearer '+state.accessToken,'Content-Type':'application/json',...(options.headers||{})}});
+    }
+
+    async function fetchJsonWithRetry(url, options={}, {retries=5, baseDelay=500}={}){
+      let attempt=0;
+      while(true){
+        const res = await rawFetch(url, options);
+        if(res.ok){
+          if(res.status===204) return null;
+          return await res.json();
+        }
+        if([400,401,403,404,405].includes(res.status)){
+          if(res.status === 401 || res.status === 403) {
+            // Token expired or invalid
+            sessionStorage.removeItem('purecloud_token');
+            sessionStorage.removeItem('purecloud_token_exp');
+            document.getElementById('appContent').style.display='none';
+            document.getElementById('authCard').style.display='block';
+            document.getElementById('auth-message').textContent='Session expired. Redirecting to login...';
+            document.getElementById('auth-message').className='info-message';
+            setTimeout(() => { window.location.href = oauthUrl; }, 2000);
+            throw new Error('Authentication required');
+          }
+          const err=new Error(`HTTP ${res.status}`); err.status=res.status; throw err;
+        }
+        attempt++;
+        if(attempt>retries){
+          const err=new Error(`HTTP ${res.status}`); err.status=res.status; throw err;
+        }
+        const retryAfter = Number(res.headers.get('Retry-After')) || null;
+        const delay = retryAfter ? retryAfter*1000 : Math.round(baseDelay * (2**(attempt-1)) * (1 + Math.random()*0.25));
+        await sleep(delay);
+      }
+    }
+
+    async function fetchPaginatedGET(url){
+      let all=[]; let next=url;
+      while(next){
+        const data = await fetchJsonWithRetry(next, {method:'GET'});
+        if(Array.isArray(data.entities)) all=all.concat(data.entities);
+        else if(Array.isArray(data.users)) all=all.concat(data.users);
+        else if(Array.isArray(data)) all=all.concat(data);
+        else if(data.entities) all=all.concat(data.entities);
+        next = data.nextUri ? `https://api.${config.REGION}${data.nextUri}` : null;
+      }
+      return all;
+    }
+
+    function safeGet(o,p,def=null){ try{ return p.split('.').reduce((x,k)=>(x && k in x)?x[k]:undefined ,o) ?? def; }catch{ return def; } }
+    function pct(n,d=1){ if(n==null||!isFinite(n)) return '-'; return (Math.round(n*10**d)/10**d).toFixed(d)+'%'; }
+    function fmt(n,d=1){ if(n==null||!isFinite(n)) return '-'; return (Math.round(n*10**d)/10**d).toFixed(d); }
+    function toUKDate(d){ const dt=new Date(d); return dt.toLocaleDateString('en-GB'); }
+    function dayKeyUTC(d){ const dt=new Date(d); return new Date(Date.UTC(dt.getUTCFullYear(),dt.getUTCMonth(),dt.getUTCDate())).toISOString().split('T')[0]; }
+
+    // Analytics helper functions
+    function getPassSettings(){
+      const pass=parseFloat(document.getElementById('passTarget').value||'85');
+      const band=parseFloat(document.getElementById('amberBand').value||'5');
+      return {pass, band};
+    }
+
+    function colourFor(score, pass, band){
+      if(score==null||!isFinite(score)) return COLORS.BAD;
+      if(score>=pass) return COLORS.OK;
+      if(score>=pass-band) return COLORS.WARN;
+      return COLORS.BAD;
+    }
+
+    function standardiseMedia(m){
+      const x=String(m||'').toUpperCase();
+      if(x.includes('EMAIL')) return 'Email';
+      if(x.includes('CALL')||x.includes('VOICE')||x==='CALL') return 'Voice';
+      if(x.includes('CHAT')||x.includes('MESSAGE')) return 'Message';
+      if(x.includes('SOCIAL')) return 'Social';
+      return 'Other';
+    }
+
+    // Improved critical/fatal detection
+    function getMaxScoreForQuestion(questionObj) {
+      const opts = [...(questionObj?.answerOptions || []), ...(questionObj?.options || [])];
+      if (opts.length > 0) { return Math.max(...opts.map(opt => Number(opt.value) || 0)); }
+      return Number(questionObj?.maxScore) || 1;
+    }
+
+    function detectCriticalFatalQuestions(qScore, questionObj) {
+      const isFatal = !!(qScore.failedKillQuestion || qScore.isKill || qScore.isFatal);
+      const explicitCritFail = !!(qScore.failedCriticalQuestion);
+      if (qScore.notApplicable) {
+        return { isFatal, isCritical: explicitCritFail };
+      }
+      const criticalFlag = !!( qScore.isCritical || safeGet(qScore,'question.isCritical') || safeGet(questionObj,'criticalQuestion') || safeGet(questionObj,'isCritical') );
+      const maxScore = getMaxScoreForQuestion(questionObj || {});
+      let currentScore = Number(qScore.score);
+      if (!isFinite(currentScore)) currentScore = 0;
+      const markdownByScore = criticalFlag && maxScore > 0 && currentScore < maxScore;
+      return { isFatal, isCritical: explicitCritFail || markdownByScore };
+    }
+
+    // Stacked bar chart init - now uses actual data
+    function initializeStackedBarChart(dailyData) {
+      const ctx = document.getElementById('dailyTrendChart').getContext('2d');
+      const labels = dailyData.map(d => d.date);
+      const passedData = dailyData.map(d => d.passed);
+      const amberData = dailyData.map(d => d.amber);
+      const failedData = dailyData.map(d => d.failed);
+      return new Chart(ctx, {
+        type: 'bar',
+        data: { labels, datasets: [
+          { label: 'Passed', data: passedData, backgroundColor: COLORS.OK,   borderColor: COLORS.OK,   borderWidth: 1 },
+          { label: 'Amber',  data: amberData, backgroundColor: COLORS.WARN, borderColor: COLORS.WARN, borderWidth: 1 },
+          { label: 'Failed', data: failedData, backgroundColor: COLORS.BAD,  borderColor: COLORS.BAD,  borderWidth: 1 }
+        ]},
+        options: {
+          responsive: true, maintainAspectRatio: false,
+          scales: {
+            x: { stacked: true, grid: { color: 'rgba(0,0,0,0.1)' } },
+            y: { stacked: true, beginAtZero: true, title: { display: true, text: 'Number of Evaluations' }, grid: { color: 'rgba(0,0,0,0.1)' } }
+          },
+          plugins: {
+            legend: { position: 'top', labels: { color: COLORS.TEXT } },
+            title: { display: true, text: 'Daily Performance Trend', color: COLORS.TEXT }
+          }
+        }
+      });
+    }
+
+    let dailyTrendChart = null;
+
+    // Table sorter
+    function tableSorter(tableId){
+      const t=document.getElementById(tableId);
+      if(!t||!t.tHead) return;
+      const ths=[...t.tHead.querySelectorAll('th')];
+      ths.forEach((th,i)=>{
+        th.onclick=()=>{
+          const dir=th.dataset.dir==='asc'?'desc':'asc';
+          ths.forEach(h=>{
+            h.dataset.dir='';
+            const s=h.querySelector('.sort-ind');
+            if(s) s.remove();
+          });
+          th.dataset.dir=dir;
+          const ind=document.createElement('span');
+          ind.className='sort-ind';
+          ind.textContent=dir==='asc'?'▲':'▼';
+          th.appendChild(ind);
+          const body=t.tBodies[0];
+          const rows=[...body.rows];
+          const num=th.dataset.type==='num';
+          rows.sort((a,b)=>{
+            const av=a.cells[i].getAttribute('data-sort') ?? a.cells[i].innerText;
+            const bv=b.cells[i].getAttribute('data-sort') ?? b.cells[i].innerText;
+            const A=num?Number(av):String(av).toLowerCase();
+            const B=num?Number(bv):String(bv).toLowerCase();
+            return dir==='asc'? (A>B?1:A<L?-1:0) : (A<B?1:A>B?-1:0);
+          });
+          body.innerHTML='';
+          rows.forEach(r=>body.appendChild(r));
+        };
+      });
+      t.classList.add('sortable');
+    }
+
+    // ===== Lookups =====
+    async function fetchAllUsers(){
+      const url=`https://api.${config.REGION}/api/v2/users?pageSize=100`;
+      const users=await fetchPaginatedGET(url);
+      state.users=users.map(u=>({id:u.id,name:(u.name || `${u.givenName||''} ${u.familyName||''}`).trim(),email:u.email||''})).sort((a,b)=>a.name.localeCompare(b.name));
+      dropdowns.users.setOptions(state.users.map(u=>({value:u.id,label:`${u.name}${u.email?` — ${u.email}`:''}`})));
+    }
+
+    async function fetchAllTeams(){
+      const url=`https://api.${config.REGION}/api/v2/teams?pageSize=100`;
+      const teams = await fetchPaginatedGET(url);
+      state.teams = teams.map(t=>({id:t.id,name:t.name||'(Unnamed team)'})).sort((a,b)=>a.name.localeCompare(b.name));
+      state.teamsById = Object.fromEntries(state.teams.map(t=>[t.id,t]));
+      dropdowns.teams.setOptions(state.teams.map(t=>({value:t.id,label:t.name})));
+    }
+
+    async function ensureTeamMembersLoaded(teamIds){
+      const missing = teamIds.filter(id=>!state.teamMembers.has(id));
+      if(!missing.length) return;
+      await Promise.all(missing.map(fetchTeamMembers));
+    }
+
+    async function fetchTeamMembers(teamId){
+      const url=`https://api.${config.REGION}/api/v2/teams/${teamId}/members?pageSize=100`;
+      const members=await fetchPaginatedGET(url);
+      const ids = Array.from(new Set(members.map(m => safeGet(m,'member.id') || safeGet(m,'member.user.id') || safeGet(m,'user.id') || safeGet(m,'id')).filter(Boolean)));
+      state.teamMembers.set(teamId, ids);
+    }
+
+    async function fetchAllForms(){
+      const url=`https://api.${config.REGION}/api/v2/quality/forms/evaluations?pageSize=100`;
+      const forms=await fetchPaginatedGET(url);
+      state.forms=forms.map(f=>({id:f.id,name:f.name||f.title||'(Unnamed form)'})).sort((a,b)=>a.name.localeCompare(b.name));
+      state.formsById=Object.fromEntries(state.forms.map(f=>[f.id,f]));
+      dropdowns.forms.setOptions(state.forms.map(f=>({value:f.id,label:f.name})));
+    }
+
+    async function computeSelectedAgentIds(){
+      const userIds = dropdowns.users.getSelectedValues();
+      const teamIds = dropdowns.teams.getSelectedValues();
+      const set = new Set(userIds);
+      if(teamIds.length){
+        await ensureTeamMembersLoaded(teamIds);
+        teamIds.forEach(tid=>{
+          (state.teamMembers.get(tid)||[]).forEach(uid=>set.add(uid));
+        });
+      }
+      return Array.from(set);
+    }
+
+    // Helper for analytics team filtering
+    async function agentsForTeams(teamIds){
+      await ensureTeamMembersLoaded(teamIds);
+      const ids=new Set();
+      teamIds.forEach(tid=>(state.teamMembers.get(tid)||[]).forEach(id=>ids.add(id)));
+      return Array.from(ids);
+    }
+
+    // ===== Evaluations with GET/POST fallback + retry =====
+    async function loadEvaluations(){
+      const agentIds = await computeSelectedAgentIds();
+      const formIds = dropdowns.forms.getSelectedValues();
+
+      if(agentIds.length===0 && formIds.length===0){
+        msg('Please select at least one agent, team, or form.','error');
+        return;
+      }
+      if(!state.monthStart || !state.monthEnd){
+        msg('Please select a month.','error');
+        return;
+      }
+
+      const btn=document.getElementById('loadBtn'); setLoading(btn,true); msg('Loading evaluations…','info');
+      try{
+        const agentList = agentIds.length ? agentIds : state.users.map(u=>u.id);
+        state.evals = await fetchDetailedEvaluations(agentList, formIds, state.monthStart, state.monthEnd);
+        msg(`Loaded ${state.evals.length} evaluations.`,'success');
+        renderAll();
+      }catch(e){ console.error(e); msg('Failed to load evaluations: '+e.message,'error'); }
+      finally{ setLoading(btn,false); }
+    }
+
+    async function loadAnalyticsRange(){
+      const from=document.getElementById('anaFrom').value;
+      const to=document.getElementById('anaTo').value;
+      if(!from || !to){ msg('Select both From and To months for Analytics.','error'); return; }
+      const [fy,fm]=from.split('-').map(Number);
+      const [ty,tm]=to.split('-').map(Number);
+      const start=new Date(Date.UTC(fy, fm-1, 1, 0,0,0));
+      const end  =new Date(Date.UTC(ty, tm,   0, 23,59,59));
+      if(start>end){ msg('The From month must be before the To month.','error'); return; }
+
+      const formIds = dropdowns.forms.getSelectedValues();
+      const agentIds = await computeSelectedAgentIds();
+      if(agentIds.length===0 && formIds.length===0){
+        msg('Please select at least one agent, team, or form.','error'); return;
+      }
+
+      const btn=document.getElementById('loadAnalyticsBtn'); setLoading(btn,true);
+      try{
+        const agentList = agentIds.length ? agentIds : state.users.map(u=>u.id);
+        const data=await fetchDetailedEvaluations(agentList,formIds,start,end);
+        state.analyticsEvals=data; state.analyticsRange={start,end};
+        msg(`Analytics range loaded: ${data.length} evaluations.`, 'success');
+        renderAnalytics();
+      }catch(e){ console.error(e); msg('Failed to load analytics range: '+e.message,'error'); }
+      finally{ setLoading(btn,false); }
+    }
+
+    async function fetchDetailedEvaluations(agentIds,formIds,startDate,endDate){
+      const all=[];
+      for(let i=0;i<agentIds.length;i+=MAX_CONCURRENT_AGENT_BATCH){
+        const batch=agentIds.slice(i,i+MAX_CONCURRENT_AGENT_BATCH);
+        const res=await Promise.all(batch.map(id=>fetchEvaluationsForAgentInterval(id,formIds,startDate,endDate)));
+        res.forEach(items=>all.push(...items));
+        if(i+MAX_CONCURRENT_AGENT_BATCH<agentIds.length) await sleep(300);
+      }
+      return all;
+    }
+
+    async function fetchEvaluationsForAgentInterval(agentId,formIds,startDate,endDate){
+      const start=startDate.toISOString(); const end=endDate.toISOString();
+      const base = `https://api.${config.REGION}/api/v2/quality/evaluations/query`;
+
+      // Helper: GET path
+      async function getViaGET(singleFormId){
+        const params = new URLSearchParams({
+          agentUserId: agentId,
+          startTime: start,
+          endTime: end,
+          expandAnswerTotalScores: 'true',
+          pageSize: '50'
+        });
+        if(singleFormId) params.set('formId', singleFormId);
+        const url = `${base}?${params.toString()}`;
+        let all=[]; let next=url;
+        while(next){
+          try{
+            const data = await fetchJsonWithRetry(next,{method:'GET'});
+            const entities = data?.entities || [];
+            all = all.concat(entities);
+            next = data?.nextUri ? `https://api.${config.REGION}${data.nextUri}` : null;
+          }catch(err){ throw err; }
+        }
+        return all;
+      }
+
+      // Helper: POST path
+      async function getViaPOST(){
+        const url = base;
+        const body = {
+          agentUserIds: [agentId],
+          interval: `${start}/${end}`,
+          expandAnswerTotalScores: true,
+          pageSize: 50
+        };
+        if(formIds && formIds.length>0) body.formIds = formIds;
+
+        let page=1, all=[];
+        while(true){
+          body.pageNumber = page;
+          try{
+            const data = await fetchJsonWithRetry(url,{method:'POST',body:JSON.stringify(body)});
+            const entities = data?.entities || [];
+            if(!entities.length) break;
+            all = all.concat(entities);
+            if(!data.nextUri && entities.length < body.pageSize) break;
+            page++;
+          }catch(err){ throw err; }
+        }
+        return all;
+      }
+
+      if(!formIds || formIds.length<=1){
+        try{ return await getViaGET(formIds?.[0]); }
+        catch(err){ if(err.status===405 || err.status===400){ /* fallback */ } else throw err; }
+      }
+
+      try{ return await getViaPOST(); }
+      catch(err){
+        if(err.status===405 || err.status===400){ return await getViaGET(undefined); }
+        throw err;
+      }
+    }
+
+    // ===== Forms & lookups =====
+    function formKey(formId, versionId){ return (versionId === '__published__') ? `pub@${formId}` : `${formId}@${versionId || 'latest'}`; }
+    async function getFormDetails(formId, versionId){
+      const key=formKey(formId,versionId);
+      if(state.formDetailsCache.has(key)) return state.formDetailsCache.get(key);
+      let url;
+      if (versionId === '__published__') url = `https://api.${config.REGION}/api/v2/quality/publishedforms/evaluations/${formId}`;
+      else url = versionId
+        ? `https://api.${config.REGION}/api/v2/quality/forms/evaluations/${formId}/versions/${versionId}`
+        : `https://api.${config.REGION}/api/v2/quality/forms/evaluations/${formId}`;
+      try{
+        let data;
+        try{ data = await fetchJsonWithRetry(url,{method:'GET'}); }
+        catch(err){
+          if(versionId && versionId!=='__published__'){
+            data = await fetchJsonWithRetry(`https://api.${config.REGION}/api/v2/quality/forms/evaluations/${formId}`,{method:'GET'});
+          }else{ throw err; }
+        }
+        state.formDetailsCache.set(key,data);
+        state.formLookupCache.set(key,buildFormLookup(data||{}));
+        return data;
+      }catch(e){ state.formDetailsCache.set(key,null); return null; }
+    }
+
+    function buildFormLookup(form){
+      const questionText=new Map(), answerText=new Map(), questionObj=new Map();
+      function addQ(q){
+        if(!q) return;
+        const qTxt=q.text || q.label || q.title || '';
+        [q.id, q.contextId, q.questionId, q.questionContextId].filter(Boolean).forEach(id=>{
+          questionText.set(id,qTxt); 
+          questionObj.set(id,q);
+        });
+        (q.answerOptions||[]).forEach(a=>{
+          const aTxt=a.text ?? String(a.value ?? '');
+          [a.id, a.contextId, a.answerId, a.answerOptionId].filter(Boolean).forEach(id=>{
+            answerText.set(id,aTxt);
+          });
+        });
+        (q.multipleSelectOptionQuestions||[]).forEach(addQ);
+      }
+      function walk(groups){ (groups||[]).forEach(g=>{ (g.questions||[]).forEach(addQ); (g.questionGroups||[]).forEach(walk); }); }
+      (form?.questions||[]).forEach(addQ); walk(form?.questionGroups);
+      return {questionText,answerText,questionObj};
+    }
+
+    async function getCombinedLookupForEval(e){
+      const pubId = safeGet(e,'evaluationForm.id');
+      const formId = safeGet(e,'form.id') || e.formId;
+      const formVersionId = safeGet(e,'form.versionId') || e.formVersionId || safeGet(e,'form.version');
+      const comboKey = [ pubId ? `pub:${pubId}` : '', formId ? `form:${formId}` : '', formVersionId ? `ver:${formVersionId}` : '' ].filter(Boolean).join('|') || 'none';
+      if(state.combinedLookupCache.has(comboKey)) return state.combinedLookupCache.get(comboKey);
+      const detailsPromises = [];
+      if (pubId) { detailsPromises.push(getFormDetails(pubId, '__published__')); }
+      if (formId && formVersionId) { detailsPromises.push(getFormDetails(formId, formVersionId)); }
+      if (formId && !formVersionId) { detailsPromises.push(getFormDetails(formId, null)); }
+      if (formId) { detailsPromises.push(getFormDetails(formId, null)); }
+      const details = (await Promise.all(detailsPromises)).filter(Boolean);
+      const merged = { questionText: new Map(), answerText: new Map(), questionObj: new Map() };
+      const names = [];
+      details.forEach(d => {
+        if(d?.name) names.push(d.name);
+        const lk = buildFormLookup(d || {});
+        lk.questionText.forEach((v,k) => merged.questionText.set(k,v));
+        lk.answerText.forEach((v,k) => merged.answerText.set(k,v));
+        lk.questionObj.forEach((v,k) => merged.questionObj.set(k,v));
+      });
+      const formName = safeGet(e,'evaluationForm.name') || safeGet(e,'form.name') || names[0] || '(Form)';
+      const combined = {...merged, formName};
+      state.combinedLookupCache.set(comboKey, combined);
+      return combined;
+    }
+
+    // ===== IMPROVED Helpers for Q/A text =====
+    function approx(a,b){ return Math.abs(Number(a)-Number(b))<1e-6; }
+    function resolveQuestionTextWithLookup(lookup, qScore) {
+      const candidates = [ qScore.questionId, qScore.questionContextId, safeGet(qScore, 'question.id'), safeGet(qScore, 'question.contextId'), safeGet(qScore, 'question.questionId') ].filter(Boolean);
+      for (const id of candidates) { const t = lookup.questionText.get(id); if (t) return t; }
+      const questionText = safeGet(qScore, 'question.text') || safeGet(qScore, 'question.label');
+      if (questionText) return questionText;
+      return candidates.length > 0 ? `Question (${candidates[0]})` : 'Question';
+    }
+
+    function resolveAnswerTextWithLookup(lookup, qScore) {
+      const ids = new Set();
+      (qScore.selectedAnswerIds || []).forEach(x => ids.add(x));
+      (qScore.selectedAnswerOptionIds || []).forEach(x => ids.add(x));
+      if (qScore.selectedAnswerId) ids.add(qScore.selectedAnswerId);
+      if (qScore.answerOptionId) ids.add(qScore.answerOptionId);
+      if (qScore.answerId) ids.add(qScore.answerId);
+      const a = qScore.answer || {};
+      [a.id, a.contextId, a.answerId, a.answerOptionId].filter(Boolean).forEach(x => ids.add(x));
+      (qScore.answers || []).forEach(ans => { [ans.id, ans.contextId, ans.answerId, ans.answerOptionId].filter(Boolean).forEach(x => ids.add(x)); });
+      const texts = [];
+      Array.from(ids).forEach(id => { const t = lookup.answerText.get(id); if (t) texts.push(t); });
+      if (texts.length) return texts.join(', ');
+      const qIds = [ qScore.questionId, qScore.questionContextId, safeGet(qScore, 'question.id'), safeGet(qScore, 'question.contextId') ].filter(Boolean);
+      const q = qIds.map(id => lookup.questionObj.get(id)).find(Boolean);
+      if (q && Array.isArray(q.answerOptions) && q.answerOptions.length) {
+        const s = Number(qScore.score);
+        const match = q.answerOptions.find(o => approx(s, o.value) || approx(s / 100, o.value) || approx(s, o.value * 100) || (o.value === 0 && s === 0) );
+        if (match) { return match.text ?? String(match.value ?? ''); }
+        if (qScore.score !== null && qScore.score !== undefined) { return `Score: ${qScore.score}`; }
+      }
+      if (qScore.freeTextAnswer) return String(qScore.freeTextAnswer);
+      if (qScore.numericAnswer !== undefined && qScore.numericAnswer !== null) return String(qScore.numericAnswer);
+      if (safeGet(qScore, 'answer.text')) return qScore.answer.text;
+      if (qScore.score !== null && qScore.score !== undefined) { return `Score: ${qScore.score}`; }
+      return 'No answer';
+    }
+
+    // ===== Renderers =====
+    function renderAll(){ renderOverview(); renderAnalytics(); renderDetails(); renderCritical(); }
+    function resolveUserName(id){ const u=state.users.find(x=>x.id===id); return u?u.name:(id||'(unknown)'); }
+    function getEvalPercent(e){
+      const p=e.totalScore || e.totalPercent || safeGet(e,'scoring.totalPercent') || safeGet(e,'oTotalPercent') || safeGet(e,'answers.totalScore');
+      if(p==null) return null; return p<=1 ? p*100 : p;
+    }
+
+    function renderOverview(){
+      const evals=state.evals;
+      const byAgent=new Map();
+      evals.forEach(e=>{
+        const a=safeGet(e,'agent.id') || e.agentUserId || e.userId || '(unknown)';
+        const p=getEvalPercent(e);
+        if(!byAgent.has(a)) byAgent.set(a,{count:0,sum:0});
+        const o=byAgent.get(a); o.count++; if(p!=null && isFinite(p)) o.sum+=Number(p);
+      });
+      const rows=[]; let total=0;
+      for(const [aid,{count,sum}] of byAgent.entries()){ rows.push({agent:resolveUserName(aid),count,avg:count?(sum/count):null}); total+=count; }
+      rows.sort((a,b)=>a.agent.localeCompare(b.agent));
+      const overallAvg=(rows.length && total)?(rows.reduce((s,r)=>s+(r.avg||0),0)/rows.length):null;
+
+      document.getElementById('overviewKPIs').innerHTML=`
+        <div class="kpi"><div class="label">Month</div><div class="value">${document.getElementById('monthInput').value}</div></div>
+        <div class="kpi"><div class="label">Evaluations</div><div class="value">${evals.length}</div></div>
+        <div class="kpi"><div class="label">Agents</div><div class="value">${rows.length}</div></div>
+        <div class="kpi"><div class="label">Average Score (Agent Avg)</div><div class="value">${overallAvg==null?'-':pct(overallAvg,1)}</div></div>`;
+      const tbl=document.getElementById('agentSummaryTable');
+      tbl.innerHTML = rows.length
+        ? `<thead><tr><th>Agent</th><th>Evaluations</th><th>Average Score</th></tr></thead>
+           <tbody>${rows.map(r=>`<tr><td>${r.agent}</td><td>${r.count}</td><td>${r.avg==null?'-':pct(r.avg,1)}</td></tr>`).join('')}</tbody>`
+        : '<tr><td colspan="3" class="muted">No evaluation data available for the selected criteria.</td></tr>';
+    }
+
+    function getAnalyticsSet(){ return (state.analyticsEvals && state.analyticsRange) ? state.analyticsEvals : state.evals; }
+    function guessMediaType(e){ return standardiseMedia(safeGet(e,'mediaType') || safeGet(e,'conversation.mediaType') || 'Unknown'); }
+    function buildDays(start,end){ const out=[]; for(let d=new Date(start); d<=end; d.setUTCDate(d.getUTCDate()+1)){ out.push(new Date(d)); } return out; }
+
+    function calculateDailyTrendData(evals, start, end) {
+      const {pass, band} = getPassSettings();
+      const dailyMap = new Map();
+      const days = buildDays(start, end);
+      days.forEach(day => {
+        const dayKey = dayKeyUTC(day);
+        dailyMap.set(dayKey, { date: toUKDate(day), passed: 0, amber: 0, failed: 0 });
+      });
+      evals.forEach(e => {
+        const dayKey = dayKeyUTC(e.releaseDate || e.assignedDate || e.creationDate || e.evaluationDate || e.date || Date.now());
+        if (dailyMap.has(dayKey)) {
+          const score = getEvalPercent(e);
+          const dayData = dailyMap.get(dayKey);
+          if (score === null || !isFinite(score)) { dayData.failed++; }
+          else if (score >= pass) { dayData.passed++; }
+          else if (score >= pass - band) { dayData.amber++; }
+          else { dayData.failed++; }
+        }
+      });
+      return Array.from(dailyMap.values());
+    }
+
+    async function renderAnalytics(){
+      const raw = getAnalyticsSet();
+      if(!raw || !raw.length){
+        document.getElementById('analyticsKPIs').innerHTML='';
+        document.getElementById('mediaTable').innerHTML='<tr><td class="muted">No data loaded yet.</td></tr>';
+        document.getElementById('repeatFailsTable').innerHTML='';
+        document.getElementById('agentInsights').innerHTML='';
+        document.getElementById('trendTable').innerHTML='';
+        document.getElementById('topAgentsTable').innerHTML='';
+        document.getElementById('bottomAgentsTable').innerHTML='';
+        document.getElementById('agentMediaChart').innerHTML='';
+        return;
+      }
+
+      const teamFilter = dropdowns.analyticsTeams.getSelectedValues();
+      let allowedAgents = null;
+      if(teamFilter.length){ allowedAgents = new Set(await agentsForTeams(teamFilter)); }
+      const evals = allowedAgents ? raw.filter(e => allowedAgents.has(safeGet(e,'agent.id')||e.agentUserId)) : raw;
+
+      const start = state.analyticsRange?.start || state.monthStart;
+      const end   = state.analyticsRange?.end   || state.monthEnd;
+      const dailyTrendData = calculateDailyTrendData(evals, start, end);
+      if (dailyTrendChart) { dailyTrendChart.destroy(); }
+      dailyTrendChart = initializeStackedBarChart(dailyTrendData);
+
+      let withFatal=0, withCritical=0, totalCriticalMarks=0, totalFatalMarks=0;
+      let sumScores=0, scored=0;
+      for (const e of evals) {
+        const qgs = safeGet(e, 'answers.questionGroupScores') || [];
+        let evalHasFatal = false, evalHasCritical = false;
+        for (const g of qgs) {
+          for (const q of (g.questionScores || [])) {
+            const lookup = await getCombinedLookupForEval(e);
+            const qIds = [q.questionId, q.questionContextId, safeGet(q, 'question.id'), safeGet(q, 'question.contextId')].filter(Boolean);
+            const questionObj = qIds.map(id => lookup.questionObj.get(id)).find(Boolean);
+            const { isFatal, isCritical } = detectCriticalFatalQuestions(q, questionObj);
+            if (isFatal) { evalHasFatal = true; totalFatalMarks++; }
+            if (isCritical) { evalHasCritical = true; totalCriticalMarks++; }
+          }
+        }
+        if (evalHasFatal) withFatal++;
+        if (evalHasCritical) withCritical++;
+        const p=getEvalPercent(e); if(p!=null && isFinite(p)){ sumScores+=Number(p); scored++; }
+      }
+      const avgOverall = scored? (sumScores/scored): null;
+      const passRate = evals.length? ((evals.length - Math.max(withFatal, withCritical))/evals.length): null;
+
+      document.getElementById('analyticsKPIs').innerHTML = `
+        <div class="kpi"><div class="label">Evaluations (range)</div><div class="value">${evals.length}</div></div>
+        <div class="kpi"><div class="label">Avg Score</div><div class="value">${avgOverall==null?'-':pct(avgOverall,1)}</div></div>
+        <div class="kpi"><div class="label">With Critical</div><div class="value">${withCritical}</div></div>
+        <div class="kpi"><div class="label">With Fatal</div><div class="value">${withFatal}</div></div>
+        <div class="kpi"><div class="label">Pass Rate</div><div class="value">${passRate==null?'-':pct(passRate*100,1)}</div></div>
+        <div class="kpi"><div class="label">Critical Marks</div><div class="value">${totalCriticalMarks}</div></div>
+        <div class="kpi"><div class="label">Fatal Marks</div><div class="value">${totalFatalMarks}</div></div>
+      `;
+
+      const {pass, band} = getPassSettings();
+      const byAgent=new Map(); // agent -> media -> {count,sum,scored}
+      evals.forEach(e=>{
+        const aid=safeGet(e,'agent.id')||e.agentUserId||'(unknown)';
+        const name=resolveUserName(aid);
+        const mt=guessMediaType(e);
+        if(!byAgent.has(aid)) byAgent.set(aid,{name,map:new Map()});
+        const m=byAgent.get(aid).map;
+        if(!m.has(mt)) m.set(mt,{count:0,sum:0,scored:0});
+        const o=m.get(mt);
+        o.count++;
+        const p=getEvalPercent(e);
+        if(p!=null&&isFinite(p)){ o.sum+=Number(p); o.scored++; }
+      });
+      const mediaOrder = ['Voice','Email','Message','Social','Other'];
+      const width=700, height=22;
+      const rowsHtml = Array.from(byAgent.values()).sort((a,b)=>a.name.localeCompare(b.name)).map(row=>{
+        const total=Array.from(row.map.values()).reduce((s,o)=>s+o.count,0)||1;
+        let x=0;
+        const rects = mediaOrder.map(type=>{
+          const o=row.map.get(type);
+          if(!o) return '';
+          const w=Math.max(1, Math.round((o.count/total)*width));
+          const avg = o.scored? (o.sum/o.scored) : null;
+          const fill = colourFor(avg, pass, band);
+          const tooltip = `${type}: ${o.count} evals · ${avg==null?'-':pct(avg,1)}`;
+          const rx=x; x+=w;
+          return `<rect x="${rx}" y="0" width="${w}" height="${height}" fill="${fill}"><title>${tooltip}</title></rect>`;
+        }).join('');
+        const label = Array.from(row.map.entries()).map(([t,o])=>`${t}:${o.count}`).join(' • ');
+        return `<div class="chart-row">
+                  <div class="chart-label" title="${row.name}">${row.name}</div>
+                  <svg class="chart-svg" viewBox="0 0 ${width} ${height}" preserveAspectRatio="none" width="100%" height="${height+2}">
+                    ${rects}
+                  </svg>
+                  <div class="muted" style="width:180px; text-align:right">${label}</div>
+                </div>`;
+      }).join('');
+      document.getElementById('agentMediaChart').innerHTML = rowsHtml || '<div class="muted">No data</div>';
+
+      const mediaMap=new Map();
+      evals.forEach(e=>{
+        const mt=guessMediaType(e);
+        if(!mediaMap.has(mt)) mediaMap.set(mt,{count:0,sum:0,scored:0});
+        const o=mediaMap.get(mt); o.count++;
+        const p=getEvalPercent(e); if(p!=null && isFinite(p)){ o.sum+=Number(p); o.scored++; }
+      });
+      const mediaRows = Array.from(mediaMap.entries()).map(([mt,o])=>{
+        const avg = o.scored? (o.sum/o.scored) : null;
+        return `<tr>
+          <td>${mt}</td>
+          <td data-sort="${o.count}">${o.count}</td>
+          <td data-sort="${avg==null?0:avg.toFixed(2)}">${avg==null?'-':pct(avg,1)}</td>
+        </tr>`;
+      }).join('');
+      document.getElementById('mediaTable').innerHTML = `
+        <thead><tr>
+          <th data-type="text">Media Type</th>
+          <th data-type="num">Evaluations</th>
+          <th data-type="num">Avg Score</th>
+        </tr></thead>
+        <tbody>${mediaRows}</tbody>
+      `;
+      tableSorter('mediaTable');
+
+      const failMap=new Map();
+      for(const e of evals){
+        const lookup = await getCombinedLookupForEval(e);
+        const qgs=safeGet(e,'answers.questionGroupScores')||[];
+        qgs.forEach(g=> (g.questionScores||[]).forEach(q=>{
+          const qIds = [q.questionId, q.questionContextId, safeGet(q, 'question.id'), safeGet(q, 'question.contextId')].filter(Boolean);
+          const questionObj = qIds.map(id => lookup.questionObj.get(id)).find(Boolean);
+          const { isFatal, isCritical } = detectCriticalFatalQuestions(q, questionObj);
+          if (isFatal || isCritical) {
+            const qText = resolveQuestionTextWithLookup(lookup,q);
+            const key = `${lookup.formName}|${qText}`;
+            if(!failMap.has(key)) failMap.set(key,{formName:lookup.formName,qText,critical:0,fatal:0});
+            const o=failMap.get(key);
+            if(isFatal) o.fatal++;
+            else if(isCritical) o.critical++;
+          }
+        }));
+      }
+      const repeatRows = Array.from(failMap.values())
+        .sort((a,b)=>(b.fatal+b.critical)-(a.fatal+a.critical))
+        .map(r=>`<tr>
+          <td>${r.formName}</td><td>${r.qText}</td>
+          <td data-sort="${r.critical}">${r.critical}</td>
+          <td data-sort="${r.fatal}">${r.fatal}</td>
+          <td data-sort="${r.critical+r.fatal}">${r.critical+r.fatal}</td></tr>`)
+        .join('');
+      document.getElementById('repeatFailsTable').innerHTML = `
+        <thead><tr>
+          <th data-type="text">Form</th><th data-type="text">Question</th>
+          <th data-type="num">Critical</th><th data-type="num">Fatal</th><th data-type="num">Total</th>
+        </tr></thead>
+        <tbody>${repeatRows || `<tr><td colspan="5" class="muted">No critical/fatal marks found.</td></tr>`}</tbody>
+      `;
+      tableSorter('repeatFailsTable');
+
+      const byAgentInsight=new Map();
+      evals.forEach(e=>{
+        const id=safeGet(e,'agent.id')||e.agentUserId||'(unknown)';
+        const name=resolveUserName(id);
+        if(!byAgentInsight.has(id)) byAgentInsight.set(id,{name,count:0,sum:0,scored:0,fails:0});
+        const o=byAgentInsight.get(id);
+        o.count++;
+        const p=getEvalPercent(e); if(p!=null && isFinite(p)){ o.sum+=Number(p); o.scored++; }
+        const hasFail=(safeGet(e,'answers.questionGroupScores')||[]).some(g=>(g.questionScores||[]).some(q=>{
+          const lookup = state.combinedLookupCache; // not used directly here
+          const isF = !!q.failedKillQuestion; const isC = !!q.failedCriticalQuestion;
+          return isF || isC;
+        }));
+        if(hasFail) o.fails++;
+      });
+      const insightArr = Array.from(byAgentInsight.values()).map(o=>({ name:o.name, count:o.count, avg:o.scored?o.sum/o.scored:null, fails:o.fails }));
+      window._insightData = insightArr;
+      renderAgentInsights();
+
+      const dayKeys = dailyTrendData.map(d => d.date);
+      const agents = Array.from(new Set(evals.map(e=> safeGet(e,'agent.id') || e.agentUserId))).filter(Boolean);
+      const map = new Map();
+      evals.forEach(e=>{
+        const aid = safeGet(e,'agent.id') || e.agentUserId || '(unknown)';
+        const dk = toUKDate(e.releaseDate || e.assignedDate || e.creationDate || e.evaluationDate || e.date || Date.now());
+        const p = getEvalPercent(e);
+        if(!map.has(aid)) map.set(aid, new Map());
+        const dm = map.get(aid);
+        if(!dm.has(dk)) dm.set(dk,{sum:0,count:0});
+        if (p!=null && isFinite(p)) { const o=dm.get(dk); o.sum+=Number(p); o.count++; }
+      });
+
+      const header = `<thead><tr><th>Agent</th>${dayKeys.map(k=>`<th>${k}</th>`).join('')}</tr></thead>`;
+      const rows = agents.map(aid=>{
+        const dm = map.get(aid) || new Map();
+        const cells = dayKeys.map(k=>{
+          const v=dm.get(k);
+          if(!v||v.count===0) return '<td>-</td>';
+          return `<td>${pct(v.sum/v.count,1)}</td>`;
+        }).join('');
+        return `<tr><td>${resolveUserName(aid)}</td>${cells}</tr>`;
+      }).join('');
+
+      document.getElementById('trendTable').innerHTML = `
+        <table class="frozen-table trend-table">
+          ${header}
+          <tbody>${rows}</tbody>
+        </table>
+      `;
+
+      const byAvg = insightArr.filter(x=>x.avg!=null).sort((a,b)=>b.avg-a.avg);
+      const top = byAvg.slice(0,5).map(x=>`<tr><td>${x.name}</td><td>${x.count}</td><td>${pct(x.avg,1)}</td></tr>`).join('');
+      const bottom = byAvg.slice(-5).map(x=>`<tr><td>${x.name}</td><td>${x.count}</td><td>${pct(x.avg,1)}</td></tr>`).join('');
+      document.getElementById('topAgentsTable').innerHTML = `
+        <thead><tr><th>Top Agents</th><th>Evals</th><th>Avg</th></tr></thead><tbody>${top || '<tr><td colspan="3" class="muted">No data</td></tr>'}</tbody>`;
+      document.getElementById('bottomAgentsTable').innerHTML = `
+        <thead><tr><th>Bottom Agents</th><th>Evals</th><th>Avg</th></tr></thead><tbody>${bottom || '<tr><td colspan="3" class="muted">No data</td></tr>'}</tbody>`;
+    }
+
+    function renderAgentInsights(){
+      const data = window._insightData || [];
+      const mode = document.getElementById('insightsSort').value || 'avgDesc';
+      const arr = (function sort(mode, a){
+        const x=[...a];
+        if(mode==='avgAsc') x.sort((u,v)=>(u.avg??-1)-(v.avg??-1));
+        else if(mode==='avgDesc') x.sort((u,v)=>(v.avg??-1)-(u.avg??-1));
+        else if(mode==='failsDesc') x.sort((u,v)=>v.fails-u.fails);
+        else if(mode==='evalsDesc') x.sort((u,v)=>v.count-u.count);
+        return x;
+      })(mode, data);
+
+      const html = arr.map(a=>{
+        const w = a.avg==null?0:Math.max(0,Math.min(100,a.avg));
+        return `<div class="insight-row">
+          <div class="insight-name">${a.name}</div>
+          <div class="insight-bar-wrap"><div class="insight-bar" style="width:${w}%"></div></div>
+          <div class="insight-meta">${pct(a.avg??0,1)} <span class="pill">Evals ${a.count}</span><span class="pill">Fails ${a.fails}</span></div>
+        </div>`;
+      }).join('');
+      document.getElementById('agentInsights').innerHTML = html || '<div class="muted">No agent data.</div>';
+    }
+
+    // ===== Details =====
+    async function renderDetails(){
+      const c=document.getElementById('detailsContainer');
+      if (!state.evals.length){ c.innerHTML = '<div class="muted">No evaluations loaded.</div>'; return; }
+      c.innerHTML = '<div class="info-message">Loading evaluation details...</div>';
+
+      const evaluationElements = await Promise.all(state.evals.map(async (e) => {
+        const agent = resolveUserName(safeGet(e,'agent.id') || e.agentUserId);
+        const lookup = await getCombinedLookupForEval(e);
+        const formName = lookup.formName;
+        const when = toUKDate(e.releaseDate || e.assignedDate || e.creationDate || e.evaluationDate || e.date || Date.now());
+        const convo = e.conversationId || e.conversation?.id || '(n/a)';
+        const score = getEvalPercent(e);
+        const questionGroups = safeGet(e, 'answers.questionGroupScores') || [];
+
+        let qRows = '';
+        questionGroups.forEach(group => {
+          (group.questionScores || []).forEach(qScore => {
+            const questionText = resolveQuestionTextWithLookup(lookup,qScore);
+            const answerText = resolveAnswerTextWithLookup(lookup,qScore);
+            const ansScore = qScore.score ?? null;
+            const qIds = [qScore.questionId, qScore.questionContextId, safeGet(qScore, 'question.id'), safeGet(qScore, 'question.contextId')].filter(Boolean);
+            const questionObj = qIds.map(id => lookup.questionObj.get(id)).find(Boolean);
+            const { isFatal, isCritical } = detectCriticalFatalQuestions(qScore, questionObj);
+
+            let rowClass = '';
+            if (isFatal) rowClass = 'fatal-question';
+            else if (isCritical) rowClass = 'critical-warning';
+
+            let allComments = '';
+            if (qScore.comments) { allComments += `<div class="comment-bubble"><strong>Evaluator Comments:</strong> ${qScore.comments}</div>`; }
+            if (qScore.aiAnswer && qScore.aiAnswer.explanation) { allComments += `<div class="comment-bubble"><strong>AI Analysis:</strong> ${qScore.aiAnswer.explanation}</div>`; }
+
+            qRows += `<tr class="${rowClass}">
+              <td>${questionText}</td>
+              <td>${answerText}</td>
+              <td>${ansScore === null ? '-' : fmt(ansScore, 1)}</td>
+              <td>${isFatal ? '<span class="badge badge-fatal">Fatal</span>' : isCritical ? '<span class="badge badge-critical">Critical</span>' : '<span class="badge badge-ok">OK</span>'}</td>
+              <td>${allComments}</td>
+            </tr>`;
+          });
+        });
+
+        return `
+          <details class="evaluation">
+            <summary>${when} • <strong>${agent}</strong> — ${formName} &nbsp;&middot;&nbsp; Score: <strong>${score===null?'-':pct(score,1)}</strong> ${convo!=='(n/a)'?`&nbsp;&middot;&nbsp; Conversation: ${convo}`:''}</summary>
+            <div class="table-container">
+              <table class="details-table">
+                <thead><tr><th>Question</th><th>Answer</th><th>Score</th><th>Flags</th><th>Comments</th></tr></thead>
+                <tbody>${qRows || `<tr><td colspan="5" class="muted">No question data available.</td></tr>`}</tbody>
+              </table>
+            </div>
+          </details>
+        `;
+      }));
+      c.innerHTML = evaluationElements.join('');
+    }
+
+    // ===== Critical =====
+    async function renderCritical(){
+      const tbl=document.getElementById('criticalTable');
+      if(!state.evals.length){ 
+        document.getElementById('criticalSummaryKPIs').innerHTML = '';
+        tbl.innerHTML='<tr><td class="muted">No evaluations loaded.</td></tr>'; 
+        return; 
+      }
+
+      let totalCritical = 0;
+      let totalFatal = 0;
+      const fatalMap=new Map();  
+      const critMap=new Map();
+      
+      function add(map, formName, qText, agentName){
+        const key=formName+'|'+qText;
+        if(!map.has(key)) map.set(key,{formName,qText,count:0,agents:new Map()});
+        const o=map.get(key); o.count++; o.agents.set(agentName,(o.agents.get(agentName)||0)+1);
+      }
+
+      for (const e of state.evals){
+        const lookup = await getCombinedLookupForEval(e);
+        const formName = lookup.formName;
+        const agentName = resolveUserName(safeGet(e,'agent.id')||e.agentUserId);
+        const qGroups = safeGet(e,'answers.questionGroupScores') || [];
+        qGroups.forEach(g=>{
+          (g.questionScores||[]).forEach(qs=>{
+            const qText = resolveQuestionTextWithLookup(lookup,qs);
+            const qIds = [qs.questionId, qs.questionContextId, safeGet(qs, 'question.id'), safeGet(qs, 'question.contextId')].filter(Boolean);
+            const questionObj = qIds.map(id => lookup.questionObj.get(id)).find(Boolean);
+            const { isFatal, isCritical } = detectCriticalFatalQuestions(qs, questionObj);
+            if(isFatal) { add(fatalMap, formName, qText, agentName); totalFatal++; }
+            if(isCritical && !isFatal) { add(critMap, formName, qText, agentName); totalCritical++; }
+          });
+        });
+      }
+
+      document.getElementById('criticalSummaryKPIs').innerHTML = `
+        <div class="critical-kpi critical">
+          <div class="number">${totalCritical}</div>
+          <div class="label">Total Critical Marks</div>
+        </div>
+        <div class="critical-kpi fatal">
+          <div class="number">${totalFatal}</div>
+          <div class="label">Total Fatal Marks</div>
+        </div>
+      `;
+
+      const rows = [];
+      function rowsFrom(map, type){
+        Array.from(map.values())
+          .sort((a,b)=>b.count-a.count)
+          .forEach(r=>{
+            const agentsArr = Array.from(r.agents.entries()).sort((a,b)=>b[1]-a[1]);
+            const summaryText = `${agentsArr.length} agent${agentsArr.length!==1?'s':''} / ${r.count} mark${r.count!==1?'s':''}`;
+            const agentsHtml = `<details class="agent-list">
+                <summary>${summaryText}</summary>
+                <div class="agent-pills">
+                  ${agentsArr.map(([name,c])=>`<span class="pill">${name} × ${c}</span>`).join('')}
+                </div>
+              </details>`;
+            rows.push(`<tr>
+              <td>${r.formName}</td>
+              <td>${r.qText}</td>
+              <td>${type==='fatal'
+                    ? '<span class="badge badge-fatal">Fatal</span>'
+                    : '<span class="badge badge-critical">Critical</span>'}</td>
+              <td>${r.count}</td>
+              <td>${agentsHtml}</td>
+            </tr>`);
+          });
+      }
+      rowsFrom(fatalMap,'fatal'); 
+      rowsFrom(critMap,'critical');
+
+      tbl.innerHTML = `
+        <thead><tr>
+          <th>Form</th><th>Question</th><th>Type</th><th>Marks</th><th>Agents</th>
+        </tr></thead>
+        <tbody>${rows.join('') || `<tr><td colspan="5" class="muted">No critical or fatal marks found for the selected period.</td></tr>`}</tbody>`;
+    }
+  </script>
+</body>
+</html>

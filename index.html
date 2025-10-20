@@ -31,64 +31,6 @@
     tr:hover{background-color:rgba(99,171,143,.05)}
     .table-container{overflow-x:auto;border:1px solid var(--border-color);border-radius:6px;padding:1px;margin-top:10px}
 
-    /* Frozen column styling for analytics table */
-    .frozen-table-container {
-        position: relative;
-        overflow: auto;
-        border: 1px solid var(--border-color);
-        border-radius: 6px;
-        margin-top: 10px;
-        max-height: 600px;
-    }
-
-    .frozen-table {
-        border-collapse: collapse;
-        width: auto;
-        min-width: 100%;
-    }
-
-    .frozen-table th,
-    .frozen-table td {
-        padding: 10px 12px;
-        text-align: left;
-        border-bottom: 1px solid var(--border-color);
-        vertical-align: top;
-        white-space: nowrap;
-        background: var(--card-bg);
-    }
-
-    .frozen-table th {
-        background-color: var(--primary-color);
-        color: white;
-        font-weight: 600;
-        position: sticky;
-        top: 0;
-        z-index: 10;
-    }
-
-    .frozen-table th:first-child,
-    .frozen-table td:first-child {
-        position: sticky;
-        left: 0;
-        background: var(--card-bg);
-        z-index: 5;
-        border-right: 2px solid var(--border-color);
-        min-width: 200px;
-    }
-
-    .frozen-table th:first-child {
-        z-index: 15;
-        background: var(--primary-color);
-    }
-
-    .frozen-table tr:hover td {
-        background-color: rgba(99,171,143,.05);
-    }
-
-    .frozen-table tr:hover td:first-child {
-        background: rgba(99,171,143,.1);
-    }
-
     .tab{display:inline-block;padding:12px 20px;margin-right:10px;background:#eee;cursor:pointer;border-radius:6px;font-weight:500}
     .tab.active{background:var(--primary-color);color:white}
     .tab-content{display:none}
@@ -106,15 +48,7 @@
     .kpi .label{color:var(--text-light);font-size:12px}
     .kpi .value{font-size:20px;font-weight:700;margin-top:4px}
 
-    .critical-summary-kpis{display:grid;grid-template-columns:repeat(auto-fit,minmax(200px,1fr));gap:16px;margin-bottom:20px}
-    .critical-kpi{background:#fff;border:2px solid var(--border-color);border-radius:12px;padding:20px;text-align:center}
-    .critical-kpi.critical{border-color:#f59e0b}
-    .critical-kpi.fatal{border-color:#ef4444}
-    .critical-kpi .number{font-size:32px;font-weight:800;line-height:1}
-    .critical-kpi.critical .number{color:#f59e0b}
-    .critical-kpi.fatal .number{color:#ef4444}
-    .critical-kpi .label{color:var(--text-light);margin-top:8px;font-size:14px;font-weight:600}
-
+    /* Checkbox dropdown */
     .checkbox-dropdown{position:relative;min-width:220px;width:100%}
     .cd-trigger{display:flex;align-items:center;justify-content:space-between;border:1px solid var(--border-color);border-radius:6px;background:#fff;padding:10px;cursor:pointer;width:100%;box-sizing:border-box}
     .cd-trigger .label{white-space:nowrap;overflow:hidden;text-overflow:ellipsis;flex:1}
@@ -141,6 +75,7 @@
     tr.critical-warning:hover{background-color:#fef3c7!important}
     tr.fatal-question:hover{background-color:#fecaca!important}
 
+    /* Details table: keep question column roomy */
     .details-table th:nth-child(1),
     .details-table td:nth-child(1){ width:32%; min-width:280px }
     .details-table th:nth-child(2),
@@ -152,9 +87,11 @@
     .details-table th:nth-child(5),
     .details-table td:nth-child(5){ width:auto }
 
+    /* Analytics: widen first column in trends table */
     .trend-table th:first-child,
     .trend-table td:first-child{ width:220px; min-width:220px; white-space:nowrap }
 
+    /* Agent insights bars */
     .insight-row{display:flex;align-items:center;gap:10px;padding:8px;border-bottom:1px solid #f1f3f5}
     .insight-name{width:200px;flex-shrink:0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
     .insight-bar-wrap{flex:1;background:#f1f3f5;border-radius:999px;overflow:hidden;height:12px}
@@ -162,6 +99,7 @@
     .insight-meta{width:120px;text-align:right;font-size:12px;color:#6c757d}
     .pill{display:inline-block;border:1px solid var(--border-color);border-radius:999px;padding:2px 8px;font-size:12px;background:#fff;margin-left:6px}
 
+    /* NEW: Analytics enhancements */
     .chart-row{display:flex;align-items:center;gap:10px;margin:8px 0}
     .chart-label{width:200px;flex-shrink:0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
     .chart-svg{flex:1;border:1px solid #f1f3f5;border-radius:8px;background:#fafafa}
@@ -169,10 +107,17 @@
     .legend .key{display:flex;align-items:center;gap:6px}
     .swatch{width:14px;height:14px;border-radius:3px;border:1px solid #ddd}
 
+    /* Sortable tables */
     .sortable th{cursor:pointer}
     .sortable th .sort-ind{margin-left:6px;opacity:.8;font-weight:700}
 
+    /* Stacked bar chart styling */
     .stacked-bar-container { position: relative; height: 400px; margin: 20px 0; }
+
+    /* Header actions */
+    .header-actions{display:flex;gap:8px;align-items:center;justify-content:flex-end;margin-top:8px}
+    .link-btn{background:transparent;border:1px solid var(--border-color);color:var(--text-color)}
+    .link-btn:hover{background:#f8fafc}
   </style>
   <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
 </head>
@@ -183,8 +128,19 @@
 
   <h1>QA Evaluations – Monthly View</h1>
 
+  <div class="header-actions">
+    <button id="signOutBtn" class="link-btn" title="Clear token and sign in again">Sign out</button>
+    <button id="openDebugBtn" class="link-btn" title="Show auth debug">Auth debug</button>
+  </div>
+
   <div id="authCard" class="card">
     <div id="auth-message" class="info-message">Authenticating with PureCloud...</div>
+  </div>
+
+  <div id="authDebug" class="card" style="display:none">
+    <h2 class="section-title">Auth debug</h2>
+    <pre id="authDump" style="background:#f6f8fa;border:1px solid #eee;padding:12px;border-radius:8px;overflow:auto"></pre>
+    <button id="signinBtn">Sign in with Genesys</button>
   </div>
 
   <div id="appContent" style="display:none;">
@@ -194,20 +150,24 @@
       <h2 class="section-title">Configuration</h2>
       <div class="controls">
         <div>
-          <label for="userDropdown">Agents</label>
+          <label for="userDropdown">Agents (Optional)</label>
           <div id="userDropdown" class="checkbox-dropdown"></div>
+          <div class="muted">Select agents to filter by, or leave empty for all</div>
         </div>
         <div>
-          <label for="teamDropdown">Work Teams</label>
+          <label for="teamDropdown">Work Teams (Optional)</label>
           <div id="teamDropdown" class="checkbox-dropdown"></div>
+          <div class="muted">Select teams to filter by, or leave empty for all</div>
         </div>
         <div>
-          <label for="formDropdown">Evaluation Forms</label>
+          <label for="formDropdown">Evaluation Forms (Optional)</label>
           <div id="formDropdown" class="checkbox-dropdown"></div>
+          <div class="muted">Select forms to filter by, or leave empty for all</div>
         </div>
         <div>
           <label for="monthInput">Month</label>
           <input id="monthInput" type="month">
+          <div class="muted">Evaluations within the selected month</div>
         </div>
         <div>
           <label>&nbsp;</label>
@@ -244,13 +204,15 @@
           <div>
             <label for="anaFrom">From (Month)</label>
             <input id="anaFrom" type="month">
+            <div class="muted">Start of range (inclusive)</div>
           </div>
           <div>
             <label for="anaTo">To (Month)</label>
             <input id="anaTo" type="month">
+            <div class="muted">End of range (inclusive)</div>
           </div>
           <div>
-            <label for="analyticsTeamDropdown">Filter by Work Team</label>
+            <label for="analyticsTeamDropdown">Filter by Work Team (local)</label>
             <div id="analyticsTeamDropdown" class="checkbox-dropdown"></div>
           </div>
         </div>
@@ -325,7 +287,9 @@
         </div>
 
         <h3 class="section-title" style="margin-top:18px">Daily Trend by Agent (Selected Period)</h3>
-        <div id="trendTable" class="frozen-table-container"></div>
+        <div class="table-container">
+          <table id="trendTable" class="trend-table"></table>
+        </div>
 
         <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(260px,1fr));gap:16px;margin-top:16px">
           <div class="table-container">
@@ -344,7 +308,6 @@
 
       <div id="criticalTab" class="tab-content">
         <h2 class="section-title">Critical / Kill Question Counts</h2>
-        <div id="criticalSummaryKPIs" class="critical-summary-kpis"></div>
         <div class="table-container">
           <table id="criticalTable"></table>
         </div>
@@ -356,6 +319,7 @@
     // ===== OAuth Configuration =====
     const clientId = 'fe305808-b368-4547-8af9-325d28d552bb';
     const config = { REGION: 'mypurecloud.ie' };
+    const DEBUG = new URLSearchParams(window.location.search).has('debug');
     const redirectUri = 'https://gmcglynn88.github.io/QualityReporting/'; // must exactly match your OAuth app
     const oauthUrl = `https://login.${config.REGION}/oauth/authorize?client_id=${encodeURIComponent(clientId)}&response_type=token&redirect_uri=${encodeURIComponent(redirectUri)}&state=qa`;
 
@@ -479,6 +443,29 @@
       document.getElementById('loadBtn').disabled=!(hasMonth && (hasUsers || hasTeams || hasForms));
     }
 
+    // ===== Robust OAuth handling =====
+    function forceReauth(reason){
+      sessionStorage.removeItem('purecloud_token');
+      sessionStorage.removeItem('purecloud_token_exp');
+      state.accessToken = null;
+      document.getElementById('appContent').style.display='none';
+      document.getElementById('authCard').style.display='block';
+      const dbg = document.getElementById('authDebug');
+      const dump = document.getElementById('authDump');
+      dbg.style.display = 'block';
+      dump.textContent = (reason||'Sign-in required') + `\n\nRedirect URI: ${redirectUri}`;
+      document.getElementById('auth-message').textContent='Please sign in.';
+    }
+
+    document.getElementById('signOutBtn').onclick = () => {
+      forceReauth('Signed out.');
+      document.getElementById('auth-message').textContent='Signed out. Click "Sign in with Genesys".';
+    };
+    document.getElementById('openDebugBtn').onclick = () => {
+      const dbg = document.getElementById('authDebug');
+      dbg.style.display = dbg.style.display === 'none' ? 'block' : 'none';
+    };
+
     // ===== Boot (handles errors + expiry, avoids redirect loops) =====
     document.addEventListener('DOMContentLoaded', () => {
       resolveColors();
@@ -494,8 +481,12 @@
         sessionStorage.removeItem('purecloud_token');
         sessionStorage.removeItem('purecloud_token_exp');
 
-        document.getElementById('auth-message').textContent = 'Sign-in failed. Please refresh the page to try again.';
-        document.getElementById('auth-message').className = 'error-message';
+        const dbg = document.getElementById('authDebug');
+        const dump = document.getElementById('authDump');
+        dbg.style.display = 'block';
+        dump.textContent = `OAuth error: ${oauthError}\n${desc}`;
+        document.getElementById('auth-message').textContent = 'Sign-in failed. See Auth debug below.';
+        document.getElementById('signinBtn').onclick = () => window.location.href = oauthUrl;
         return;
       }
 
@@ -519,16 +510,23 @@
         return;
       }
 
-      // 4) No token yet - redirect to OAuth
-      document.getElementById('auth-message').textContent = 'Redirecting to Genesys Cloud for authentication...';
-      setTimeout(() => { window.location.href = oauthUrl; }, 400);
+      // 4) No token yet
+      if (DEBUG) {
+        document.getElementById('authDebug').style.display = 'block';
+        document.getElementById('authDump').textContent = 'No token. Click Sign in.';
+        document.getElementById('signinBtn').onclick = () => window.location.href = oauthUrl;
+        document.getElementById('auth-message').textContent = 'Debug mode: click Sign in with Genesys';
+      } else {
+        document.getElementById('auth-message').textContent = 'Redirecting to Genesys Cloud for authentication...';
+        setTimeout(() => { window.location.href = oauthUrl; }, 400);
+      }
     });
 
     function startApp(token){
       state.accessToken=token;
       document.getElementById('auth-message').textContent='Authenticated successfully!';
       document.getElementById('auth-message').className='success-message';
-      setTimeout(()=>{ document.getElementById('authCard').style.display='none'; }, 800);
+      setTimeout(()=>{ document.getElementById('authCard').style.display='none'; document.getElementById('authDebug').style.display='none'; }, 800);
       document.getElementById('appContent').style.display='block';
 
       dropdowns.users=createCheckboxDropdown('userDropdown',{placeholder:'Select agents (optional)',searchPlaceholder:'Search agents...'});
@@ -587,6 +585,13 @@
       return fetch(url,{...options,headers:{'Authorization':'Bearer '+state.accessToken,'Content-Type':'application/json',...(options.headers||{})}});
     }
 
+    function handleAuthStatus(status){
+      if(status===401 || status===403){
+        forceReauth('Session expired or unauthorised. Please sign in again.');
+        throw new Error(`HTTP ${status}`);
+      }
+    }
+
     async function fetchJsonWithRetry(url, options={}, {retries=5, baseDelay=500}={}){
       let attempt=0;
       while(true){
@@ -596,17 +601,7 @@
           return await res.json();
         }
         if([400,401,403,404,405].includes(res.status)){
-          if(res.status === 401 || res.status === 403) {
-            // Token expired or invalid
-            sessionStorage.removeItem('purecloud_token');
-            sessionStorage.removeItem('purecloud_token_exp');
-            document.getElementById('appContent').style.display='none';
-            document.getElementById('authCard').style.display='block';
-            document.getElementById('auth-message').textContent='Session expired. Redirecting to login...';
-            document.getElementById('auth-message').className='info-message';
-            setTimeout(() => { window.location.href = oauthUrl; }, 2000);
-            throw new Error('Authentication required');
-          }
+          handleAuthStatus(res.status);
           const err=new Error(`HTTP ${res.status}`); err.status=res.status; throw err;
         }
         attempt++;
@@ -661,52 +656,17 @@
       return 'Other';
     }
 
-    // Improved critical/fatal detection
-    function detectCriticalFatalQuestions(qScore, questionObj) {
-        const isFatal = !!qScore.failedKillQuestion;
-        const isCritical = !!qScore.failedCriticalQuestion;
-        
-        if (isFatal || isCritical) {
-            return { isFatal, isCritical };
-        }
-        
-        if (questionObj && questionObj.criticalQuestion) {
-            const maxScore = getMaxScoreForQuestion(questionObj);
-            const currentScore = qScore.score || 0;
-            
-            if (maxScore > 0 && currentScore === 0) {
-                return { isFatal: false, isCritical: true };
-            }
-        }
-        
-        return { isFatal: false, isCritical: false };
-    }
-
-    function getMaxScoreForQuestion(questionObj) {
-        if (questionObj.answerOptions && questionObj.answerOptions.length > 0) {
-            return Math.max(...questionObj.answerOptions.map(opt => opt.value || 0));
-        }
-        return questionObj.maxScore || 1;
-    }
-
-    // Stacked bar chart init - now uses actual data
-    function initializeStackedBarChart(dailyData) {
+    // Stacked bar chart init
+    function initializeStackedBarChart() {
       const ctx = document.getElementById('dailyTrendChart').getContext('2d');
-      
-      // Prepare data from actual evaluations
-      const labels = dailyData.map(d => d.date);
-      const passedData = dailyData.map(d => d.passed);
-      const amberData = dailyData.map(d => d.amber);
-      const failedData = dailyData.map(d => d.failed);
-      
       return new Chart(ctx, {
         type: 'bar',
         data: {
-          labels: labels,
+          labels: ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'],
           datasets: [
-            { label: 'Passed', data: passedData, backgroundColor: COLORS.OK,   borderColor: COLORS.OK,   borderWidth: 1 },
-            { label: 'Amber',  data: amberData, backgroundColor: COLORS.WARN, borderColor: COLORS.WARN, borderWidth: 1 },
-            { label: 'Failed', data: failedData, backgroundColor: COLORS.BAD,  borderColor: COLORS.BAD,  borderWidth: 1 }
+            { label: 'Passed', data: [65,59,80,81,56,55,40], backgroundColor: COLORS.OK,   borderColor: COLORS.OK,   borderWidth: 1 },
+            { label: 'Amber',  data: [28,48,40,19,86,27,90], backgroundColor: COLORS.WARN, borderColor: COLORS.WARN, borderWidth: 1 },
+            { label: 'Failed', data: [12,15,10, 8,12,18, 5], backgroundColor: COLORS.BAD,  borderColor: COLORS.BAD,  borderWidth: 1 }
           ]
         },
         options: {
@@ -1023,86 +983,10 @@
 
     // ===== Helpers for Q/A text =====
     function approx(a,b){ return Math.abs(Number(a)-Number(b))<1e-6; }
-    
-    function resolveQuestionTextWithLookup(lookup, qScore) {
-      const candidates = [
-        qScore.questionId, 
-        qScore.questionContextId,
-        safeGet(qScore, 'question.id'), 
-        safeGet(qScore, 'question.contextId')
-      ].filter(Boolean);
-      
-      for (const id of candidates) {
-        const t = lookup.questionText.get(id);
-        if (t) return t;
-      }
-      
-      // Fallback to direct question text
-      const questionText = safeGet(qScore, 'question.text');
-      if (questionText) return questionText;
-      
-      return `Question ${candidates[0] || ''}`.trim();
-    }
-
-    function resolveAnswerTextWithLookup(lookup, qScore) {
-      const ids = new Set();
-      
-      // Collect all possible answer IDs
-      (qScore.selectedAnswerIds || []).forEach(x => ids.add(x));
-      (qScore.selectedAnswerOptionIds || []).forEach(x => ids.add(x));
-      if (qScore.selectedAnswerId) ids.add(qScore.selectedAnswerId);
-      if (qScore.answerOptionId) ids.add(qScore.answerOptionId);
-      if (qScore.answerId) ids.add(qScore.answerId);
-      
-      const a = qScore.answer || {};
-      [a.id, a.contextId, a.answerId, a.answerOptionId].filter(Boolean).forEach(x => ids.add(x));
-      
-      (qScore.answers || []).forEach(ans => {
-        [ans.id, ans.contextId, ans.answerId, ans.answerOptionId].filter(Boolean).forEach(x => ids.add(x));
-      });
-
-      // Try to find answer text from the lookup
-      const texts = [];
-      Array.from(ids).forEach(id => {
-        const t = lookup.answerText.get(id);
-        if (t) texts.push(t);
-      });
-      
-      if (texts.length) return texts.join(', ');
-
-      // If no answer text found in lookup, try to get from question's answer options
-      const qIds = [qScore.questionId, qScore.questionContextId, 
-                   safeGet(qScore, 'question.id'), safeGet(qScore, 'question.contextId')].filter(Boolean);
-      const q = qIds.map(id => lookup.questionObj.get(id)).find(Boolean);
-      
-      if (q && Array.isArray(q.answerOptions) && q.answerOptions.length) {
-        const s = Number(qScore.score);
-        const match = q.answerOptions.find(o => 
-          approx(s, o.value) || 
-          approx(s / 100, o.value) || 
-          approx(s, o.value * 100)
-        );
-        if (match) {
-          return match.text ?? String(match.value ?? '');
-        }
-        
-        // If no match found but there are answer options, return the score value
-        if (qScore.score !== null && qScore.score !== undefined) {
-          return String(qScore.score);
-        }
-      }
-
-      // Fallback to various answer fields
-      if (qScore.freeTextAnswer) return String(qScore.freeTextAnswer);
-      if (qScore.numericAnswer !== undefined && qScore.numericAnswer !== null) return String(qScore.numericAnswer);
-      if (safeGet(qScore, 'answer.text')) return qScore.answer.text;
-      
-      // If we have a score but no answer text, show the score
-      if (qScore.score !== null && qScore.score !== undefined) {
-        return `Score: ${qScore.score}`;
-      }
-
-      return 'N/A';
+    function resolveQuestionTextWithLookup(lookup,qScore){
+      const candidates=[qScore.questionId,qScore.questionContextId,safeGet(qScore,'question.id'),safeGet(qScore,'question.contextId')].filter(Boolean);
+      for(const id of candidates){ const t=lookup.questionText.get(id); if(t) return t; }
+      return safeGet(qScore,'question.text') || `Question ${candidates[0]||''}`.trim();
     }
 
     // ===== Renderers =====
@@ -1143,40 +1027,6 @@
     function guessMediaType(e){ return standardiseMedia(safeGet(e,'mediaType') || safeGet(e,'conversation.mediaType') || 'Unknown'); }
     function buildDays(start,end){ const out=[]; for(let d=new Date(start); d<=end; d.setUTCDate(d.getUTCDate()+1)){ out.push(new Date(d)); } return out; }
 
-    // New function to calculate daily trend data from actual evaluations
-    function calculateDailyTrendData(evals, start, end) {
-      const {pass, band} = getPassSettings();
-      const dailyMap = new Map();
-      
-      // Initialize all days in range
-      const days = buildDays(start, end);
-      days.forEach(day => {
-        const dayKey = dayKeyUTC(day);
-        dailyMap.set(dayKey, { date: toUKDate(day), passed: 0, amber: 0, failed: 0 });
-      });
-      
-      // Count evaluations by day and status
-      evals.forEach(e => {
-        const dayKey = dayKeyUTC(e.releaseDate || e.assignedDate || e.creationDate || e.evaluationDate || e.date || Date.now());
-        if (dailyMap.has(dayKey)) {
-          const score = getEvalPercent(e);
-          const dayData = dailyMap.get(dayKey);
-          
-          if (score === null || !isFinite(score)) {
-            dayData.failed++;
-          } else if (score >= pass) {
-            dayData.passed++;
-          } else if (score >= pass - band) {
-            dayData.amber++;
-          } else {
-            dayData.failed++;
-          }
-        }
-      });
-      
-      return Array.from(dailyMap.values());
-    }
-
     async function renderAnalytics(){
       const raw = getAnalyticsSet();
       if(!raw || !raw.length){
@@ -1191,67 +1041,35 @@
         return;
       }
 
+      if (!dailyTrendChart) dailyTrendChart = initializeStackedBarChart();
+
       // Apply team filter for analytics
       const teamFilter = dropdowns.analyticsTeams.getSelectedValues();
       let allowedAgents = null;
       if(teamFilter.length){ allowedAgents = new Set(await agentsForTeams(teamFilter)); }
       const evals = allowedAgents ? raw.filter(e => allowedAgents.has(safeGet(e,'agent.id')||e.agentUserId)) : raw;
 
-      // Calculate daily trend data from actual evaluations
-      const start = state.analyticsRange?.start || state.monthStart;
-      const end   = state.analyticsRange?.end   || state.monthEnd;
-      const dailyTrendData = calculateDailyTrendData(evals, start, end);
-      
-      // Update or create the chart with actual data
-      if (dailyTrendChart) {
-        dailyTrendChart.destroy();
-      }
-      dailyTrendChart = initializeStackedBarChart(dailyTrendData);
-
-      let withFatal=0, withCritical=0, totalCriticalMarks=0, totalFatalMarks=0;
+      let withFatal=0, withCritical=0, total=evals.length;
       let sumScores=0, scored=0;
-      
-      for (const e of evals) {
-        const qgs = safeGet(e, 'answers.questionGroupScores') || [];
-        let evalHasFatal = false, evalHasCritical = false;
-        
-        for (const g of qgs) {
-          for (const q of (g.questionScores || [])) {
-            const qIds = [q.questionId, q.questionContextId, 
-                         safeGet(q, 'question.id'), safeGet(q, 'question.contextId')].filter(Boolean);
-            const questionObj = qIds.map(id => state.combinedLookupCache.get(safeGet(e, 'form.id'))?.questionObj.get(id)).find(Boolean);
-            
-            const { isFatal, isCritical } = detectCriticalFatalQuestions(q, questionObj);
-            
-            if (isFatal) {
-              evalHasFatal = true;
-              totalFatalMarks++;
-            }
-            if (isCritical) {
-              evalHasCritical = true;
-              totalCriticalMarks++;
-            }
-          }
-        }
-        
-        if (evalHasFatal) withFatal++;
-        if (evalHasCritical) withCritical++;
-        
-        const p=getEvalPercent(e); 
-        if(p!=null && isFinite(p)){ sumScores+=Number(p); scored++; }
-      }
-      
+      evals.forEach(e=>{
+        const qgs=safeGet(e,'answers.questionGroupScores')||[];
+        let fatal=false, crit=false;
+        qgs.forEach(g=> (g.questionScores||[]).forEach(q=>{
+          fatal = fatal || !!q.failedKillQuestion;
+          crit  = crit  || !!q.failedCriticalQuestion;
+        }));
+        if(fatal) withFatal++; if(crit) withCritical++;
+        const p=getEvalPercent(e); if(p!=null && isFinite(p)){ sumScores+=Number(p); scored++; }
+      });
       const avgOverall = scored? (sumScores/scored): null;
-      const passRate = evals.length? ((evals.length - Math.max(withFatal, withCritical))/evals.length): null;
+      const passRate = total? ((total - Math.max(withFatal, withCritical))/total): null;
 
       document.getElementById('analyticsKPIs').innerHTML = `
-        <div class="kpi"><div class="label">Evaluations (range)</div><div class="value">${evals.length}</div></div>
+        <div class="kpi"><div class="label">Evaluations (range)</div><div class="value">${total}</div></div>
         <div class="kpi"><div class="label">Avg Score</div><div class="value">${avgOverall==null?'-':pct(avgOverall,1)}</div></div>
         <div class="kpi"><div class="label">With Critical</div><div class="value">${withCritical}</div></div>
         <div class="kpi"><div class="label">With Fatal</div><div class="value">${withFatal}</div></div>
         <div class="kpi"><div class="label">Pass Rate</div><div class="value">${passRate==null?'-':pct(passRate*100,1)}</div></div>
-        <div class="kpi"><div class="label">Critical Marks</div><div class="value">${totalCriticalMarks}</div></div>
-        <div class="kpi"><div class="label">Fatal Marks</div><div class="value">${totalFatalMarks}</div></div>
       `;
 
       const {pass, band} = getPassSettings();
@@ -1324,19 +1142,13 @@
         const lookup = await getCombinedLookupForEval(e);
         const qgs=safeGet(e,'answers.questionGroupScores')||[];
         qgs.forEach(g=> (g.questionScores||[]).forEach(q=>{
-          const qIds = [q.questionId, q.questionContextId, 
-                       safeGet(q, 'question.id'), safeGet(q, 'question.contextId')].filter(Boolean);
-          const questionObj = qIds.map(id => lookup.questionObj.get(id)).find(Boolean);
-          
-          const { isFatal, isCritical } = detectCriticalFatalQuestions(q, questionObj);
-          
-          if (isFatal || isCritical) {
+          if(q.failedKillQuestion || q.failedCriticalQuestion){
             const qText = resolveQuestionTextWithLookup(lookup,q);
             const key = `${lookup.formName}|${qText}`;
             if(!failMap.has(key)) failMap.set(key,{formName:lookup.formName,qText,critical:0,fatal:0});
             const o=failMap.get(key);
-            if(isFatal) o.fatal++;
-            else if(isCritical) o.critical++;
+            if(q.failedKillQuestion) o.fatal++;
+            else if(q.failedCriticalQuestion) o.critical++;
           }
         }));
       }
@@ -1365,34 +1177,29 @@
         const o=byAgentInsight.get(id);
         o.count++;
         const p=getEvalPercent(e); if(p!=null && isFinite(p)){ o.sum+=Number(p); o.scored++; }
-        const hasFail=(safeGet(e,'answers.questionGroupScores')||[]).some(g=>(g.questionScores||[]).some(q=>{
-          const qIds = [q.questionId, q.questionContextId, 
-                       safeGet(q, 'question.id'), safeGet(q, 'question.contextId')].filter(Boolean);
-          const questionObj = qIds.map(id => state.combinedLookupCache.get(safeGet(e, 'form.id'))?.questionObj.get(id)).find(Boolean);
-          const { isFatal, isCritical } = detectCriticalFatalQuestions(q, questionObj);
-          return isFatal || isCritical;
-        }));
+        const hasFail=(safeGet(e,'answers.questionGroupScores')||[]).some(g=>(g.questionScores||[]).some(q=>q.failedKillQuestion||q.failedCriticalQuestion));
         if(hasFail) o.fails++;
       });
       const insightArr = Array.from(byAgentInsight.values()).map(o=>({ name:o.name, count:o.count, avg:o.scored?o.sum/o.scored:null, fails:o.fails }));
       window._insightData = insightArr;
       renderAgentInsights();
 
-      const dayKeys = dailyTrendData.map(d => d.date);
+      const start = state.analyticsRange?.start || state.monthStart;
+      const end   = state.analyticsRange?.end   || state.monthEnd;
+      const days = buildDays(start,end);
+      const dayKeys = days.map(d=> d.toISOString().split('T')[0]);
       const agents = Array.from(new Set(evals.map(e=> safeGet(e,'agent.id') || e.agentUserId))).filter(Boolean);
       const map = new Map();
       evals.forEach(e=>{
         const aid = safeGet(e,'agent.id') || e.agentUserId || '(unknown)';
-        const dk = toUKDate(e.releaseDate || e.assignedDate || e.creationDate || e.evaluationDate || e.date || Date.now());
+        const dk = dayKeyUTC(e.releaseDate || e.assignedDate || e.creationDate || e.evaluationDate || e.date || Date.now());
         const p = getEvalPercent(e);
         if(!map.has(aid)) map.set(aid, new Map());
         const dm = map.get(aid);
         if(!dm.has(dk)) dm.set(dk,{sum:0,count:0});
         if (p!=null && isFinite(p)) { const o=dm.get(dk); o.sum+=Number(p); o.count++; }
       });
-      
-      // Frozen table implementation
-      const header = `<thead><tr><th>Agent</th>${dayKeys.map(k=>`<th>${k}</th>`).join('')}</tr></thead>`;
+      const header = `<thead><tr><th>Agent</th>${dayKeys.map(k=>`<th>${toUKDate(k)}</th>`).join('')}</tr></thead>`;
       const rows = agents.map(aid=>{
         const dm = map.get(aid) || new Map();
         const cells = dayKeys.map(k=>{
@@ -1402,13 +1209,7 @@
         }).join('');
         return `<tr><td>${resolveUserName(aid)}</td>${cells}</tr>`;
       }).join('');
-      
-      document.getElementById('trendTable').innerHTML = `
-        <table class="frozen-table trend-table">
-          ${header}
-          <tbody>${rows}</tbody>
-        </table>
-      `;
+      document.getElementById('trendTable').innerHTML = header + `<tbody>${rows}</tbody>`;
 
       const byAvg = insightArr.filter(x=>x.avg!=null).sort((a,b)=>b.avg-a.avg);
       const top = byAvg.slice(0,5).map(x=>`<tr><td>${x.name}</td><td>${x.count}</td><td>${pct(x.avg,1)}</td></tr>`).join('');
@@ -1457,22 +1258,46 @@
         const score = getEvalPercent(e);
         const questionGroups = safeGet(e, 'answers.questionGroupScores') || [];
 
+        function resolveAnswerTextWithLookup(lookup,qScore){
+          const ids=new Set();
+          (qScore.selectedAnswerIds||[]).forEach(x=>ids.add(x));
+          (qScore.selectedAnswerOptionIds||[]).forEach(x=>ids.add(x));
+          if(qScore.selectedAnswerId) ids.add(qScore.selectedAnswerId);
+          if(qScore.answerOptionId) ids.add(qScore.answerOptionId);
+          if(qScore.answerId) ids.add(qScore.answerId);
+          const a=qScore.answer||{};
+          [a.id,a.contextId,a.answerId,a.answerOptionId].filter(Boolean).forEach(x=>ids.add(x));
+          (qScore.answers||[]).forEach(ans=>{ [ans.id,ans.contextId,ans.answerId,ans.answerOptionId].filter(Boolean).forEach(x=>ids.add(x)); });
+
+          const texts=[];
+          Array.from(ids).forEach(id=>{ const t=lookup.answerText.get(id); if(t) texts.push(t); });
+          if(texts.length) return texts.join(', ');
+
+          const qIds=[qScore.questionId,qScore.questionContextId,safeGet(qScore,'question.id'),safeGet(qScore,'question.contextId')].filter(Boolean);
+          const q = qIds.map(id=>lookup.questionObj.get(id)).find(Boolean);
+          if(q && Array.isArray(q.answerOptions) && q.answerOptions.length){
+            const s = Number(qScore.score);
+            const match = q.answerOptions.find(o => approx(s,o.value) || approx(s/100,o.value) || approx(s,o.value*100));
+            if(match){ return match.text ?? String(match.value ?? ''); }
+          }
+          if(qScore.freeTextAnswer) return String(qScore.freeTextAnswer);
+          if(qScore.numericAnswer!==undefined && qScore.numericAnswer!==null) return String(qScore.numericAnswer);
+          if(safeGet(qScore,'answer.text')) return qScore.answer.text;
+          return 'N/A';
+        }
+
         let qRows = '';
         questionGroups.forEach(group => {
           (group.questionScores || []).forEach(qScore => {
             const questionText = resolveQuestionTextWithLookup(lookup,qScore);
             const answerText = resolveAnswerTextWithLookup(lookup,qScore);
             const ansScore = qScore.score ?? null;
-            
-            const qIds = [qScore.questionId, qScore.questionContextId, 
-                         safeGet(qScore, 'question.id'), safeGet(qScore, 'question.contextId')].filter(Boolean);
-            const questionObj = qIds.map(id => lookup.questionObj.get(id)).find(Boolean);
-            
-            const { isFatal, isCritical } = detectCriticalFatalQuestions(qScore, questionObj);
+            const isFat = !!qScore.failedKillQuestion;
+            const isCrit = !!qScore.failedCriticalQuestion;
 
             let rowClass = '';
-            if (isFatal) rowClass = 'fatal-question';
-            else if (isCritical) rowClass = 'critical-warning';
+            if (isFat) rowClass = 'fatal-question';
+            else if (isCrit) rowClass = 'critical-warning';
 
             let allComments = '';
             if (qScore.comments) { allComments += `<div class="comment-bubble"><strong>Evaluator Comments:</strong> ${qScore.comments}</div>`; }
@@ -1482,7 +1307,7 @@
               <td>${questionText}</td>
               <td>${answerText}</td>
               <td>${ansScore === null ? '-' : fmt(ansScore, 1)}</td>
-              <td>${isFatal ? '<span class="badge badge-fatal">Fatal</span>' : isCritical ? '<span class="badge badge-critical">Critical</span>' : '<span class="badge badge-ok">OK</span>'}</td>
+              <td>${isFat ? '<span class="badge badge-fatal">Fatal</span>' : isCrit ? '<span class="badge badge-critical">Critical</span>' : '<span class="badge badge-ok">OK</span>'}</td>
               <td>${allComments}</td>
             </tr>`;
           });
@@ -1506,17 +1331,9 @@
     // ===== Critical =====
     async function renderCritical(){
       const tbl=document.getElementById('criticalTable');
-      if(!state.evals.length){ 
-        document.getElementById('criticalSummaryKPIs').innerHTML = '';
-        tbl.innerHTML='<tr><td class="muted">No evaluations loaded.</td></tr>'; 
-        return; 
-      }
+      if(!state.evals.length){ tbl.innerHTML='<tr><td class="muted">No evaluations loaded.</td></tr>'; return; }
 
-      let totalCritical = 0;
-      let totalFatal = 0;
-      const fatalMap=new Map();  
-      const critMap=new Map();
-      
+      const fatalMap=new Map();  const critMap=new Map();
       function add(map, formName, qText, agentName){
         const key=formName+'|'+qText;
         if(!map.has(key)) map.set(key,{formName,qText,count:0,agents:new Map()});
@@ -1531,35 +1348,11 @@
         qGroups.forEach(g=>{
           (g.questionScores||[]).forEach(qs=>{
             const qText = resolveQuestionTextWithLookup(lookup,qs);
-            
-            const qIds = [qs.questionId, qs.questionContextId, 
-                         safeGet(qs, 'question.id'), safeGet(qs, 'question.contextId')].filter(Boolean);
-            const questionObj = qIds.map(id => lookup.questionObj.get(id)).find(Boolean);
-            
-            const { isFatal, isCritical } = detectCriticalFatalQuestions(qs, questionObj);
-            
-            if(isFatal) {
-              add(fatalMap, formName, qText, agentName);
-              totalFatal++;
-            }
-            if(isCritical && !isFatal) {
-              add(critMap, formName, qText, agentName);
-              totalCritical++;
-            }
+            if(qs.failedKillQuestion) add(fatalMap, formName, qText, agentName);
+            if(qs.failedCriticalQuestion && !qs.failedKillQuestion) add(critMap, formName, qText, agentName);
           });
         });
       }
-
-      document.getElementById('criticalSummaryKPIs').innerHTML = `
-        <div class="critical-kpi critical">
-          <div class="number">${totalCritical}</div>
-          <div class="label">Total Critical Marks</div>
-        </div>
-        <div class="critical-kpi fatal">
-          <div class="number">${totalFatal}</div>
-          <div class="label">Total Fatal Marks</div>
-        </div>
-      `;
 
       const rows = [];
       function rowsFrom(map, type){
@@ -1585,8 +1378,7 @@
             </tr>`);
           });
       }
-      rowsFrom(fatalMap,'fatal'); 
-      rowsFrom(critMap,'critical');
+      rowsFrom(fatalMap,'fatal'); rowsFrom(critMap,'critical');
 
       tbl.innerHTML = `
         <thead><tr>

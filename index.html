@@ -137,11 +137,6 @@
 
   <div id="authCard" class="card">
     <div id="auth-message" class="info-message">Authenticating with PureCloud...</div>
-    <div style="margin-top:10px; display:flex; gap:8px; align-items:center">
-      <button id="signinBtn" style="display:none">Sign in</button>
-      <button id="resetSessionBtn" style="display:none; background:#6c757d">Reset session</button>
-    </div>
-  </div>
   </div>
 
   <div id="appContent" style="display:none;">
@@ -310,15 +305,11 @@
   </div>
 
   <script>
-    // === Global JS error surface ===
-    window.addEventListener('error', (e) => {
-      const el = document.getElementById('auth-message');
-      if (el) { el.textContent = 'Error: ' + (e?.message || 'Script failed to load'); el.className = 'error-message'; }
-    });
     // ===== OAuth Configuration =====
     const clientId = 'fe305808-b368-4547-8af9-325d28d552bb';
     const config = { REGION: 'mypurecloud.ie' };
     const redirectUri = 'https://gmcglynn88.github.io/QualityReporting/'; // must exactly match your OAuth app
+    // Hard-coded, pre-encoded OAuth URL
     const oauthUrl = 'https://login.mypurecloud.ie/oauth/authorize?client_id=fe305808-b368-4547-8af9-325d28d552bb&response_type=token&redirect_uri=https%3A%2F%2Fgmcglynn88.github.io%2FQualityReporting%2F&state=qa';
 
     const state = {
@@ -442,7 +433,7 @@
     }
 
     // ===== Boot (handles errors + expiry, avoids redirect loops) =====
-    document.addEventListener('DOMContentLoaded', () => {
+    document.addEventListener('DOMContentLoaded', function () {
       resolveColors();
 
       const rawHash = (window.location.hash || '').replace(/^#/, '');
@@ -483,110 +474,7 @@
 
       // 4) No token yet - redirect to OAuth
       document.getElementById('auth-message').textContent = 'Redirecting to Genesys Cloud for authentication...';
-      setTimeout(() => { window.location.href = oauthUrl; }, 400);
-    });
-
-        const rawHash = (window.location.hash || '').replace(/^#/, '');
-        const params = new URLSearchParams(rawHash);
-
-        const signinBtn = document.getElementById('signinBtn');
-        const resetBtn = document.getElementById('resetSessionBtn');
-        const doRedirect = () => { document.getElementById('auth-message').textContent = 'Redirecting to Genesys Cloud for authentication...'; setTimeout(() => { window.location.href = oauthUrl; }, 250); };
-        signinBtn.onclick = doRedirect;
-        resetBtn.onclick = () => { sessionStorage.removeItem('purecloud_token'); sessionStorage.removeItem('purecloud_token_exp'); doRedirect(); };
-
-        // 1) OAuth error (prevents infinite redirect)
-        const oauthError = params.get('error');
-        if (oauthError) {
-          history.replaceState(null, document.title, window.location.pathname + window.location.search);
-          sessionStorage.removeItem('purecloud_token');
-          sessionStorage.removeItem('purecloud_token_exp');
-          document.getElementById('auth-message').textContent = 'Sign-in failed. Please click “Sign in”.';
-          document.getElementById('auth-message').className = 'error-message';
-          signinBtn.style.display = 'inline-block';
-          resetBtn.style.display = 'inline-block';
-          return;
-        }
-
-        // 2) Token in hash
-        const tokenFromHash = params.get('access_token');
-        if (tokenFromHash) {
-          const expiresIn = parseInt(params.get('expires_in') || '0', 10);
-          const expAt = expiresIn ? Date.now() + (expiresIn - 60) * 1000 : 0; // pad by 60s
-          sessionStorage.setItem('purecloud_token', tokenFromHash);
-          if (expAt) sessionStorage.setItem('purecloud_token_exp', String(expAt));
-          history.replaceState(null, document.title, window.location.pathname + window.location.search);
-          startApp(tokenFromHash);
-          return;
-        }
-
-        // 3) Token from session (if not expired)
-        const tokenFromSession = sessionStorage.getItem('purecloud_token');
-        const exp = parseInt(sessionStorage.getItem('purecloud_token_exp') || '0', 10);
-        if (tokenFromSession && (!exp || Date.now() < exp)) {
-          startApp(tokenFromSession);
-          return;
-        }
-
-        // 4) No token yet - redirect to OAuth
-        document.getElementById('auth-message').textContent = 'Redirecting to Genesys Cloud for authentication...';
-        // Show manual buttons in case redirects are blocked
-        signinBtn.style.display = 'inline-block';
-        resetBtn.style.display = 'inline-block';
-        setTimeout(doRedirect, 400);
-
-        // Safety: if still not redirected after a bit, enable manual sign-in visibly
-        setTimeout(() => { signinBtn.style.display = 'inline-block'; resetBtn.style.display = 'inline-block'; }, 1500);
-      } catch (err) {
-        console.error(err);
-        const el = document.getElementById('auth-message');
-        if (el) { el.textContent = 'Startup error: ' + (err?.message || err); el.className = 'error-message'; }
-        const signinBtn = document.getElementById('signinBtn');
-        const resetBtn = document.getElementById('resetSessionBtn');
-        if (signinBtn) signinBtn.style.display = 'inline-block';
-        if (resetBtn) resetBtn.style.display = 'inline-block';
-      }
-    });
-
-      const rawHash = (window.location.hash || '').replace(/^#/, '');
-      const params = new URLSearchParams(rawHash);
-
-      // 1) OAuth error (prevents infinite redirect)
-      const oauthError = params.get('error');
-      if (oauthError) {
-        const desc = decodeURIComponent(params.get('error_description') || '');
-        history.replaceState(null, document.title, window.location.pathname + window.location.search);
-        sessionStorage.removeItem('purecloud_token');
-        sessionStorage.removeItem('purecloud_token_exp');
-
-        document.getElementById('auth-message').textContent = 'Sign-in failed. Please refresh the page to try again.';
-        document.getElementById('auth-message').className = 'error-message';
-        return;
-      }
-
-      // 2) Token in hash
-      const tokenFromHash = params.get('access_token');
-      if (tokenFromHash) {
-        const expiresIn = parseInt(params.get('expires_in') || '0', 10);
-        const expAt = expiresIn ? Date.now() + (expiresIn - 60) * 1000 : 0; // pad by 60s
-        sessionStorage.setItem('purecloud_token', tokenFromHash);
-        if (expAt) sessionStorage.setItem('purecloud_token_exp', String(expAt));
-        history.replaceState(null, document.title, window.location.pathname + window.location.search);
-        startApp(tokenFromHash);
-        return;
-      }
-
-      // 3) Token from session (if not expired)
-      const tokenFromSession = sessionStorage.getItem('purecloud_token');
-      const exp = parseInt(sessionStorage.getItem('purecloud_token_exp') || '0', 10);
-      if (tokenFromSession && (!exp || Date.now() < exp)) {
-        startApp(tokenFromSession);
-        return;
-      }
-
-      // 4) No token yet - redirect to OAuth
-      document.getElementById('auth-message').textContent = 'Redirecting to Genesys Cloud for authentication...';
-      setTimeout(() => { window.location.href = oauthUrl; }, 400);
+      setTimeout(function(){ window.location.href = oauthUrl; }, 200);
     });
 
     function startApp(token){
@@ -727,55 +615,45 @@
     }
 
     // Improved critical/fatal detection
-    function detectCriticalFatalQuestions(qScore, questionObj) { const isFatal = !!(qScore.failedKillQuestion || qScore.isKill || qScore.isFatal); // explicit API flags const explicitCritFail = !!(qScore.failedCriticalQuestion); // Genesys flag // If the question/evaluation explicitly marked N/A, don't treat as markdown if (qScore.notApplicable) { return { isFatal, isCritical: explicitCritFail }; } // Determine whether this is a critical question in the schema or payload const criticalFlag = !!( qScore.isCritical || safeGet(qScore,'question.isCritical') || safeGet(questionObj,'criticalQuestion') || safeGet(questionObj,'isCritical') ); // Compare score vs max for markdown const maxScore = getMaxScoreForQuestion(questionObj || {}); let currentScore = Number(qScore.score); if (!isFinite(currentScore)) currentScore = 0; const markdownByScore = criticalFlag && maxScore > 0 && currentScore < maxScore; return { isFatal, isCritical: explicitCritFail || markdownByScore }; };
-        }
-        
-        if (questionObj && questionObj.criticalQuestion) {
-            const maxScore = getMaxScoreForQuestion(questionObj);
-            const currentScore = qScore.score || 0;
-            
-            if (maxScore > 0 && currentScore === 0) {
-                return { isFatal: false, isCritical: true };
-            }
-        }
-        
-        return { isFatal: false, isCritical: false };
+    function getMaxScoreForQuestion(questionObj) {
+      const opts = [...(questionObj?.answerOptions || []), ...(questionObj?.options || [])];
+      if (opts.length > 0) { return Math.max(...opts.map(opt => Number(opt.value) || 0)); }
+      return Number(questionObj?.maxScore) || 1;
     }
 
-    function getMaxScoreForQuestion(questionObj) { const opts = [...(questionObj?.answerOptions || []), ...(questionObj?.options || [])]; if (opts.length > 0) { return Math.max(...opts.map(opt => Number(opt.value) || 0)); } return Number(questionObj?.maxScore) || 1; }
-        return questionObj.maxScore || 1;
+    function detectCriticalFatalQuestions(qScore, questionObj) {
+      const isFatal = !!(qScore.failedKillQuestion || qScore.isKill || qScore.isFatal);
+      const explicitCritFail = !!(qScore.failedCriticalQuestion);
+      if (qScore.notApplicable) {
+        return { isFatal, isCritical: explicitCritFail };
+      }
+      const criticalFlag = !!( qScore.isCritical || safeGet(qScore,'question.isCritical') || safeGet(questionObj,'criticalQuestion') || safeGet(questionObj,'isCritical') );
+      const maxScore = getMaxScoreForQuestion(questionObj || {});
+      let currentScore = Number(qScore.score);
+      if (!isFinite(currentScore)) currentScore = 0;
+      const markdownByScore = criticalFlag && maxScore > 0 && currentScore < maxScore;
+      return { isFatal, isCritical: explicitCritFail || markdownByScore };
     }
 
     // Stacked bar chart init - now uses actual data
     function initializeStackedBarChart(dailyData) {
       const ctx = document.getElementById('dailyTrendChart').getContext('2d');
-      
-      // Prepare data from actual evaluations
       const labels = dailyData.map(d => d.date);
       const passedData = dailyData.map(d => d.passed);
       const amberData = dailyData.map(d => d.amber);
       const failedData = dailyData.map(d => d.failed);
-      
       return new Chart(ctx, {
         type: 'bar',
-        data: {
-          labels: labels,
-          datasets: [
-            { label: 'Passed', data: passedData, backgroundColor: COLORS.OK,   borderColor: COLORS.OK,   borderWidth: 1 },
-            { label: 'Amber',  data: amberData, backgroundColor: COLORS.WARN, borderColor: COLORS.WARN, borderWidth: 1 },
-            { label: 'Failed', data: failedData, backgroundColor: COLORS.BAD,  borderColor: COLORS.BAD,  borderWidth: 1 }
-          ]
-        },
+        data: { labels, datasets: [
+          { label: 'Passed', data: passedData, backgroundColor: COLORS.OK,   borderColor: COLORS.OK,   borderWidth: 1 },
+          { label: 'Amber',  data: amberData, backgroundColor: COLORS.WARN, borderColor: COLORS.WARN, borderWidth: 1 },
+          { label: 'Failed', data: failedData, backgroundColor: COLORS.BAD,  borderColor: COLORS.BAD,  borderWidth: 1 }
+        ]},
         options: {
-          responsive: true,
-          maintainAspectRatio: false,
+          responsive: true, maintainAspectRatio: false,
           scales: {
             x: { stacked: true, grid: { color: 'rgba(0,0,0,0.1)' } },
-            y: {
-              stacked: true, beginAtZero: true,
-              title: { display: true, text: 'Number of Evaluations' },
-              grid: { color: 'rgba(0,0,0,0.1)' }
-            }
+            y: { stacked: true, beginAtZero: true, title: { display: true, text: 'Number of Evaluations' }, grid: { color: 'rgba(0,0,0,0.1)' } }
           },
           plugins: {
             legend: { position: 'top', labels: { color: COLORS.TEXT } },
@@ -813,7 +691,7 @@
             const bv=b.cells[i].getAttribute('data-sort') ?? b.cells[i].innerText;
             const A=num?Number(av):String(av).toLowerCase();
             const B=num?Number(bv):String(bv).toLowerCase();
-            return dir==='asc'? (A>B?1:A<B?-1:0) : (A<B?1:A>B?-1:0);
+            return dir==='asc'? (A>B?1:A<L?-1:0) : (A<B?1:A>B?-1:0);
           });
           body.innerHTML='';
           rows.forEach(r=>body.appendChild(r));
@@ -1007,91 +885,29 @@
       }
     }
 
-    // ===== Forms & lookups (hardened for ALL forms) =====
+    // ===== Forms & lookups =====
     function formKey(formId, versionId){ return (versionId === '__published__') ? `pub@${formId}` : `${formId}@${versionId || 'latest'}`; }
-
-    async function getFormDetails(formIdOrPubId, versionId){
-      const key = formKey(formIdOrPubId, versionId);
-      if (state.formDetailsCache.has(key)) return state.formDetailsCache.get(key);
-
-      const baseForms = `https://api.${config.REGION}/api/v2/quality/forms/evaluations`;
-      const basePublished = `https://api.${config.REGION}/api/v2/quality/publishedforms/evaluations`;
-
-      async function tryGet(url){
-        try { return await fetchJsonWithRetry(url, { method: 'GET' }); }
-        catch (err) {
-          if ([400,404,405].includes(err.status)) return null; // soft-fail
-          throw err;
+    async function getFormDetails(formId, versionId){
+      const key=formKey(formId,versionId);
+      if(state.formDetailsCache.has(key)) return state.formDetailsCache.get(key);
+      let url;
+      if (versionId === '__published__') url = `https://api.${config.REGION}/api/v2/quality/publishedforms/evaluations/${formId}`;
+      else url = versionId
+        ? `https://api.${config.REGION}/api/v2/quality/forms/evaluations/${formId}/versions/${versionId}`
+        : `https://api.${config.REGION}/api/v2/quality/forms/evaluations/${formId}`;
+      try{
+        let data;
+        try{ data = await fetchJsonWithRetry(url,{method:'GET'}); }
+        catch(err){
+          if(versionId && versionId!=='__published__'){
+            data = await fetchJsonWithRetry(`https://api.${config.REGION}/api/v2/quality/forms/evaluations/${formId}`,{method:'GET'});
+          }else{ throw err; }
         }
-      }
-
-      let data = null;
-      if (versionId === '__published__') {
-        data = await tryGet(`${basePublished}/${formIdOrPubId}`);
-        if (!data) data = await tryGet(`${baseForms}/${formIdOrPubId}`);
-      } else if (versionId) {
-        data = await tryGet(`${baseForms}/${formIdOrPubId}/versions/${versionId}`);
-        if (!data) data = await tryGet(`${baseForms}/${formIdOrPubId}`);
-        if (!data) data = await tryGet(`${basePublished}/${formIdOrPubId}`);
-      } else {
-        data = await tryGet(`${baseForms}/${formIdOrPubId}`);
-        if (!data) data = await tryGet(`${basePublished}/${formIdOrPubId}`);
-      }
-
-      state.formDetailsCache.set(key, data || null);
-      state.formLookupCache.set(key, buildFormLookup(data || {}));
-      return data;
+        state.formDetailsCache.set(key,data);
+        state.formLookupCache.set(key,buildFormLookup(data||{}));
+        return data;
+      }catch(e){ state.formDetailsCache.set(key,null); return null; }
     }
-
-    async function getCombinedLookupForEval(e){
-      const eForm = safeGet(e,'evaluationForm') || {};
-      const pubId = eForm.id || null;
-
-      const formId = safeGet(e,'form.id') || e.formId || null;
-      const formVer = safeGet(e,'form.versionId') || safeGet(e,'form.version') || null;
-
-      const pubVer = eForm.versionId || eForm.version || null;
-
-      const comboKey = [
-        pubId ? `pub:${pubId}` : '',
-        formId ? `form:${formId}` : '',
-        (formVer || pubVer) ? `ver:${formVer || pubVer}` : ''
-      ].filter(Boolean).join('|') || 'none';
-
-      if(state.combinedLookupCache.has(comboKey)) return state.combinedLookupCache.get(comboKey);
-
-      const attempts = [];
-      const seen = new Set();
-      function add(id, ver){ if(!id) return; const sig=`${id}|${ver||''}`; if(seen.has(sig)) return; seen.add(sig); attempts.push(getFormDetails(id, ver)); }
-
-      // Try the lot (order matters)
-      add(pubId, '__published__');
-      add(pubId, pubVer);
-      add(formId, formVer);
-      add(formId, null);
-      // Treat evaluationForm.id as a normal form if needed
-      add(pubId, null);
-
-      const details = (await Promise.all(attempts)).filter(Boolean);
-
-      const merged = { questionText:new Map(), answerText:new Map(), questionObj:new Map() };
-      const names = [];
-      details.forEach(d => {
-        if(d?.name) names.push(d.name);
-        const lk = buildFormLookup(d || {});
-        lk.questionText.forEach((v,k)=>merged.questionText.set(k,v));
-        lk.answerText.forEach((v,k)=>merged.answerText.set(k,v));
-        lk.questionObj.forEach((v,k)=>merged.questionObj.set(k,v));
-      });
-
-      const formName = safeGet(e,'evaluationForm.name') || safeGet(e,'form.name') || names[0] || '(Form)';
-      const combined = {...merged, formName};
-
-      state.combinedLookupCache.set(comboKey, combined);
-      return combined;
-    }
-
-    function approx(a,b){ return Math.abs(Number(a)-Number(b))<1e-6; }
 
     function buildFormLookup(form){
       const questionText=new Map(), answerText=new Map(), questionObj=new Map();
@@ -1102,8 +918,7 @@
           questionText.set(id,qTxt); 
           questionObj.set(id,q);
         });
-        const opts = [...(q.answerOptions||[]), ...(q.options||[])];
-        opts.forEach(a=>{
+        (q.answerOptions||[]).forEach(a=>{
           const aTxt=a.text ?? String(a.value ?? '');
           [a.id, a.contextId, a.answerId, a.answerOptionId].filter(Boolean).forEach(id=>{
             answerText.set(id,aTxt);
@@ -1116,82 +931,68 @@
       return {questionText,answerText,questionObj};
     }
 
-    // ===== Helpers for Q/A text (covers ALL forms) =====
+    async function getCombinedLookupForEval(e){
+      const pubId = safeGet(e,'evaluationForm.id');
+      const formId = safeGet(e,'form.id') || e.formId;
+      const formVersionId = safeGet(e,'form.versionId') || e.formVersionId || safeGet(e,'form.version');
+      const comboKey = [ pubId ? `pub:${pubId}` : '', formId ? `form:${formId}` : '', formVersionId ? `ver:${formVersionId}` : '' ].filter(Boolean).join('|') || 'none';
+      if(state.combinedLookupCache.has(comboKey)) return state.combinedLookupCache.get(comboKey);
+      const detailsPromises = [];
+      if (pubId) { detailsPromises.push(getFormDetails(pubId, '__published__')); }
+      if (formId && formVersionId) { detailsPromises.push(getFormDetails(formId, formVersionId)); }
+      if (formId && !formVersionId) { detailsPromises.push(getFormDetails(formId, null)); }
+      if (formId) { detailsPromises.push(getFormDetails(formId, null)); }
+      const details = (await Promise.all(detailsPromises)).filter(Boolean);
+      const merged = { questionText: new Map(), answerText: new Map(), questionObj: new Map() };
+      const names = [];
+      details.forEach(d => {
+        if(d?.name) names.push(d.name);
+        const lk = buildFormLookup(d || {});
+        lk.questionText.forEach((v,k) => merged.questionText.set(k,v));
+        lk.answerText.forEach((v,k) => merged.answerText.set(k,v));
+        lk.questionObj.forEach((v,k) => merged.questionObj.set(k,v));
+      });
+      const formName = safeGet(e,'evaluationForm.name') || safeGet(e,'form.name') || names[0] || '(Form)';
+      const combined = {...merged, formName};
+      state.combinedLookupCache.set(comboKey, combined);
+      return combined;
+    }
+
+    // ===== IMPROVED Helpers for Q/A text =====
+    function approx(a,b){ return Math.abs(Number(a)-Number(b))<1e-6; }
     function resolveQuestionTextWithLookup(lookup, qScore) {
-      const candidates = [
-        qScore.questionId, 
-        qScore.questionContextId,
-        safeGet(qScore, 'question.id'), 
-        safeGet(qScore, 'question.contextId'),
-        safeGet(qScore, 'question.questionId')
-      ].filter(Boolean);
-
-      for (const id of candidates) {
-        const t = lookup.questionText.get(id);
-        if (t) return t;
-      }
-
+      const candidates = [ qScore.questionId, qScore.questionContextId, safeGet(qScore, 'question.id'), safeGet(qScore, 'question.contextId'), safeGet(qScore, 'question.questionId') ].filter(Boolean);
+      for (const id of candidates) { const t = lookup.questionText.get(id); if (t) return t; }
       const questionText = safeGet(qScore, 'question.text') || safeGet(qScore, 'question.label');
       if (questionText) return questionText;
-
-      return candidates.length ? `Question (${candidates[0]})` : 'Question';
+      return candidates.length > 0 ? `Question (${candidates[0]})` : 'Question';
     }
 
     function resolveAnswerTextWithLookup(lookup, qScore) {
       const ids = new Set();
-
-      // Honour N/A early
-      if (qScore.notApplicable) return 'N/A';
-
-      // Additional shapes seen on non-AI forms
-      if (qScore.selectedOptionId) ids.add(qScore.selectedOptionId);
-      if (safeGet(qScore,'answer.selectedOptionId')) ids.add(qScore.answer.selectedOptionId);
-
       (qScore.selectedAnswerIds || []).forEach(x => ids.add(x));
       (qScore.selectedAnswerOptionIds || []).forEach(x => ids.add(x));
-
       if (qScore.selectedAnswerId) ids.add(qScore.selectedAnswerId);
       if (qScore.answerOptionId) ids.add(qScore.answerOptionId);
       if (qScore.answerId) ids.add(qScore.answerId);
-
       const a = qScore.answer || {};
       [a.id, a.contextId, a.answerId, a.answerOptionId].filter(Boolean).forEach(x => ids.add(x));
-
-      (qScore.answers || []).forEach(ans => {
-        [ans.id, ans.contextId, ans.answerId, ans.answerOptionId, ans.selectedOptionId]
-          .filter(Boolean).forEach(x => ids.add(x));
-      });
-
+      (qScore.answers || []).forEach(ans => { [ans.id, ans.contextId, ans.answerId, ans.answerOptionId].filter(Boolean).forEach(x => ids.add(x)); });
       const texts = [];
       Array.from(ids).forEach(id => { const t = lookup.answerText.get(id); if (t) texts.push(t); });
       if (texts.length) return texts.join(', ');
-
-      // Try match by score against the question's option values
-      const qIds = [
-        qScore.questionId, 
-        qScore.questionContextId,
-        safeGet(qScore, 'question.id'), 
-        safeGet(qScore, 'question.contextId')
-      ].filter(Boolean);
+      const qIds = [ qScore.questionId, qScore.questionContextId, safeGet(qScore, 'question.id'), safeGet(qScore, 'question.contextId') ].filter(Boolean);
       const q = qIds.map(id => lookup.questionObj.get(id)).find(Boolean);
-
       if (q && Array.isArray(q.answerOptions) && q.answerOptions.length) {
         const s = Number(qScore.score);
-        const match = q.answerOptions.find(o => 
-          approx(s, o.value) || 
-          approx(s / 100, o.value) || 
-          approx(s, o.value * 100) ||
-          (o.value === 0 && s === 0)
-        );
-        if (match) return match.text ?? String(match.value ?? '');
-        if (qScore.score !== null && qScore.score !== undefined) return `Score: ${qScore.score}`;
+        const match = q.answerOptions.find(o => approx(s, o.value) || approx(s / 100, o.value) || approx(s, o.value * 100) || (o.value === 0 && s === 0) );
+        if (match) { return match.text ?? String(match.value ?? ''); }
+        if (qScore.score !== null && qScore.score !== undefined) { return `Score: ${qScore.score}`; }
       }
-
       if (qScore.freeTextAnswer) return String(qScore.freeTextAnswer);
       if (qScore.numericAnswer !== undefined && qScore.numericAnswer !== null) return String(qScore.numericAnswer);
       if (safeGet(qScore, 'answer.text')) return qScore.answer.text;
-      if (qScore.score !== null && qScore.score !== undefined) return `Score: ${qScore.score}`;
-
+      if (qScore.score !== null && qScore.score !== undefined) { return `Score: ${qScore.score}`; }
       return 'No answer';
     }
 
@@ -1233,37 +1034,25 @@
     function guessMediaType(e){ return standardiseMedia(safeGet(e,'mediaType') || safeGet(e,'conversation.mediaType') || 'Unknown'); }
     function buildDays(start,end){ const out=[]; for(let d=new Date(start); d<=end; d.setUTCDate(d.getUTCDate()+1)){ out.push(new Date(d)); } return out; }
 
-    // New function to calculate daily trend data from actual evaluations
     function calculateDailyTrendData(evals, start, end) {
       const {pass, band} = getPassSettings();
       const dailyMap = new Map();
-      
-      // Initialize all days in range
       const days = buildDays(start, end);
       days.forEach(day => {
         const dayKey = dayKeyUTC(day);
         dailyMap.set(dayKey, { date: toUKDate(day), passed: 0, amber: 0, failed: 0 });
       });
-      
-      // Count evaluations by day and status
       evals.forEach(e => {
         const dayKey = dayKeyUTC(e.releaseDate || e.assignedDate || e.creationDate || e.evaluationDate || e.date || Date.now());
         if (dailyMap.has(dayKey)) {
           const score = getEvalPercent(e);
           const dayData = dailyMap.get(dayKey);
-          
-          if (score === null || !isFinite(score)) {
-            dayData.failed++;
-          } else if (score >= pass) {
-            dayData.passed++;
-          } else if (score >= pass - band) {
-            dayData.amber++;
-          } else {
-            dayData.failed++;
-          }
+          if (score === null || !isFinite(score)) { dayData.failed++; }
+          else if (score >= pass) { dayData.passed++; }
+          else if (score >= pass - band) { dayData.amber++; }
+          else { dayData.failed++; }
         }
       });
-      
       return Array.from(dailyMap.values());
     }
 
@@ -1281,30 +1070,25 @@
         return;
       }
 
-      // Apply team filter for analytics
       const teamFilter = dropdowns.analyticsTeams.getSelectedValues();
       let allowedAgents = null;
       if(teamFilter.length){ allowedAgents = new Set(await agentsForTeams(teamFilter)); }
       const evals = allowedAgents ? raw.filter(e => allowedAgents.has(safeGet(e,'agent.id')||e.agentUserId)) : raw;
 
-      // Calculate daily trend data from actual evaluations
       const start = state.analyticsRange?.start || state.monthStart;
       const end   = state.analyticsRange?.end   || state.monthEnd;
       const dailyTrendData = calculateDailyTrendData(evals, start, end);
-      
-      if (dailyTrendChart) dailyTrendChart.destroy();
+      if (dailyTrendChart) { dailyTrendChart.destroy(); }
       dailyTrendChart = initializeStackedBarChart(dailyTrendData);
 
       let withFatal=0, withCritical=0, totalCriticalMarks=0, totalFatalMarks=0;
       let sumScores=0, scored=0;
-      
       for (const e of evals) {
-        const lookup = await getCombinedLookupForEval(e);
         const qgs = safeGet(e, 'answers.questionGroupScores') || [];
         let evalHasFatal = false, evalHasCritical = false;
-        
         for (const g of qgs) {
           for (const q of (g.questionScores || [])) {
+            const lookup = await getCombinedLookupForEval(e);
             const qIds = [q.questionId, q.questionContextId, safeGet(q, 'question.id'), safeGet(q, 'question.contextId')].filter(Boolean);
             const questionObj = qIds.map(id => lookup.questionObj.get(id)).find(Boolean);
             const { isFatal, isCritical } = detectCriticalFatalQuestions(q, questionObj);
@@ -1312,14 +1096,10 @@
             if (isCritical) { evalHasCritical = true; totalCriticalMarks++; }
           }
         }
-        
         if (evalHasFatal) withFatal++;
         if (evalHasCritical) withCritical++;
-        
-        const p=getEvalPercent(e); 
-        if(p!=null && isFinite(p)){ sumScores+=Number(p); scored++; }
+        const p=getEvalPercent(e); if(p!=null && isFinite(p)){ sumScores+=Number(p); scored++; }
       }
-      
       const avgOverall = scored? (sumScores/scored): null;
       const passRate = evals.length? ((evals.length - Math.max(withFatal, withCritical))/evals.length): null;
 
@@ -1434,8 +1214,7 @@
       tableSorter('repeatFailsTable');
 
       const byAgentInsight=new Map();
-      for (const e of evals) {
-        const lookup = await getCombinedLookupForEval(e);
+      evals.forEach(e=>{
         const id=safeGet(e,'agent.id')||e.agentUserId||'(unknown)';
         const name=resolveUserName(id);
         if(!byAgentInsight.has(id)) byAgentInsight.set(id,{name,count:0,sum:0,scored:0,fails:0});
@@ -1443,13 +1222,12 @@
         o.count++;
         const p=getEvalPercent(e); if(p!=null && isFinite(p)){ o.sum+=Number(p); o.scored++; }
         const hasFail=(safeGet(e,'answers.questionGroupScores')||[]).some(g=>(g.questionScores||[]).some(q=>{
-          const qIds = [q.questionId, q.questionContextId, safeGet(q, 'question.id'), safeGet(q, 'question.contextId')].filter(Boolean);
-          const questionObj = qIds.map(id => lookup.questionObj.get(id)).find(Boolean);
-          const { isFatal, isCritical } = detectCriticalFatalQuestions(q, questionObj);
-          return isFatal || isCritical;
+          const lookup = state.combinedLookupCache; // not used directly here
+          const isF = !!q.failedKillQuestion; const isC = !!q.failedCriticalQuestion;
+          return isF || isC;
         }));
         if(hasFail) o.fails++;
-      }
+      });
       const insightArr = Array.from(byAgentInsight.values()).map(o=>({ name:o.name, count:o.count, avg:o.scored?o.sum/o.scored:null, fails:o.fails }));
       window._insightData = insightArr;
       renderAgentInsights();
@@ -1466,7 +1244,7 @@
         if(!dm.has(dk)) dm.set(dk,{sum:0,count:0});
         if (p!=null && isFinite(p)) { const o=dm.get(dk); o.sum+=Number(p); o.count++; }
       });
-      
+
       const header = `<thead><tr><th>Agent</th>${dayKeys.map(k=>`<th>${k}</th>`).join('')}</tr></thead>`;
       const rows = agents.map(aid=>{
         const dm = map.get(aid) || new Map();
@@ -1477,7 +1255,7 @@
         }).join('');
         return `<tr><td>${resolveUserName(aid)}</td>${cells}</tr>`;
       }).join('');
-      
+
       document.getElementById('trendTable').innerHTML = `
         <table class="frozen-table trend-table">
           ${header}
@@ -1499,10 +1277,10 @@
       const mode = document.getElementById('insightsSort').value || 'avgDesc';
       const arr = (function sort(mode, a){
         const x=[...a];
-        if(mode==='avgAsc') x.sort((u,v) => (u.avg??-1) - (v.avg??-1));
-        else if(mode==='avgDesc') x.sort((u,v) => (v.avg??-1) - (u.avg??-1));
-        else if(mode==='failsDesc') x.sort((u,v) => v.fails - u.fails);
-        else if(mode==='evalsDesc') x.sort((u,v) => v.count - u.count);
+        if(mode==='avgAsc') x.sort((u,v)=>(u.avg??-1)-(v.avg??-1));
+        else if(mode==='avgDesc') x.sort((u,v)=>(v.avg??-1)-(u.avg??-1));
+        else if(mode==='failsDesc') x.sort((u,v)=>v.fails-u.fails);
+        else if(mode==='evalsDesc') x.sort((u,v)=>v.count-u.count);
         return x;
       })(mode, data);
 
@@ -1538,7 +1316,6 @@
             const questionText = resolveQuestionTextWithLookup(lookup,qScore);
             const answerText = resolveAnswerTextWithLookup(lookup,qScore);
             const ansScore = qScore.score ?? null;
-            
             const qIds = [qScore.questionId, qScore.questionContextId, safeGet(qScore, 'question.id'), safeGet(qScore, 'question.contextId')].filter(Boolean);
             const questionObj = qIds.map(id => lookup.questionObj.get(id)).find(Boolean);
             const { isFatal, isCritical } = detectCriticalFatalQuestions(qScore, questionObj);

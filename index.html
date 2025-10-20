@@ -31,15 +31,55 @@
     tr:hover{background-color:rgba(99,171,143,.05)}
     .table-container{overflow-x:auto;border:1px solid var(--border-color);border-radius:6px;padding:1px;margin-top:10px}
 
-    /* Frozen column styling for analytics table */
-    .frozen-table-container { position: relative; overflow: auto; border: 1px solid var(--border-color); border-radius: 6px; margin-top: 10px; max-height: 600px; -webkit-overflow-scrolling: touch; }
-    .frozen-table { border-collapse: separate; border-spacing: 0; width: max-content; min-width: 100%; }
-    .frozen-table th, .frozen-table td { padding: 10px 12px; text-align: left; border-bottom: 1px solid var(--border-color); vertical-align: top; white-space: nowrap; background: var(--card-bg); position: relative; }
-    .frozen-table thead th { background-color: var(--primary-color); color: white; font-weight: 600; position: sticky; top: 0; z-index: 10; }
-    .frozen-table th:first-child, .frozen-table td:first-child { position: sticky; left: 0; background: var(--card-bg); background-clip: padding-box; z-index: 12; border-right: 2px solid var(--border-color); min-width: 220px; }
-    .frozen-table thead th:first-child { z-index: 20; background: var(--primary-color); }
+    /* Frozen column styling for analytics trend table */
+    .frozen-table-container {
+      position: relative;
+      overflow: auto;
+      border: 1px solid var(--border-color);
+      border-radius: 6px;
+      margin-top: 10px;
+      max-height: 600px;
+    }
+    .frozen-table {
+      border-collapse: separate; /* important for sticky cols */
+      border-spacing: 0;
+      width: auto;
+      min-width: 100%;
+    }
+    .frozen-table th,
+    .frozen-table td {
+      padding: 10px 12px;
+      text-align: left;
+      border-bottom: 1px solid var(--border-color);
+      vertical-align: top;
+      white-space: nowrap;
+      background: var(--card-bg);
+    }
+    .frozen-table thead th {
+      position: sticky;
+      top: 0;
+      z-index: 10;
+      background-color: var(--primary-color);
+      color: #fff;
+      font-weight: 600;
+    }
+    /* Bullet-proof sticky first column */
+    .frozen-table .sticky-col {
+      position: sticky;
+      left: 0;
+      z-index: 20;
+      background: var(--card-bg);
+      border-right: 2px solid var(--border-color);
+      min-width: 220px;
+      max-width: 320px;
+    }
+    .frozen-table thead .sticky-col {
+      z-index: 30;
+      background: var(--primary-color);
+      color: #fff;
+    }
     .frozen-table tr:hover td { background-color: rgba(99,171,143,.05); }
-    .frozen-table tr:hover td:first-child { background: rgba(99,171,143,.1); }
+    .frozen-table tr:hover .sticky-col { background: rgba(99,171,143,.1); }
 
     .tab{display:inline-block;padding:12px 20px;margin-right:10px;background:#eee;cursor:pointer;border-radius:6px;font-weight:500}
     .tab.active{background:var(--primary-color);color:white}
@@ -103,9 +143,6 @@
     .details-table td:nth-child(4){ width:10%; white-space:nowrap }
     .details-table th:nth-child(5),
     .details-table td:nth-child(5){ width:auto }
-
-    .trend-table th:first-child,
-    .trend-table td:first-child{ width:220px; min-width:220px; white-space:nowrap }
 
     .insight-row{display:flex;align-items:center;gap:10px;padding:8px;border-bottom:1px solid #f1f3f5}
     .insight-name{width:200px;flex-shrink:0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
@@ -308,9 +345,8 @@
     // ===== OAuth Configuration =====
     const clientId = 'fe305808-b368-4547-8af9-325d28d552bb';
     const config = { REGION: 'mypurecloud.ie' };
-    const redirectUri = 'https://gmcglynn88.github.io/QualityReporting/'; // must exactly match your OAuth app
-    // Hard-coded, pre-encoded OAuth URL
-    const oauthUrl = 'https://login.mypurecloud.ie/oauth/authorize?client_id=fe305808-b368-4547-8af9-325d28d552bb&response_type=token&redirect_uri=https%3A%2F%2Fgmcglynn88.github.io%2FQualityReporting%2F&state=qa';
+    const redirectUri = 'https://gmcglynn88.github.io/QualityReporting/';
+    const oauthUrl = `https://login.${config.REGION}/oauth/authorize?client_id=${encodeURIComponent(clientId)}&response_type=token&redirect_uri=${encodeURIComponent(redirectUri)}&state=qa`;
 
     const state = {
       accessToken: null,
@@ -335,7 +371,7 @@
 
     const dropdowns = { users:null, teams:null, forms:null, analyticsTeams:null };
 
-    // Chart colours resolved from CSS vars (Chart.js can't read CSS vars directly)
+    // Chart colours from CSS vars
     const cssVar = k => getComputedStyle(document.documentElement).getPropertyValue(k).trim();
     let COLORS = { OK: '#22c55e', WARN: '#f59e0b', BAD: '#ef4444', TEXT: '#2C3E50' };
     function resolveColors() {
@@ -349,7 +385,6 @@
     let lastApiCall = 0;
     const API_DELAY = 120;                  // ms spacing between calls
     const MAX_CONCURRENT_AGENT_BATCH = 3;
-
     function sleep(ms){ return new Promise(r=>setTimeout(r,ms)); }
 
     function msg(html,type='info'){
@@ -432,27 +467,25 @@
       document.getElementById('loadBtn').disabled=!(hasMonth && (hasUsers || hasTeams || hasForms));
     }
 
-    // ===== Boot (handles errors + expiry, avoids redirect loops) =====
-    document.addEventListener('DOMContentLoaded', function () {
+    // ===== Boot =====
+    document.addEventListener('DOMContentLoaded', () => {
       resolveColors();
 
       const rawHash = (window.location.hash || '').replace(/^#/, '');
       const params = new URLSearchParams(rawHash);
 
-      // 1) OAuth error (prevents infinite redirect)
+      // OAuth error
       const oauthError = params.get('error');
       if (oauthError) {
-        const desc = decodeURIComponent(params.get('error_description') || '');
         history.replaceState(null, document.title, window.location.pathname + window.location.search);
         sessionStorage.removeItem('purecloud_token');
         sessionStorage.removeItem('purecloud_token_exp');
-
         document.getElementById('auth-message').textContent = 'Sign-in failed. Please refresh the page to try again.';
         document.getElementById('auth-message').className = 'error-message';
         return;
       }
 
-      // 2) Token in hash
+      // Token in hash
       const tokenFromHash = params.get('access_token');
       if (tokenFromHash) {
         const expiresIn = parseInt(params.get('expires_in') || '0', 10);
@@ -464,7 +497,7 @@
         return;
       }
 
-      // 3) Token from session (if not expired)
+      // Token from session (if not expired)
       const tokenFromSession = sessionStorage.getItem('purecloud_token');
       const exp = parseInt(sessionStorage.getItem('purecloud_token_exp') || '0', 10);
       if (tokenFromSession && (!exp || Date.now() < exp)) {
@@ -472,9 +505,9 @@
         return;
       }
 
-      // 4) No token yet - redirect to OAuth
+      // Redirect to OAuth
       document.getElementById('auth-message').textContent = 'Redirecting to Genesys Cloud for authentication...';
-      setTimeout(function(){ window.location.href = oauthUrl; }, 200);
+      setTimeout(() => { window.location.href = oauthUrl; }, 400);
     });
 
     function startApp(token){
@@ -614,43 +647,48 @@
       return 'Other';
     }
 
-    // Improved critical/fatal detection
     function getMaxScoreForQuestion(questionObj) {
-      const opts = [...(questionObj?.answerOptions || []), ...(questionObj?.options || [])];
-      if (opts.length > 0) { return Math.max(...opts.map(opt => Number(opt.value) || 0)); }
+      if (questionObj?.answerOptions?.length) {
+        return Math.max(...questionObj.answerOptions.map(opt => Number(opt.value) || 0));
+      }
       return Number(questionObj?.maxScore) || 1;
     }
 
+    // Per your rule: critical when criticalQuestion true AND max score not achieved,
+    // fatal when failedKillQuestion true. Also honour failedCriticalQuestion if present.
     function detectCriticalFatalQuestions(qScore, questionObj) {
-      const isFatal = !!(qScore.failedKillQuestion || qScore.isKill || qScore.isFatal);
-      const explicitCritFail = !!(qScore.failedCriticalQuestion);
-      if (qScore.notApplicable) {
-        return { isFatal, isCritical: explicitCritFail };
+      const isFatal = !!qScore?.failedKillQuestion;
+      let isCritical = !!qScore?.failedCriticalQuestion;
+
+      if (!isCritical && questionObj?.criticalQuestion) {
+        const maxScore = getMaxScoreForQuestion(questionObj);
+        const current = Number(qScore?.score ?? 0);
+        if (maxScore > 0 && current < maxScore) isCritical = true;
       }
-      const criticalFlag = !!( qScore.isCritical || safeGet(qScore,'question.isCritical') || safeGet(questionObj,'criticalQuestion') || safeGet(questionObj,'isCritical') );
-      const maxScore = getMaxScoreForQuestion(questionObj || {});
-      let currentScore = Number(qScore.score);
-      if (!isFinite(currentScore)) currentScore = 0;
-      const markdownByScore = criticalFlag && maxScore > 0 && currentScore < maxScore;
-      return { isFatal, isCritical: explicitCritFail || markdownByScore };
+      return { isFatal, isCritical };
     }
 
-    // Stacked bar chart init - now uses actual data
+    // Stacked bar chart
     function initializeStackedBarChart(dailyData) {
       const ctx = document.getElementById('dailyTrendChart').getContext('2d');
       const labels = dailyData.map(d => d.date);
       const passedData = dailyData.map(d => d.passed);
       const amberData = dailyData.map(d => d.amber);
       const failedData = dailyData.map(d => d.failed);
+
       return new Chart(ctx, {
         type: 'bar',
-        data: { labels, datasets: [
-          { label: 'Passed', data: passedData, backgroundColor: COLORS.OK,   borderColor: COLORS.OK,   borderWidth: 1 },
-          { label: 'Amber',  data: amberData, backgroundColor: COLORS.WARN, borderColor: COLORS.WARN, borderWidth: 1 },
-          { label: 'Failed', data: failedData, backgroundColor: COLORS.BAD,  borderColor: COLORS.BAD,  borderWidth: 1 }
-        ]},
+        data: {
+          labels,
+          datasets: [
+            { label: 'Passed', data: passedData, backgroundColor: COLORS.OK,   borderColor: COLORS.OK,   borderWidth: 1 },
+            { label: 'Amber',  data: amberData, backgroundColor: COLORS.WARN, borderColor: COLORS.WARN, borderWidth: 1 },
+            { label: 'Failed', data: failedData, backgroundColor: COLORS.BAD,  borderColor: COLORS.BAD,  borderWidth: 1 }
+          ]
+        },
         options: {
-          responsive: true, maintainAspectRatio: false,
+          responsive: true,
+          maintainAspectRatio: false,
           scales: {
             x: { stacked: true, grid: { color: 'rgba(0,0,0,0.1)' } },
             y: { stacked: true, beginAtZero: true, title: { display: true, text: 'Number of Evaluations' }, grid: { color: 'rgba(0,0,0,0.1)' } }
@@ -665,7 +703,7 @@
 
     let dailyTrendChart = null;
 
-    // Table sorter
+    // Sortable tables
     function tableSorter(tableId){
       const t=document.getElementById(tableId);
       if(!t||!t.tHead) return;
@@ -691,7 +729,7 @@
             const bv=b.cells[i].getAttribute('data-sort') ?? b.cells[i].innerText;
             const A=num?Number(av):String(av).toLowerCase();
             const B=num?Number(bv):String(bv).toLowerCase();
-            return dir==='asc'? (A>B?1:A<L?-1:0) : (A<B?1:A>B?-1:0);
+            return dir==='asc'? (A>B?1:A<B?-1:0) : (A<B?1:A>B?-1:0);
           });
           body.innerHTML='';
           rows.forEach(r=>body.appendChild(r));
@@ -750,7 +788,6 @@
       return Array.from(set);
     }
 
-    // Helper for analytics team filtering
     async function agentsForTeams(teamIds){
       await ensureTeamMembersLoaded(teamIds);
       const ids=new Set();
@@ -758,7 +795,7 @@
       return Array.from(ids);
     }
 
-    // ===== Evaluations with GET/POST fallback + retry =====
+    // ===== Evaluations =====
     async function loadEvaluations(){
       const agentIds = await computeSelectedAgentIds();
       const formIds = dropdowns.forms.getSelectedValues();
@@ -824,7 +861,7 @@
       const start=startDate.toISOString(); const end=endDate.toISOString();
       const base = `https://api.${config.REGION}/api/v2/quality/evaluations/query`;
 
-      // Helper: GET path
+      // GET path
       async function getViaGET(singleFormId){
         const params = new URLSearchParams({
           agentUserId: agentId,
@@ -837,17 +874,15 @@
         const url = `${base}?${params.toString()}`;
         let all=[]; let next=url;
         while(next){
-          try{
-            const data = await fetchJsonWithRetry(next,{method:'GET'});
-            const entities = data?.entities || [];
-            all = all.concat(entities);
-            next = data?.nextUri ? `https://api.${config.REGION}${data.nextUri}` : null;
-          }catch(err){ throw err; }
+          const data = await fetchJsonWithRetry(next,{method:'GET'});
+          const entities = data?.entities || [];
+          all = all.concat(entities);
+          next = data?.nextUri ? `https://api.${config.REGION}${data.nextUri}` : null;
         }
         return all;
       }
 
-      // Helper: POST path
+      // POST path
       async function getViaPOST(){
         const url = base;
         const body = {
@@ -861,14 +896,12 @@
         let page=1, all=[];
         while(true){
           body.pageNumber = page;
-          try{
-            const data = await fetchJsonWithRetry(url,{method:'POST',body:JSON.stringify(body)});
-            const entities = data?.entities || [];
-            if(!entities.length) break;
-            all = all.concat(entities);
-            if(!data.nextUri && entities.length < body.pageSize) break;
-            page++;
-          }catch(err){ throw err; }
+          const data = await fetchJsonWithRetry(url,{method:'POST',body:JSON.stringify(body)});
+          const entities = data?.entities || [];
+          if(!entities.length) break;
+          all = all.concat(entities);
+          if(!data.nextUri && entities.length < body.pageSize) break;
+          page++;
         }
         return all;
       }
@@ -877,7 +910,6 @@
         try{ return await getViaGET(formIds?.[0]); }
         catch(err){ if(err.status===405 || err.status===400){ /* fallback */ } else throw err; }
       }
-
       try{ return await getViaPOST(); }
       catch(err){
         if(err.status===405 || err.status===400){ return await getViaGET(undefined); }
@@ -886,7 +918,43 @@
     }
 
     // ===== Forms & lookups =====
+    function buildFormLookup(form){
+      const questionText=new Map(), answerText=new Map(), questionObj=new Map();
+
+      function addQ(q){
+        if(!q) return;
+        const qTxt=q.text || q.label || q.title || '';
+        [q.id, q.contextId, q.questionId, q.questionContextId].filter(Boolean).forEach(id=>{
+          questionText.set(id,qTxt);
+          questionObj.set(id,q);
+        });
+        (q.answerOptions||[]).forEach(a=>{
+          const aTxt=a.text ?? String(a.value ?? '');
+          [a.id, a.contextId, a.answerId, a.answerOptionId].filter(Boolean).forEach(id=>{
+            answerText.set(id,aTxt);
+          });
+        });
+        (q.multipleSelectOptionQuestions||[]).forEach(addQ);
+      }
+
+      function walk(groups){
+        (groups||[]).forEach(g=>{
+          (g.questions||[]).forEach(addQ);
+          (g.questionGroups||[]).forEach(walk);
+        });
+      }
+
+      // Try all likely containers
+      if(form?.questions) (form.questions||[]).forEach(addQ);
+      if(form?.questionGroups) walk(form.questionGroups);
+      if(form?.sections) walk(form.sections);
+      if(form?.evaluationForm?.questionGroups) walk(form.evaluationForm.questionGroups);
+
+      return {questionText,answerText,questionObj};
+    }
+
     function formKey(formId, versionId){ return (versionId === '__published__') ? `pub@${formId}` : `${formId}@${versionId || 'latest'}`; }
+
     async function getFormDetails(formId, versionId){
       const key=formKey(formId,versionId);
       if(state.formDetailsCache.has(key)) return state.formDetailsCache.get(key);
@@ -909,90 +977,115 @@
       }catch(e){ state.formDetailsCache.set(key,null); return null; }
     }
 
-    function buildFormLookup(form){
-      const questionText=new Map(), answerText=new Map(), questionObj=new Map();
-      function addQ(q){
-        if(!q) return;
-        const qTxt=q.text || q.label || q.title || '';
-        [q.id, q.contextId, q.questionId, q.questionContextId].filter(Boolean).forEach(id=>{
-          questionText.set(id,qTxt); 
-          questionObj.set(id,q);
-        });
-        (q.answerOptions||[]).forEach(a=>{
-          const aTxt=a.text ?? String(a.value ?? '');
-          [a.id, a.contextId, a.answerId, a.answerOptionId].filter(Boolean).forEach(id=>{
-            answerText.set(id,aTxt);
-          });
-        });
-        (q.multipleSelectOptionQuestions||[]).forEach(addQ);
-      }
-      function walk(groups){ (groups||[]).forEach(g=>{ (g.questions||[]).forEach(addQ); (g.questionGroups||[]).forEach(walk); }); }
-      (form?.questions||[]).forEach(addQ); walk(form?.questionGroups);
-      return {questionText,answerText,questionObj};
-    }
-
+    // Stronger: build lookup from inline evaluationForm + remote forms
     async function getCombinedLookupForEval(e){
       const pubId = safeGet(e,'evaluationForm.id');
       const formId = safeGet(e,'form.id') || e.formId;
       const formVersionId = safeGet(e,'form.versionId') || e.formVersionId || safeGet(e,'form.version');
-      const comboKey = [ pubId ? `pub:${pubId}` : '', formId ? `form:${formId}` : '', formVersionId ? `ver:${formVersionId}` : '' ].filter(Boolean).join('|') || 'none';
-      if(state.combinedLookupCache.has(comboKey)) return state.combinedLookupCache.get(comboKey);
-      const detailsPromises = [];
-      if (pubId) { detailsPromises.push(getFormDetails(pubId, '__published__')); }
-      if (formId && formVersionId) { detailsPromises.push(getFormDetails(formId, formVersionId)); }
-      if (formId && !formVersionId) { detailsPromises.push(getFormDetails(formId, null)); }
-      if (formId) { detailsPromises.push(getFormDetails(formId, null)); }
-      const details = (await Promise.all(detailsPromises)).filter(Boolean);
-      const merged = { questionText: new Map(), answerText: new Map(), questionObj: new Map() };
+      const evalId = e.id || `${pubId||''}|${formId||''}|${formVersionId||''}`;
+
+      if(state.combinedLookupCache.has(evalId)) return state.combinedLookupCache.get(evalId);
+
+      const details = [];
+
+      // 1) Inline evaluation form (closest to this eval)
+      const inlineForm = safeGet(e,'evaluationForm') || safeGet(e,'form');
+      if (inlineForm) details.push(inlineForm);
+
+      // 2) Remote forms (published / by id / by version)
+      const detailPromises = [];
+      if (pubId) detailPromises.push(getFormDetails(pubId, '__published__'));
+      if (formId && formVersionId) detailPromises.push(getFormDetails(formId, formVersionId));
+      if (formId) detailPromises.push(getFormDetails(formId, null));
+
+      const fetched = (await Promise.all(detailPromises)).filter(Boolean);
+      details.push(...fetched);
+
+      // Merge
+      const merged = {
+        questionText: new Map(),
+        answerText: new Map(),
+        questionObj: new Map()
+      };
       const names = [];
-      details.forEach(d => {
+      details.forEach(d=>{
         if(d?.name) names.push(d.name);
         const lk = buildFormLookup(d || {});
-        lk.questionText.forEach((v,k) => merged.questionText.set(k,v));
-        lk.answerText.forEach((v,k) => merged.answerText.set(k,v));
-        lk.questionObj.forEach((v,k) => merged.questionObj.set(k,v));
+        lk.questionText.forEach((v,k)=>merged.questionText.set(k,v));
+        lk.answerText.forEach((v,k)=>merged.answerText.set(k,v));
+        lk.questionObj.forEach((v,k)=>merged.questionObj.set(k,v));
       });
+
       const formName = safeGet(e,'evaluationForm.name') || safeGet(e,'form.name') || names[0] || '(Form)';
       const combined = {...merged, formName};
-      state.combinedLookupCache.set(comboKey, combined);
+
+      state.combinedLookupCache.set(evalId, combined);
       return combined;
     }
 
-    // ===== IMPROVED Helpers for Q/A text =====
     function approx(a,b){ return Math.abs(Number(a)-Number(b))<1e-6; }
+
     function resolveQuestionTextWithLookup(lookup, qScore) {
-      const candidates = [ qScore.questionId, qScore.questionContextId, safeGet(qScore, 'question.id'), safeGet(qScore, 'question.contextId'), safeGet(qScore, 'question.questionId') ].filter(Boolean);
-      for (const id of candidates) { const t = lookup.questionText.get(id); if (t) return t; }
+      const candidates = [
+        qScore.questionId,
+        qScore.questionContextId,
+        safeGet(qScore, 'question.id'),
+        safeGet(qScore, 'question.contextId'),
+        safeGet(qScore, 'question.questionId')
+      ].filter(Boolean);
+
+      for (const id of candidates) {
+        const t = lookup.questionText.get(id);
+        if (t) return t;
+      }
       const questionText = safeGet(qScore, 'question.text') || safeGet(qScore, 'question.label');
       if (questionText) return questionText;
-      return candidates.length > 0 ? `Question (${candidates[0]})` : 'Question';
+
+      return candidates.length ? `Question (${candidates[0]})` : 'Question';
     }
 
     function resolveAnswerTextWithLookup(lookup, qScore) {
       const ids = new Set();
+
       (qScore.selectedAnswerIds || []).forEach(x => ids.add(x));
       (qScore.selectedAnswerOptionIds || []).forEach(x => ids.add(x));
       if (qScore.selectedAnswerId) ids.add(qScore.selectedAnswerId);
       if (qScore.answerOptionId) ids.add(qScore.answerOptionId);
       if (qScore.answerId) ids.add(qScore.answerId);
+
       const a = qScore.answer || {};
       [a.id, a.contextId, a.answerId, a.answerOptionId].filter(Boolean).forEach(x => ids.add(x));
-      (qScore.answers || []).forEach(ans => { [ans.id, ans.contextId, ans.answerId, ans.answerOptionId].filter(Boolean).forEach(x => ids.add(x)); });
+      (qScore.answers || []).forEach(ans => {
+        [ans.id, ans.contextId, ans.answerId, ans.answerOptionId].filter(Boolean).forEach(x => ids.add(x));
+      });
+
       const texts = [];
-      Array.from(ids).forEach(id => { const t = lookup.answerText.get(id); if (t) texts.push(t); });
+      Array.from(ids).forEach(id => {
+        const t = lookup.answerText.get(id);
+        if (t) texts.push(t);
+      });
       if (texts.length) return texts.join(', ');
-      const qIds = [ qScore.questionId, qScore.questionContextId, safeGet(qScore, 'question.id'), safeGet(qScore, 'question.contextId') ].filter(Boolean);
+
+      const qIds = [
+        qScore.questionId, qScore.questionContextId,
+        safeGet(qScore, 'question.id'), safeGet(qScore, 'question.contextId')
+      ].filter(Boolean);
       const q = qIds.map(id => lookup.questionObj.get(id)).find(Boolean);
+
       if (q && Array.isArray(q.answerOptions) && q.answerOptions.length) {
         const s = Number(qScore.score);
-        const match = q.answerOptions.find(o => approx(s, o.value) || approx(s / 100, o.value) || approx(s, o.value * 100) || (o.value === 0 && s === 0) );
-        if (match) { return match.text ?? String(match.value ?? ''); }
-        if (qScore.score !== null && qScore.score !== undefined) { return `Score: ${qScore.score}`; }
+        const match = q.answerOptions.find(o =>
+          approx(s, o.value) || approx(s / 100, o.value) || approx(s, o.value * 100) ||
+          (o.value === 0 && s === 0)
+        );
+        if (match) return match.text ?? String(match.value ?? '');
+        if (qScore.score !== null && qScore.score !== undefined) return `Score: ${qScore.score}`;
       }
+
       if (qScore.freeTextAnswer) return String(qScore.freeTextAnswer);
       if (qScore.numericAnswer !== undefined && qScore.numericAnswer !== null) return String(qScore.numericAnswer);
       if (safeGet(qScore, 'answer.text')) return qScore.answer.text;
-      if (qScore.score !== null && qScore.score !== undefined) { return `Score: ${qScore.score}`; }
+      if (qScore.score !== null && qScore.score !== undefined) return `Score: ${qScore.score}`;
       return 'No answer';
     }
 
@@ -1047,10 +1140,10 @@
         if (dailyMap.has(dayKey)) {
           const score = getEvalPercent(e);
           const dayData = dailyMap.get(dayKey);
-          if (score === null || !isFinite(score)) { dayData.failed++; }
-          else if (score >= pass) { dayData.passed++; }
-          else if (score >= pass - band) { dayData.amber++; }
-          else { dayData.failed++; }
+          if (score === null || !isFinite(score)) dayData.failed++;
+          else if (score >= pass) dayData.passed++;
+          else if (score >= pass - band) dayData.amber++;
+          else dayData.failed++;
         }
       });
       return Array.from(dailyMap.values());
@@ -1070,6 +1163,7 @@
         return;
       }
 
+      // Team filter
       const teamFilter = dropdowns.analyticsTeams.getSelectedValues();
       let allowedAgents = null;
       if(teamFilter.length){ allowedAgents = new Set(await agentsForTeams(teamFilter)); }
@@ -1078,28 +1172,44 @@
       const start = state.analyticsRange?.start || state.monthStart;
       const end   = state.analyticsRange?.end   || state.monthEnd;
       const dailyTrendData = calculateDailyTrendData(evals, start, end);
-      if (dailyTrendChart) { dailyTrendChart.destroy(); }
+
+      if (dailyTrendChart) dailyTrendChart.destroy();
       dailyTrendChart = initializeStackedBarChart(dailyTrendData);
+
+      // Build a small cache so we don't refetch lookups repeatedly
+      const evalLookup = new Map();
+      async function lookupFor(e){
+        const key = e.id || `${safeGet(e,'evaluationForm.id')||''}|${safeGet(e,'form.id')||''}|${safeGet(e,'form.versionId')||''}`;
+        if(!evalLookup.has(key)) evalLookup.set(key, await getCombinedLookupForEval(e));
+        return evalLookup.get(key);
+      }
 
       let withFatal=0, withCritical=0, totalCriticalMarks=0, totalFatalMarks=0;
       let sumScores=0, scored=0;
+
       for (const e of evals) {
+        const lookup = await lookupFor(e);
         const qgs = safeGet(e, 'answers.questionGroupScores') || [];
         let evalHasFatal = false, evalHasCritical = false;
+
         for (const g of qgs) {
           for (const q of (g.questionScores || [])) {
-            const lookup = await getCombinedLookupForEval(e);
             const qIds = [q.questionId, q.questionContextId, safeGet(q, 'question.id'), safeGet(q, 'question.contextId')].filter(Boolean);
-            const questionObj = qIds.map(id => lookup.questionObj.get(id)).find(Boolean);
+            const questionObj = qIds.map(id => lookup.questionObj.get(id)).find(Boolean) || null;
             const { isFatal, isCritical } = detectCriticalFatalQuestions(q, questionObj);
+
             if (isFatal) { evalHasFatal = true; totalFatalMarks++; }
             if (isCritical) { evalHasCritical = true; totalCriticalMarks++; }
           }
         }
+
         if (evalHasFatal) withFatal++;
         if (evalHasCritical) withCritical++;
-        const p=getEvalPercent(e); if(p!=null && isFinite(p)){ sumScores+=Number(p); scored++; }
+
+        const p=getEvalPercent(e);
+        if(p!=null && isFinite(p)){ sumScores+=Number(p); scored++; }
       }
+
       const avgOverall = scored? (sumScores/scored): null;
       const passRate = evals.length? ((evals.length - Math.max(withFatal, withCritical))/evals.length): null;
 
@@ -1127,6 +1237,7 @@
         const p=getEvalPercent(e);
         if(p!=null&&isFinite(p)){ o.sum+=Number(p); o.scored++; }
       });
+
       const mediaOrder = ['Voice','Email','Message','Social','Other'];
       const width=700, height=22;
       const rowsHtml = Array.from(byAgent.values()).sort((a,b)=>a.name.localeCompare(b.name)).map(row=>{
@@ -1178,14 +1289,16 @@
       `;
       tableSorter('mediaTable');
 
+      // Repeat critical/fatal by question (now using proper lookup)
       const failMap=new Map();
       for(const e of evals){
-        const lookup = await getCombinedLookupForEval(e);
+        const lookup = await lookupFor(e);
         const qgs=safeGet(e,'answers.questionGroupScores')||[];
         qgs.forEach(g=> (g.questionScores||[]).forEach(q=>{
           const qIds = [q.questionId, q.questionContextId, safeGet(q, 'question.id'), safeGet(q, 'question.contextId')].filter(Boolean);
-          const questionObj = qIds.map(id => lookup.questionObj.get(id)).find(Boolean);
+          const questionObj = qIds.map(id => lookup.questionObj.get(id)).find(Boolean) || null;
           const { isFatal, isCritical } = detectCriticalFatalQuestions(q, questionObj);
+
           if (isFatal || isCritical) {
             const qText = resolveQuestionTextWithLookup(lookup,q);
             const key = `${lookup.formName}|${qText}`;
@@ -1214,7 +1327,8 @@
       tableSorter('repeatFailsTable');
 
       const byAgentInsight=new Map();
-      evals.forEach(e=>{
+      for (const e of evals){
+        const lookup = await lookupFor(e);
         const id=safeGet(e,'agent.id')||e.agentUserId||'(unknown)';
         const name=resolveUserName(id);
         if(!byAgentInsight.has(id)) byAgentInsight.set(id,{name,count:0,sum:0,scored:0,fails:0});
@@ -1222,16 +1336,18 @@
         o.count++;
         const p=getEvalPercent(e); if(p!=null && isFinite(p)){ o.sum+=Number(p); o.scored++; }
         const hasFail=(safeGet(e,'answers.questionGroupScores')||[]).some(g=>(g.questionScores||[]).some(q=>{
-          const lookup = state.combinedLookupCache; // not used directly here
-          const isF = !!q.failedKillQuestion; const isC = !!q.failedCriticalQuestion;
-          return isF || isC;
+          const qIds = [q.questionId, q.questionContextId, safeGet(q, 'question.id'), safeGet(q, 'question.contextId')].filter(Boolean);
+          const questionObj = qIds.map(id => lookup.questionObj.get(id)).find(Boolean) || null;
+          const { isFatal, isCritical } = detectCriticalFatalQuestions(q, questionObj);
+          return isFatal || isCritical;
         }));
         if(hasFail) o.fails++;
-      });
+      }
       const insightArr = Array.from(byAgentInsight.values()).map(o=>({ name:o.name, count:o.count, avg:o.scored?o.sum/o.scored:null, fails:o.fails }));
       window._insightData = insightArr;
       renderAgentInsights();
 
+      // Build frozen daily trend table (with sticky first column)
       const dayKeys = dailyTrendData.map(d => d.date);
       const agents = Array.from(new Set(evals.map(e=> safeGet(e,'agent.id') || e.agentUserId))).filter(Boolean);
       const map = new Map();
@@ -1245,7 +1361,7 @@
         if (p!=null && isFinite(p)) { const o=dm.get(dk); o.sum+=Number(p); o.count++; }
       });
 
-      const header = `<thead><tr><th>Agent</th>${dayKeys.map(k=>`<th>${k}</th>`).join('')}</tr></thead>`;
+      const header = `<thead><tr><th class="sticky-col">Agent</th>${dayKeys.map(k=>`<th>${k}</th>`).join('')}</tr></thead>`;
       const rows = agents.map(aid=>{
         const dm = map.get(aid) || new Map();
         const cells = dayKeys.map(k=>{
@@ -1253,11 +1369,10 @@
           if(!v||v.count===0) return '<td>-</td>';
           return `<td>${pct(v.sum/v.count,1)}</td>`;
         }).join('');
-        return `<tr><td>${resolveUserName(aid)}</td>${cells}</tr>`;
+        return `<tr><td class="sticky-col">${resolveUserName(aid)}</td>${cells}</tr>`;
       }).join('');
-
       document.getElementById('trendTable').innerHTML = `
-        <table class="frozen-table trend-table">
+        <table class="frozen-table">
           ${header}
           <tbody>${rows}</tbody>
         </table>
@@ -1316,8 +1431,9 @@
             const questionText = resolveQuestionTextWithLookup(lookup,qScore);
             const answerText = resolveAnswerTextWithLookup(lookup,qScore);
             const ansScore = qScore.score ?? null;
+
             const qIds = [qScore.questionId, qScore.questionContextId, safeGet(qScore, 'question.id'), safeGet(qScore, 'question.contextId')].filter(Boolean);
-            const questionObj = qIds.map(id => lookup.questionObj.get(id)).find(Boolean);
+            const questionObj = qIds.map(id => lookup.questionObj.get(id)).find(Boolean) || null;
             const { isFatal, isCritical } = detectCriticalFatalQuestions(qScore, questionObj);
 
             let rowClass = '';
@@ -1353,7 +1469,7 @@
       c.innerHTML = evaluationElements.join('');
     }
 
-    // ===== Critical =====
+    // ===== Critical Summary =====
     async function renderCritical(){
       const tbl=document.getElementById('criticalTable');
       if(!state.evals.length){ 
@@ -1366,7 +1482,7 @@
       let totalFatal = 0;
       const fatalMap=new Map();  
       const critMap=new Map();
-      
+
       function add(map, formName, qText, agentName){
         const key=formName+'|'+qText;
         if(!map.has(key)) map.set(key,{formName,qText,count:0,agents:new Map()});
@@ -1382,10 +1498,17 @@
           (g.questionScores||[]).forEach(qs=>{
             const qText = resolveQuestionTextWithLookup(lookup,qs);
             const qIds = [qs.questionId, qs.questionContextId, safeGet(qs, 'question.id'), safeGet(qs, 'question.contextId')].filter(Boolean);
-            const questionObj = qIds.map(id => lookup.questionObj.get(id)).find(Boolean);
+            const questionObj = qIds.map(id => lookup.questionObj.get(id)).find(Boolean) || null;
             const { isFatal, isCritical } = detectCriticalFatalQuestions(qs, questionObj);
-            if(isFatal) { add(fatalMap, formName, qText, agentName); totalFatal++; }
-            if(isCritical && !isFatal) { add(critMap, formName, qText, agentName); totalCritical++; }
+
+            if(isFatal) {
+              add(fatalMap, formName, qText, agentName);
+              totalFatal++;
+            }
+            if(isCritical && !isFatal) {
+              add(critMap, formName, qText, agentName);
+              totalCritical++;
+            }
           });
         });
       }

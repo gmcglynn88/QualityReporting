@@ -1106,8 +1106,8 @@
       document.getElementById('analyticsKPIs').innerHTML = `
         <div class="kpi"><div class="label">Evaluations Completed</div><div class="value">${evals.length}</div></div>
         <div class="kpi"><div class="label">Avg Score</div><div class="value">${avgOverall==null?'-':pct(avgOverall,1)}</div></div>
-        <div class="kpi"><div class="label">Critical Questions Scored</div><div class="value">${withCritical}</div></div>
-        <div class="kpi"><div class="label">Critical Markdowns</div><div class="value">${totalCriticalMarks}</div></div>
+        <div class="kpi"><div class="label">Critical Questions Scored</div><div class="value">${totalCriticalMarks}</div></div>
+        <div class="kpi"><div class="label">Critical Markdowns</div><div class="value">${withCritical}</div></div>
         <div class="kpi"><div class="label">Fatal Evaluations</div><div class="value">${withFatal}</div></div>
         <div class="kpi"><div class="label">Fatal Marks</div><div class="value">${totalFatalMarks}</div></div>
         <div class="kpi"><div class="label">Pass Rate</div><div class="value">${passRate==null?'-':pct(passRate*80,1)}</div></div>

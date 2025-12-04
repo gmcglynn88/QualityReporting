@@ -23,7 +23,7 @@
     #messageContainer{display:none;margin-top:12px}
     .error-message{color:#b4231a;background:#fee2e2;border:1px solid #fecaca;padding:10px;border-radius:6px}
     .success-message{color:#14532d;background:#dcfce7;border:1px solid #bbf7d0;padding:10px;border-radius:6px}
-    .info-message{color:#6b4e16;background:#fff7ed;border:1px solid #ffedd5;padding:10px;border-radius:6x}
+    .info-message{color:#6b4e16;background:#fff7ed;border:1px solid #ffedd5;padding:10px;border-radius:6px}
 
     table{width:100%;border-collapse:collapse;margin-top:12px;border:1px solid var(--border-color);border-radius:6px;overflow:hidden}
     th,td{padding:10px 12px;text-align:left;border-bottom:1px solid var(--border-color);vertical-align:top}
@@ -330,7 +330,10 @@
 
       formDetailsCache: new Map(),
       formLookupCache: new Map(),
-      combinedLookupCache: new Map()
+      combinedLookupCache: new Map(),
+      
+      // NEW: Track forms that need to be loaded
+      formsToLoad: new Set()
     };
 
     const dropdowns = { users:null, teams:null, forms:null, analyticsTeams:null };
@@ -776,6 +779,10 @@
       try{
         const agentList = agentIds.length ? agentIds : state.users.map(u=>u.id);
         state.evals = await fetchDetailedEvaluations(agentList, formIds, state.monthStart, state.monthEnd);
+        
+        // CRITICAL FIX: Load ALL form details for ALL forms found in evaluations
+        await loadAllFormDetailsFromEvaluations(state.evals);
+        
         msg(`Loaded ${state.evals.length} evaluations.`,'success');
         renderAll();
       }catch(e){ console.error(e); msg('Failed to load evaluations: '+e.message,'error'); }
@@ -803,10 +810,61 @@
         const agentList = agentIds.length ? agentIds : state.users.map(u=>u.id);
         const data=await fetchDetailedEvaluations(agentList,formIds,start,end);
         state.analyticsEvals=data; state.analyticsRange={start,end};
+        
+        // CRITICAL FIX: Load ALL form details for ALL forms found in analytics evaluations
+        await loadAllFormDetailsFromEvaluations(data);
+        
         msg(`Analytics range loaded: ${data.length} evaluations.`, 'success');
         renderAnalytics();
       }catch(e){ console.error(e); msg('Failed to load analytics range: '+e.message,'error'); }
       finally{ setLoading(btn,false); }
+    }
+
+    // NEW FUNCTION: Load ALL form details from evaluations
+    async function loadAllFormDetailsFromEvaluations(evaluations) {
+      if (!evaluations || evaluations.length === 0) return;
+      
+      console.log('Loading form details for all evaluations...');
+      
+      // Collect ALL unique form IDs from evaluations
+      const formPromises = new Set();
+      
+      evaluations.forEach(e => {
+        const pubId = safeGet(e, 'evaluationForm.id');
+        const formId = safeGet(e, 'form.id') || e.formId;
+        const formVersionId = safeGet(e, 'form.versionId') || e.formVersionId || safeGet(e, 'form.version');
+        
+        // Add published form if exists
+        if (pubId) {
+          formPromises.add(getFormDetails(pubId, '__published__'));
+        }
+        
+        // Add form with version if exists
+        if (formId && formVersionId) {
+          formPromises.add(getFormDetails(formId, formVersionId));
+        }
+        
+        // Also add form without version as fallback
+        if (formId) {
+          formPromises.add(getFormDetails(formId, null));
+        }
+      });
+      
+      console.log(`Loading ${formPromises.size} form details...`);
+      
+      // Load all form details in parallel with limited concurrency
+      const promisesArray = Array.from(formPromises);
+      const BATCH_SIZE = 5;
+      
+      for (let i = 0; i < promisesArray.length; i += BATCH_SIZE) {
+        const batch = promisesArray.slice(i, i + BATCH_SIZE);
+        await Promise.all(batch);
+        if (i + BATCH_SIZE < promisesArray.length) {
+          await sleep(500); // Brief pause between batches
+        }
+      }
+      
+      console.log('All form details loaded.');
     }
 
     async function fetchDetailedEvaluations(agentIds,formIds,startDate,endDate){
@@ -886,146 +944,251 @@
     }
 
     // ===== Forms & lookups =====
-    function formKey(formId, versionId){ return (versionId === '__published__') ? `pub@${formId}` : `${formId}@${versionId || 'latest'}`; }
+    function formKey(formId, versionId){ 
+      return (versionId === '__published__') ? `pub@${formId}` : `${formId}@${versionId || 'latest'}`; 
+    }
+    
     async function getFormDetails(formId, versionId){
-      const key=formKey(formId,versionId);
-      if(state.formDetailsCache.has(key)) return state.formDetailsCache.get(key);
+      const key = formKey(formId, versionId);
+      
+      // Return cached if available
+      if (state.formDetailsCache.has(key)) {
+        console.log(`Form ${key} already cached`);
+        return state.formDetailsCache.get(key);
+      }
+      
+      console.log(`Loading form details for ${key}`);
+      
       let url;
-      if (versionId === '__published__') url = `https://api.${config.REGION}/api/v2/quality/publishedforms/evaluations/${formId}`;
-      else url = versionId
-        ? `https://api.${config.REGION}/api/v2/quality/forms/evaluations/${formId}/versions/${versionId}`
-        : `https://api.${config.REGION}/api/v2/quality/forms/evaluations/${formId}`;
-      try{
+      if (versionId === '__published__') {
+        url = `https://api.${config.REGION}/api/v2/quality/publishedforms/evaluations/${formId}`;
+      } else {
+        url = versionId
+          ? `https://api.${config.REGION}/api/v2/quality/forms/evaluations/${formId}/versions/${versionId}`
+          : `https://api.${config.REGION}/api/v2/quality/forms/evaluations/${formId}`;
+      }
+      
+      try {
         let data;
-        try{ data = await fetchJsonWithRetry(url,{method:'GET'}); }
-        catch(err){
-          if(versionId && versionId!=='__published__'){
-            data = await fetchJsonWithRetry(`https://api.${config.REGION}/api/v2/quality/forms/evaluations/${formId}`,{method:'GET'});
-          }else{ throw err; }
+        try {
+          data = await fetchJsonWithRetry(url, { method: 'GET' });
+        } catch (err) {
+          // If specific version fails, try to get the latest version
+          if (versionId && versionId !== '__published__') {
+            console.log(`Version ${versionId} not found for form ${formId}, trying latest version`);
+            data = await fetchJsonWithRetry(
+              `https://api.${config.REGION}/api/v2/quality/forms/evaluations/${formId}`, 
+              { method: 'GET' }
+            );
+          } else {
+            throw err;
+          }
         }
-        state.formDetailsCache.set(key,data);
-        state.formLookupCache.set(key,buildFormLookup(data||{}));
+        
+        // Store in cache
+        state.formDetailsCache.set(key, data);
+        state.formLookupCache.set(key, buildFormLookup(data || {}));
+        
+        console.log(`Form ${key} loaded successfully: ${data?.name || 'Unnamed form'}`);
         return data;
-      }catch(e){ state.formDetailsCache.set(key,null); return null; }
+      } catch (e) {
+        console.error(`Failed to load form ${key}:`, e.message);
+        state.formDetailsCache.set(key, null);
+        return null;
+      }
     }
 
-    // IMPROVED: Better form lookup that handles different question structures
+    // IMPROVED form lookup
     function buildFormLookup(form){
-      const questionText=new Map(), answerText=new Map(), questionObj=new Map();
+      console.log(`Building lookup for form: ${form?.name || 'Unknown'}`);
       
+      const questionText = new Map();
+      const answerText = new Map();
+      const questionObj = new Map();
+      
+      if (!form) {
+        console.log('No form data provided');
+        return { questionText, answerText, questionObj };
+      }
+
       function extractQuestionText(q) {
         return q.text || q.label || q.title || q.questionText || '';
       }
-      
+
       function extractAnswerText(a) {
         return a.text || a.label || a.title || String(a.value || '');
       }
-      
-      function addQ(q){
-        if(!q) return;
-        const qTxt = extractQuestionText(q);
+
+      function addQuestion(q, path = '') {
+        if (!q) return;
         
-        // Map ALL possible IDs from the question object
+        const qText = extractQuestionText(q);
+        const qPath = path ? `${path}.${q.id || 'q'}` : (q.id || 'root');
+        
+        console.log(`Processing question: ${qText} (ID: ${q.id}, Path: ${qPath})`);
+        
+        // Collect all possible IDs
         const allIds = [];
-        
-        // Collect all possible ID fields
         if (q.id) allIds.push(q.id);
         if (q.contextId) allIds.push(q.contextId);
         if (q.questionId) allIds.push(q.questionId);
         if (q.questionContextId) allIds.push(q.questionContextId);
         
-        // Also try to generate possible ID variations
-        if (q.id && q.id.includes('_')) {
-          const parts = q.id.split('_');
-          if (parts.length > 1) {
-            // Try without suffix
-            allIds.push(parts.slice(0, -1).join('_'));
-          }
+        // For questions without proper IDs, generate one from the path
+        if (allIds.length === 0 && qPath) {
+          allIds.push(qPath);
         }
         
-        // Map all IDs to the question text
+        // Map all IDs to question text
         allIds.forEach(id => {
-          if (id) {
-            questionText.set(id, qTxt);
+          if (id && qText) {
+            questionText.set(id, qText);
             questionObj.set(id, q);
+            console.log(`  Mapped ID ${id} -> "${qText}"`);
           }
         });
         
         // Handle answer options
-        (q.answerOptions||[]).forEach(a=>{
-          const aTxt = extractAnswerText(a);
+        (q.answerOptions || []).forEach((a, idx) => {
+          const aText = extractAnswerText(a);
           const answerIds = [];
+          
           if (a.id) answerIds.push(a.id);
           if (a.contextId) answerIds.push(a.contextId);
           if (a.answerId) answerIds.push(a.answerId);
           if (a.answerOptionId) answerIds.push(a.answerOptionId);
           
+          // Generate ID if none exists
+          if (answerIds.length === 0) {
+            answerIds.push(`${qPath}.answer.${idx}`);
+          }
+          
           answerIds.forEach(id => {
-            if (id) answerText.set(id, aTxt);
+            if (id && aText) {
+              answerText.set(id, aText);
+              console.log(`  Mapped answer ID ${id} -> "${aText}"`);
+            }
           });
         });
         
-        // Recursively handle nested questions
-        (q.multipleSelectOptionQuestions||[]).forEach(addQ);
-        (q.nestedQuestions||[]).forEach(addQ);
+        // Handle nested questions
+        (q.multipleSelectOptionQuestions || []).forEach(nested => 
+          addQuestion(nested, `${qPath}.nested`));
+        (q.nestedQuestions || []).forEach(nested => 
+          addQuestion(nested, `${qPath}.nested`));
+      }
+
+      function walkQuestionGroups(groups, path = '') {
+        (groups || []).forEach((g, gIdx) => {
+          const groupPath = path ? `${path}.group${gIdx}` : `group${gIdx}`;
+          
+          // Process questions in group
+          (g.questions || []).forEach((q, qIdx) => 
+            addQuestion(q, `${groupPath}.q${qIdx}`));
+          
+          // Recursively walk nested groups
+          walkQuestionGroups(g.questionGroups || [], groupPath);
+        });
       }
       
-      function walk(groups){ 
-        (groups||[]).forEach(g=>{ 
-          (g.questions||[]).forEach(addQ); 
-          (g.questionGroups||[]).forEach(walk);
-        }); 
-      }
-      
-      // Process questions directly on form
-      (form?.questions||[]).forEach(addQ);
+      // Process top-level questions
+      (form.questions || []).forEach((q, idx) => 
+        addQuestion(q, `q${idx}`));
       
       // Process question groups
-      walk(form?.questionGroups);
+      walkQuestionGroups(form.questionGroups || []);
       
-      return {questionText, answerText, questionObj};
+      console.log(`Lookup built: ${questionText.size} questions, ${answerText.size} answers`);
+      return { questionText, answerText, questionObj };
     }
 
     async function getCombinedLookupForEval(e){
-      const pubId = safeGet(e,'evaluationForm.id');
-      const formId = safeGet(e,'form.id') || e.formId;
-      const formVersionId = safeGet(e,'form.versionId') || e.formVersionId || safeGet(e,'form.version');
-      const comboKey = [ pubId ? `pub:${pubId}` : '', formId ? `form:${formId}` : '', formVersionId ? `ver:${formVersionId}` : '' ].filter(Boolean).join('|') || 'none';
+      const pubId = safeGet(e, 'evaluationForm.id');
+      const formId = safeGet(e, 'form.id') || e.formId;
+      const formVersionId = safeGet(e, 'form.versionId') || e.formVersionId || safeGet(e, 'form.version');
       
-      if(state.combinedLookupCache.has(comboKey)) return state.combinedLookupCache.get(comboKey);
+      // Create a more robust cache key
+      const comboKey = [
+        pubId ? `pub:${pubId}` : '',
+        formId ? `form:${formId}` : '',
+        formVersionId ? `ver:${formVersionId}` : '',
+        e.id ? `eval:${e.id}` : ''
+      ].filter(Boolean).join('|') || 'none';
       
+      if (state.combinedLookupCache.has(comboKey)) {
+        return state.combinedLookupCache.get(comboKey);
+      }
+      
+      console.log(`Creating combined lookup for evaluation: ${comboKey}`);
+      
+      // Load ALL possible form details
       const detailsPromises = [];
-      if (pubId) { detailsPromises.push(getFormDetails(pubId, '__published__')); }
-      if (formId && formVersionId) { detailsPromises.push(getFormDetails(formId, formVersionId)); }
-      if (formId && !formVersionId) { detailsPromises.push(getFormDetails(formId, null)); }
-      if (formId) { detailsPromises.push(getFormDetails(formId, null)); }
+      
+      if (pubId) {
+        detailsPromises.push(getFormDetails(pubId, '__published__'));
+      }
+      
+      if (formId && formVersionId) {
+        detailsPromises.push(getFormDetails(formId, formVersionId));
+      }
+      
+      if (formId && !formVersionId) {
+        detailsPromises.push(getFormDetails(formId, null));
+      }
+      
+      // Always try to get the form regardless of version
+      if (formId) {
+        detailsPromises.push(getFormDetails(formId, null));
+      }
       
       const details = (await Promise.all(detailsPromises)).filter(Boolean);
-      const merged = { questionText: new Map(), answerText: new Map(), questionObj: new Map() };
+      
+      if (details.length === 0) {
+        console.warn(`No form details found for evaluation ${e.id}`);
+      }
+      
+      const merged = { 
+        questionText: new Map(), 
+        answerText: new Map(), 
+        questionObj: new Map() 
+      };
+      
       const names = [];
       
       details.forEach(d => {
-        if(d?.name) names.push(d.name);
+        if (d?.name) names.push(d.name);
         const lk = buildFormLookup(d || {});
-        lk.questionText.forEach((v,k) => merged.questionText.set(k,v));
-        lk.answerText.forEach((v,k) => merged.answerText.set(k,v));
-        lk.questionObj.forEach((v,k) => merged.questionObj.set(k,v));
+        
+        // Merge all lookups
+        lk.questionText.forEach((v, k) => merged.questionText.set(k, v));
+        lk.answerText.forEach((v, k) => merged.answerText.set(k, v));
+        lk.questionObj.forEach((v, k) => merged.questionObj.set(k, v));
       });
       
-      const formName = safeGet(e,'evaluationForm.name') || safeGet(e,'form.name') || names[0] || '(Form)';
-      const combined = {...merged, formName};
+      const formName = safeGet(e, 'evaluationForm.name') || 
+                      safeGet(e, 'form.name') || 
+                      names[0] || 
+                      '(Unknown Form)';
+      
+      const combined = {
+        ...merged,
+        formName,
+        formId: formId,
+        formVersionId: formVersionId,
+        pubId: pubId
+      };
+      
       state.combinedLookupCache.set(comboKey, combined);
+      
+      console.log(`Combined lookup created: ${merged.questionText.size} questions for form "${formName}"`);
       return combined;
     }
 
-    // ===== IMPROVED Question Text Resolution =====
+    // ===== Question Text Resolution =====
     function approx(a,b){ return Math.abs(Number(a)-Number(b))<1e-6; }
     
     function resolveQuestionTextWithLookup(lookup, qScore) {
-      // DEBUG: Log what we're working with
-      console.log('Resolving question text for:', qScore);
-      
-      // Try to get from lookup using ALL possible IDs from qScore
+      // First, try direct lookup with all possible IDs
       const possibleIds = [
         qScore.questionId,
         qScore.questionContextId,
@@ -1036,34 +1199,51 @@
         safeGet(qScore, 'id')
       ].filter(Boolean);
       
-      console.log('Possible IDs to try:', possibleIds);
-      
-      // Try each ID
       for (const id of possibleIds) {
         const text = lookup.questionText.get(id);
         if (text) {
-          console.log('Found question text for ID', id, ':', text);
           return text;
         }
       }
       
-      // If lookup failed, check the lookup cache contents
-      console.log('Lookup cache question IDs:', Array.from(lookup.questionText.keys()));
+      // If no ID match, try to find by scanning all questions for matching text
+      if (qScore.questionId || qScore.questionContextId) {
+        // Try to find question with similar ID pattern
+        const allQuestionIds = Array.from(lookup.questionText.keys());
+        const targetId = qScore.questionId || qScore.questionContextId;
+        
+        // Look for partial matches
+        for (const questionId of allQuestionIds) {
+          if (questionId.includes(targetId) || targetId.includes(questionId)) {
+            const text = lookup.questionText.get(questionId);
+            if (text) return text;
+          }
+        }
+      }
       
-      // Try to get from qScore directly (some forms store text directly)
+      // Try to get from qScore directly
       const directText = safeGet(qScore, 'question.text') || 
                         safeGet(qScore, 'question.label') || 
                         safeGet(qScore, 'question.title') ||
                         safeGet(qScore, 'text');
       
       if (directText) {
-        console.log('Found direct question text:', directText);
         return directText;
+      }
+      
+      // Try to extract from the question object if available
+      const questionObj = safeGet(qScore, 'question');
+      if (questionObj) {
+        const objText = questionObj.text || questionObj.label || questionObj.title;
+        if (objText) return objText;
       }
       
       // Last resort - show something informative
       const firstId = possibleIds[0];
       if (firstId) {
+        // Check if this might be a contextId vs questionId issue
+        console.warn(`Question text not found for ID: ${firstId}`);
+        console.warn(`Available question IDs in lookup:`, Array.from(lookup.questionText.keys()));
         return `Question (${firstId.substring(0, Math.min(12, firstId.length))}${firstId.length > 12 ? '...' : ''})`;
       }
       
@@ -1307,7 +1487,6 @@
       `;
       tableSorter('mediaTable');
 
-      // DEBUG: Add logging to see what's happening with question text resolution
       const failMap=new Map();
       for(const e of evals){
         const lookup = await getCombinedLookupForEval(e);
@@ -1355,7 +1534,6 @@
         o.count++;
         const p=getEvalPercent(e); if(p!=null && isFinite(p)){ o.sum+=Number(p); o.scored++; }
         const hasFail=(safeGet(e,'answers.questionGroupScores')||[]).some(g=>(g.questionScores||[]).some(q=>{
-          const lookup = state.combinedLookupCache; // not used directly here
           const isF = !!q.failedKillQuestion; const isC = !!q.failedCriticalQuestion;
           return isF || isC;
         }));
@@ -1446,7 +1624,6 @@
         let qRows = '';
         questionGroups.forEach(group => {
           (group.questionScores || []).forEach(qScore => {
-            // Use the improved question text resolution
             const questionText = resolveQuestionTextWithLookup(lookup,qScore);
             const answerText = resolveAnswerTextWithLookup(lookup,qScore);
             const ansScore = qScore.score ?? null;

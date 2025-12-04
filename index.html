@@ -94,15 +94,17 @@
     tr.fatal-question:hover{background-color:#fecaca!important}
 
     .details-table th:nth-child(1),
-    .details-table td:nth-child(1){ width:32%; min-width:280px }
+    .details-table td:nth-child(1){ width:28%; min-width:220px }
     .details-table th:nth-child(2),
-    .details-table td:nth-child(2){ width:14% }
+    .details-table td:nth-child(2){ width:12% }
     .details-table th:nth-child(3),
     .details-table td:nth-child(3){ width:8%; white-space:nowrap }
     .details-table th:nth-child(4),
     .details-table td:nth-child(4){ width:10%; white-space:nowrap }
     .details-table th:nth-child(5),
-    .details-table td:nth-child(5){ width:auto }
+    .details-table td:nth-child(5){ width:10%; white-space:nowrap }
+    .details-table th:nth-child(6),
+    .details-table td:nth-child(6){ width:auto }
 
     .trend-table th:first-child,
     .trend-table td:first-child{ width:220px; min-width:220px; white-space:nowrap }
@@ -125,6 +127,20 @@
     .sortable th .sort-ind{margin-left:6px;opacity:.8;font-weight:700}
 
     .stacked-bar-container { position: relative; height: 400px; margin: 20px 0; }
+    
+    /* New styles for enhancements */
+    .time-period-selector { margin: 16px 0; }
+    .time-period-selector label { display: inline-block; margin-right: 10px; }
+    .agent-failure-table { margin-top: 20px; }
+    .agent-failure-table th { background-color: var(--warn); }
+    .agent-failure-table tr.fatal-agent th { background-color: var(--bad); }
+    .agent-failure-table td { vertical-align: top; }
+    .failure-details { font-size: 12px; color: var(--text-light); }
+    .failure-dates { margin-top: 4px; font-size: 11px; }
+    .sort-header { cursor: pointer; user-select: none; }
+    .sort-header:hover { background-color: rgba(255,255,255,0.2); }
+    .sort-arrow { margin-left: 5px; }
+    .contact-info { font-size: 12px; color: var(--text-light); margin-top: 2px; }
   </style>
   <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
 </head>
@@ -217,29 +233,34 @@
             <input id="amberBand" type="number" min="0" max="20" value="5">
           </div>
           <div>
+            <label for="timePeriodSelect">Time Period View</label>
+            <select id="timePeriodSelect" class="full-width-btn">
+              <option value="month">Month over Month</option>
+              <option value="week">Week over Week</option>
+            </select>
+          </div>
+          <div>
             <label>&nbsp;</label>
             <button id="loadAnalyticsBtn" class="full-width-btn">
               <span class="loading-spinner" style="display:none"></span>
               <span class="btn-text">Load Range</span>
             </button>
           </div>
-          <div>
-            <label>&nbsp;</label>
-            <button id="applyAnalyticsFilters" class="full-width-btn">Apply Filters</button>
-          </div>
         </div>
 
         <div id="analyticsKPIs" class="kpis"></div>
 
-        <div class="card" style="padding:16px;margin-top:10px">
-          <h3 class="section-title" style="margin:0 0 8px">Daily Trend</h3>
+        <!-- Month over Month / Week over Week View -->
+        <div id="timePeriodView" class="card" style="padding:16px;margin-top:10px;display:none;">
+          <h3 class="section-title" style="margin:0 0 8px" id="timePeriodTitle">Month over Month Performance</h3>
           <div class="stacked-bar-container">
-            <canvas id="dailyTrendChart"></canvas>
+            <canvas id="timePeriodChart"></canvas>
           </div>
           <div class="legend">
             <div class="key"><span class="swatch" style="background:var(--ok)"></span>Passed</div>
             <div class="key"><span class="swatch" style="background:var(--warn)"></span>Amber</div>
             <div class="key"><span class="swatch" style="background:var(--bad)"></span>Failed</div>
+            <div class="key"><span class="swatch" style="background:#3b82f6"></span>Avg Score</div>
           </div>
         </div>
 
@@ -297,6 +318,13 @@
       <div id="criticalTab" class="tab-content">
         <h2 class="section-title">Critical / Kill Question Counts</h2>
         <div id="criticalSummaryKPIs" class="critical-summary-kpis"></div>
+        
+        <!-- New Agent Failure Table -->
+        <div class="card" style="margin-top:20px;">
+          <h3 class="section-title">Agent Failures by Question</h3>
+          <div id="agentFailuresContainer"></div>
+        </div>
+        
         <div class="table-container">
           <table id="criticalTable"></table>
         </div>
@@ -330,14 +358,18 @@
 
       formDetailsCache: new Map(),
       formLookupCache: new Map(),
-      combinedLookupCache: new Map()
+      combinedLookupCache: new Map(),
+      
+      // New state for sorting
+      detailsSortField: 'date',
+      detailsSortDirection: 'desc'
     };
 
     const dropdowns = { users:null, teams:null, forms:null, analyticsTeams:null };
 
     // Chart colours resolved from CSS vars (Chart.js can't read CSS vars directly)
     const cssVar = k => getComputedStyle(document.documentElement).getPropertyValue(k).trim();
-    let COLORS = { OK: '#22c55e', WARN: '#f59e0b', BAD: '#ef4444', TEXT: '#2C3E50' };
+    let COLORS = { OK: '#22c55e', WARN: '#f59e0b', BAD: '#ef4444', TEXT: '#2C3E50', BLUE: '#3b82f6' };
     function resolveColors() {
       COLORS.OK   = cssVar('--ok')          || COLORS.OK;
       COLORS.WARN = cssVar('--warn')        || COLORS.WARN;
@@ -497,7 +529,7 @@
 
       document.getElementById('loadAnalyticsBtn').onclick=loadAnalyticsRange;
       document.getElementById('insightsSort').onchange=renderAgentInsights;
-      document.getElementById('applyAnalyticsFilters').onclick=renderAnalytics;
+      document.getElementById('timePeriodSelect').onchange=renderTimePeriodView;
 
       const m=new Date();
       const cur=`${m.getFullYear()}-${String(m.getMonth()+1).padStart(2,'0')}`;
@@ -522,6 +554,8 @@
         document.getElementById(`${n}TabButton`).classList.toggle('active', n===name);
       });
       if(name==='analytics') renderAnalytics();
+      if(name==='details') renderDetails();
+      if(name==='critical') renderCritical();
     }
 
     function updateMonthRange(){
@@ -589,7 +623,20 @@
     function pct(n,d=1){ if(n==null||!isFinite(n)) return '-'; return (Math.round(n*10**d)/10**d).toFixed(d)+'%'; }
     function fmt(n,d=1){ if(n==null||!isFinite(n)) return '-'; return (Math.round(n*10**d)/10**d).toFixed(d); }
     function toUKDate(d){ const dt=new Date(d); return dt.toLocaleDateString('en-GB'); }
+    function toDateTime(d){ const dt=new Date(d); return dt.toLocaleString('en-GB'); }
     function dayKeyUTC(d){ const dt=new Date(d); return new Date(Date.UTC(dt.getUTCFullYear(),dt.getUTCMonth(),dt.getUTCDate())).toISOString().split('T')[0]; }
+    function getWeekNumber(d) {
+      const date = new Date(d);
+      date.setHours(0, 0, 0, 0);
+      date.setDate(date.getDate() + 3 - (date.getDay() + 6) % 7);
+      const week1 = new Date(date.getFullYear(), 0, 4);
+      return 1 + Math.round(((date.getTime() - week1.getTime()) / 86400000 - 3 + (week1.getDay() + 6) % 7) / 7);
+    }
+    function formatWeek(d) {
+      const date = new Date(d);
+      const weekNum = getWeekNumber(d);
+      return `Week ${weekNum}, ${date.getFullYear()}`;
+    }
 
     // Analytics helper functions
     function getPassSettings(){
@@ -658,6 +705,53 @@
           plugins: {
             legend: { position: 'top', labels: { color: COLORS.TEXT } },
             title: { display: true, text: 'Daily Performance Trend', color: COLORS.TEXT }
+          }
+        }
+      });
+    }
+
+    // Time Period Chart (Month over Month / Week over Week)
+    let timePeriodChart = null;
+    function initializeTimePeriodChart(data, type) {
+      const ctx = document.getElementById('timePeriodChart').getContext('2d');
+      const labels = data.map(d => d.label);
+      const passedData = data.map(d => d.passed);
+      const amberData = data.map(d => d.amber);
+      const failedData = data.map(d => d.failed);
+      const avgScoreData = data.map(d => d.avgScore || 0);
+      
+      if (timePeriodChart) {
+        timePeriodChart.destroy();
+      }
+      
+      timePeriodChart = new Chart(ctx, {
+        type: 'bar',
+        data: { 
+          labels, 
+          datasets: [
+            { label: 'Passed', data: passedData, backgroundColor: COLORS.OK, borderColor: COLORS.OK, borderWidth: 1 },
+            { label: 'Amber', data: amberData, backgroundColor: COLORS.WARN, borderColor: COLORS.WARN, borderWidth: 1 },
+            { label: 'Failed', data: failedData, backgroundColor: COLORS.BAD, borderColor: COLORS.BAD, borderWidth: 1 }
+          ]
+        },
+        options: {
+          responsive: true, 
+          maintainAspectRatio: false,
+          scales: {
+            x: { 
+              stacked: true, 
+              grid: { color: 'rgba(0,0,0,0.1)' } 
+            },
+            y: { 
+              stacked: true, 
+              beginAtZero: true, 
+              title: { display: true, text: 'Number of Evaluations' }, 
+              grid: { color: 'rgba(0,0,0,0.1)' } 
+            }
+          },
+          plugins: {
+            legend: { position: 'top', labels: { color: COLORS.TEXT } },
+            title: { display: true, text: `${type === 'month' ? 'Month over Month' : 'Week over Week'} Performance`, color: COLORS.TEXT }
           }
         }
       });
@@ -1267,6 +1361,35 @@
       if(p==null) return null; return p<=1 ? p*100 : p;
     }
 
+    // Helper function to extract contact info from conversation
+    function extractContactInfo(e) {
+      const conversation = e.conversation || {};
+      let contactInfo = '';
+      
+      // Try to get phone number (ANI)
+      const ani = conversation.ani || conversation.fromAddress || conversation.callerAddress;
+      if (ani) {
+        contactInfo = `Phone: ${ani}`;
+      }
+      
+      // Try to get email address
+      const email = conversation.emailAddress || conversation.fromEmail || conversation.customerEmail;
+      if (email) {
+        if (contactInfo) contactInfo += ' | ';
+        contactInfo += `Email: ${email}`;
+      }
+      
+      // Try to get other contact info
+      if (!contactInfo) {
+        const address = conversation.address || conversation.customerAddress;
+        if (address) {
+          contactInfo = `Contact: ${address}`;
+        }
+      }
+      
+      return contactInfo || 'No contact info';
+    }
+
     function renderOverview(){
       const evals=state.evals;
       const byAgent=new Map();
@@ -1319,6 +1442,70 @@
       return Array.from(dailyMap.values());
     }
 
+    // New function to calculate time period data (month or week)
+    function calculateTimePeriodData(evals, type) {
+      const {pass, band} = getPassSettings();
+      const periodMap = new Map();
+      
+      evals.forEach(e => {
+        const date = new Date(e.releaseDate || e.assignedDate || e.creationDate || e.evaluationDate || e.date || Date.now());
+        let periodKey, periodLabel;
+        
+        if (type === 'week') {
+          const weekNum = getWeekNumber(date);
+          const year = date.getFullYear();
+          periodKey = `${year}-W${weekNum}`;
+          periodLabel = `Week ${weekNum}, ${year}`;
+        } else {
+          // month
+          const month = date.getMonth() + 1;
+          const year = date.getFullYear();
+          periodKey = `${year}-${String(month).padStart(2, '0')}`;
+          const monthNames = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+          periodLabel = `${monthNames[date.getMonth()]} ${year}`;
+        }
+        
+        if (!periodMap.has(periodKey)) {
+          periodMap.set(periodKey, { 
+            label: periodLabel, 
+            passed: 0, 
+            amber: 0, 
+            failed: 0, 
+            totalScore: 0, 
+            count: 0 
+          });
+        }
+        
+        const periodData = periodMap.get(periodKey);
+        const score = getEvalPercent(e);
+        
+        if (score === null || !isFinite(score)) { 
+          periodData.failed++; 
+        } else if (score >= pass) { 
+          periodData.passed++; 
+          periodData.totalScore += score;
+          periodData.count++;
+        } else if (score >= pass - band) { 
+          periodData.amber++; 
+          periodData.totalScore += score;
+          periodData.count++;
+        } else { 
+          periodData.failed++; 
+          periodData.totalScore += score;
+          periodData.count++;
+        }
+      });
+      
+      // Convert to array and calculate averages
+      const result = Array.from(periodMap.values()).map(p => ({
+        ...p,
+        avgScore: p.count > 0 ? p.totalScore / p.count : 0
+      }));
+      
+      // Sort by period
+      return result.sort((a, b) => a.label.localeCompare(b.label));
+    }
+
     async function renderAnalytics(){
       const raw = getAnalyticsSet();
       if(!raw || !raw.length){
@@ -1330,6 +1517,7 @@
         document.getElementById('topAgentsTable').innerHTML='';
         document.getElementById('bottomAgentsTable').innerHTML='';
         document.getElementById('agentMediaChart').innerHTML='';
+        document.getElementById('timePeriodView').style.display='none';
         return;
       }
 
@@ -1343,6 +1531,9 @@
       const dailyTrendData = calculateDailyTrendData(evals, start, end);
       if (dailyTrendChart) { dailyTrendChart.destroy(); }
       dailyTrendChart = initializeStackedBarChart(dailyTrendData);
+
+      // Render time period view
+      renderTimePeriodView();
 
       let withFatal=0, withCritical=0, totalCriticalMarks=0, totalFatalMarks=0;
       let sumScores=0, scored=0;
@@ -1537,6 +1728,26 @@
         <thead><tr><th>Bottom Agents</th><th>Evals</th><th>Avg</th></tr></thead><tbody>${bottom || '<tr><td colspan="3" class="muted">No data</td></tr>'}</tbody>`;
     }
 
+    // New function to render time period view
+    function renderTimePeriodView() {
+      const raw = getAnalyticsSet();
+      if (!raw || !raw.length) return;
+      
+      const timePeriod = document.getElementById('timePeriodSelect').value;
+      const data = calculateTimePeriodData(raw, timePeriod);
+      
+      if (data.length === 0) {
+        document.getElementById('timePeriodView').style.display = 'none';
+        return;
+      }
+      
+      document.getElementById('timePeriodView').style.display = 'block';
+      document.getElementById('timePeriodTitle').textContent = 
+        timePeriod === 'month' ? 'Month over Month Performance' : 'Week over Week Performance';
+      
+      initializeTimePeriodChart(data, timePeriod);
+    }
+
     function renderAgentInsights(){
       const data = window._insightData || [];
       const mode = document.getElementById('insightsSort').value || 'avgDesc';
@@ -1563,23 +1774,105 @@
     // ===== Details =====
     async function renderDetails(){
       const c=document.getElementById('detailsContainer');
-      if (!state.evals.length){ c.innerHTML = '<div class="muted">No evaluations loaded.</div>'; return; }
+      if (!state.evals.length){ 
+        c.innerHTML = '<div class="muted">No evaluations loaded.</div>'; 
+        return; 
+      }
+      
       c.innerHTML = '<div class="info-message">Loading evaluation details...</div>';
 
-      const evaluationElements = await Promise.all(state.evals.map(async (e) => {
+      // Create evaluation data with all needed information
+      const evaluationData = await Promise.all(state.evals.map(async (e) => {
         const agent = resolveUserName(safeGet(e,'agent.id') || e.agentUserId);
         const lookup = await getCombinedLookupForEval(e);
         const formName = lookup.formName;
-        const when = toUKDate(e.releaseDate || e.assignedDate || e.creationDate || e.evaluationDate || e.date || Date.now());
-        const convo = e.conversationId || e.conversation?.id || '(n/a)';
+        const date = new Date(e.releaseDate || e.assignedDate || e.creationDate || e.evaluationDate || e.date || Date.now());
+        const when = toDateTime(date);
+        const dateOnly = toUKDate(date);
+        const contactInfo = extractContactInfo(e);
         const score = getEvalPercent(e);
-        const questionGroups = safeGet(e, 'answers.questionGroupScores') || [];
+        
+        return {
+          agent,
+          formName,
+          date,
+          dateOnly,
+          when,
+          contactInfo,
+          score,
+          evalObj: e,
+          lookup
+        };
+      }));
 
+      // Sort the data based on current sort settings
+      evaluationData.sort((a, b) => {
+        let aVal, bVal;
+        
+        switch(state.detailsSortField) {
+          case 'date':
+            aVal = a.date.getTime();
+            bVal = b.date.getTime();
+            break;
+          case 'agent':
+            aVal = a.agent.toLowerCase();
+            bVal = b.agent.toLowerCase();
+            break;
+          case 'form':
+            aVal = a.formName.toLowerCase();
+            bVal = b.formName.toLowerCase();
+            break;
+          case 'score':
+            aVal = a.score || 0;
+            bVal = b.score || 0;
+            break;
+          default:
+            aVal = a.date.getTime();
+            bVal = b.date.getTime();
+        }
+        
+        if (state.detailsSortDirection === 'desc') {
+          return bVal - aVal || bVal < aVal ? 1 : -1;
+        } else {
+          return aVal - bVal || aVal < bVal ? -1 : 1;
+        }
+      });
+
+      // Create sortable header
+      const sortArrow = (field) => {
+        if (state.detailsSortField === field) {
+          return state.detailsSortDirection === 'asc' ? ' ▲' : ' ▼';
+        }
+        return '';
+      };
+
+      const header = `
+        <div class="table-container">
+          <table class="details-table sortable">
+            <thead>
+              <tr>
+                <th class="sort-header" onclick="sortDetails('date')">Time${sortArrow('date')}</th>
+                <th class="sort-header" onclick="sortDetails('agent')">Agent${sortArrow('agent')}</th>
+                <th class="sort-header" onclick="sortDetails('form')">Form${sortArrow('form')}</th>
+                <th class="sort-header" onclick="sortDetails('score')">Score${sortArrow('score')}</th>
+                <th>Contact Info</th>
+                <th>Details</th>
+              </tr>
+            </thead>
+            <tbody>
+      `;
+
+      // Create rows
+      const rows = await Promise.all(evaluationData.map(async (data) => {
+        const { agent, formName, when, contactInfo, score, evalObj, lookup } = data;
+        
         let qRows = '';
+        const questionGroups = safeGet(evalObj, 'answers.questionGroupScores') || [];
+        
         questionGroups.forEach(group => {
           (group.questionScores || []).forEach(qScore => {
-            const questionText = resolveQuestionTextWithLookup(lookup,qScore);
-            const answerText = resolveAnswerTextWithLookup(lookup,qScore);
+            const questionText = resolveQuestionTextWithLookup(lookup, qScore);
+            const answerText = resolveAnswerTextWithLookup(lookup, qScore);
             const ansScore = qScore.score ?? null;
             const qIds = [qScore.questionId, qScore.questionContextId, safeGet(qScore, 'question.id'), safeGet(qScore, 'question.contextId')].filter(Boolean);
             const questionObj = qIds.map(id => lookup.questionObj.get(id)).find(Boolean);
@@ -1603,27 +1896,55 @@
           });
         });
 
+        const questionsTable = qRows 
+          ? `<div class="table-container">
+               <table class="details-table">
+                 <thead><tr><th>Question</th><th>Answer</th><th>Score</th><th>Flags</th><th>Comments</th></tr></thead>
+                 <tbody>${qRows}</tbody>
+               </table>
+             </div>`
+          : `<div class="muted">No question data available.</div>`;
+
         return `
-          <details class="evaluation">
-            <summary>${when} • <strong>${agent}</strong> — ${formName} &nbsp;&middot;&nbsp; Score: <strong>${score===null?'-':pct(score,1)}</strong> ${convo!=='(n/a)'?`&nbsp;&middot;&nbsp; Conversation: ${convo}`:''}</summary>
-            <div class="table-container">
-              <table class="details-table">
-                <thead><tr><th>Question</th><th>Answer</th><th>Score</th><th>Flags</th><th>Comments</th></tr></thead>
-                <tbody>${qRows || `<tr><td colspan="5" class="muted">No question data available.</td></tr>`}</tbody>
-              </table>
-            </div>
-          </details>
+          <tr>
+            <td>${when}</td>
+            <td>${agent}</td>
+            <td>${formName}</td>
+            <td>${score===null?'-':pct(score,1)}</td>
+            <td><div class="contact-info">${contactInfo}</div></td>
+            <td>
+              <details class="evaluation">
+                <summary>View Questions</summary>
+                ${questionsTable}
+              </details>
+            </td>
+          </tr>
         `;
       }));
-      c.innerHTML = evaluationElements.join('');
+
+      c.innerHTML = header + rows.join('') + '</tbody></table></div>';
+    }
+
+    // New function to sort details
+    function sortDetails(field) {
+      if (state.detailsSortField === field) {
+        state.detailsSortDirection = state.detailsSortDirection === 'asc' ? 'desc' : 'asc';
+      } else {
+        state.detailsSortField = field;
+        state.detailsSortDirection = 'desc';
+      }
+      renderDetails();
     }
 
     // ===== Critical =====
     async function renderCritical(){
       const tbl=document.getElementById('criticalTable');
+      const agentFailuresContainer = document.getElementById('agentFailuresContainer');
+      
       if(!state.evals.length){ 
         document.getElementById('criticalSummaryKPIs').innerHTML = '';
         tbl.innerHTML='<tr><td class="muted">No evaluations loaded.</td></tr>'; 
+        agentFailuresContainer.innerHTML = '<div class="muted">No evaluations loaded.</div>';
         return; 
       }
 
@@ -1632,16 +1953,37 @@
       const fatalMap=new Map();  
       const critMap=new Map();
       
-      function add(map, formName, qText, agentName){
+      // New data structure for agent failures
+      const agentFailures = new Map(); // agent -> Map(question -> {dates: [], type: 'critical'|'fatal'})
+      
+      function add(map, formName, qText, agentName, date, type){
         const key=formName+'|'+qText;
         if(!map.has(key)) map.set(key,{formName,qText,count:0,agents:new Map()});
         const o=map.get(key); o.count++; o.agents.set(agentName,(o.agents.get(agentName)||0)+1);
+        
+        // Add to agent failures
+        if (!agentFailures.has(agentName)) {
+          agentFailures.set(agentName, new Map());
+        }
+        const agentMap = agentFailures.get(agentName);
+        const questionKey = `${formName}: ${qText}`;
+        if (!agentMap.has(questionKey)) {
+          agentMap.set(questionKey, { dates: [], type });
+        }
+        const failure = agentMap.get(questionKey);
+        failure.dates.push(date);
+        // If any is fatal, mark as fatal
+        if (type === 'fatal') {
+          failure.type = 'fatal';
+        }
       }
 
       for (const e of state.evals){
         const lookup = await getCombinedLookupForEval(e);
         const formName = lookup.formName;
         const agentName = resolveUserName(safeGet(e,'agent.id')||e.agentUserId);
+        const date = new Date(e.releaseDate || e.assignedDate || e.creationDate || e.evaluationDate || e.date || Date.now());
+        const dateStr = toUKDate(date);
         const qGroups = safeGet(e,'answers.questionGroupScores') || [];
         qGroups.forEach(g=>{
           (g.questionScores||[]).forEach(qs=>{
@@ -1649,8 +1991,14 @@
             const qIds = [qs.questionId, qs.questionContextId, safeGet(qs, 'question.id'), safeGet(qs, 'question.contextId')].filter(Boolean);
             const questionObj = qIds.map(id => lookup.questionObj.get(id)).find(Boolean);
             const { isFatal, isCritical } = detectCriticalFatalQuestions(qs, questionObj);
-            if(isFatal) { add(fatalMap, formName, qText, agentName); totalFatal++; }
-            if(isCritical && !isFatal) { add(critMap, formName, qText, agentName); totalCritical++; }
+            if(isFatal) { 
+              add(fatalMap, formName, qText, agentName, dateStr, 'fatal'); 
+              totalFatal++; 
+            }
+            if(isCritical && !isFatal) { 
+              add(critMap, formName, qText, agentName, dateStr, 'critical'); 
+              totalCritical++; 
+            }
           });
         });
       }
@@ -1665,6 +2013,62 @@
           <div class="label">Total Fatal Marks</div>
         </div>
       `;
+
+      // Render agent failures table
+      const agentFailureRows = [];
+      const agentFailureArray = Array.from(agentFailures.entries())
+        .filter(([agent, failures]) => failures.size > 0)
+        .sort((a, b) => b[1].size - a[1].size);
+      
+      agentFailureArray.forEach(([agentName, failuresMap]) => {
+        const failures = Array.from(failuresMap.entries())
+          .sort((a, b) => {
+            // Sort by type (fatal first) then by number of occurrences
+            if (a[1].type === 'fatal' && b[1].type !== 'fatal') return -1;
+            if (a[1].type !== 'fatal' && b[1].type === 'fatal') return 1;
+            return b[1].dates.length - a[1].dates.length;
+          });
+        
+        let hasFatal = false;
+        const failureItems = failures.map(([question, data]) => {
+          if (data.type === 'fatal') hasFatal = true;
+          const dates = [...new Set(data.dates)].sort().reverse();
+          const recentDates = dates.slice(0, 3); // Show only 3 most recent dates
+          const datesText = recentDates.join(', ') + (dates.length > 3 ? ` (+${dates.length - 3} more)` : '');
+          
+          return `
+            <tr class="${data.type === 'fatal' ? 'fatal-agent' : ''}">
+              <td>${question}</td>
+              <td><span class="badge ${data.type === 'fatal' ? 'badge-fatal' : 'badge-critical'}">${data.type === 'fatal' ? 'Fatal' : 'Critical'}</span></td>
+              <td>${data.dates.length}</td>
+              <td class="failure-dates">${datesText}</td>
+            </tr>
+          `;
+        }).join('');
+        
+        agentFailureRows.push(`
+          <table class="agent-failure-table">
+            <thead>
+              <tr class="${hasFatal ? 'fatal-agent' : ''}">
+                <th colspan="4">${agentName} - ${failures.length} ${failures.length === 1 ? 'Failure' : 'Failures'}</th>
+              </tr>
+              <tr>
+                <th>Question</th>
+                <th>Type</th>
+                <th>Count</th>
+                <th>Dates</th>
+              </tr>
+            </thead>
+            <tbody>
+              ${failureItems}
+            </tbody>
+          </table>
+        `);
+      });
+      
+      agentFailuresContainer.innerHTML = agentFailureRows.length 
+        ? agentFailureRows.join('')
+        : '<div class="muted">No agent failures found for the selected period.</div>';
 
       const rows = [];
       function rowsFrom(map, type){

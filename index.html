@@ -691,7 +691,7 @@
             const bv=b.cells[i].getAttribute('data-sort') ?? b.cells[i].innerText;
             const A=num?Number(av):String(av).toLowerCase();
             const B=num?Number(bv):String(bv).toLowerCase();
-            return dir==='asc'? (A>B?1:A<L?-1:0) : (A<B?1:A>B?-1:0);
+            return dir==='asc'? (A>B?1:A<B?-1:0) : (A<B?1:A>B?-1:0);
           });
           body.innerHTML='';
           rows.forEach(r=>body.appendChild(r));
@@ -914,6 +914,7 @@
       function addQ(q){
         if(!q) return;
         const qTxt=q.text || q.label || q.title || '';
+        // Map multiple possible IDs to the question text
         [q.id, q.contextId, q.questionId, q.questionContextId].filter(Boolean).forEach(id=>{
           questionText.set(id,qTxt); 
           questionObj.set(id,q);
@@ -961,14 +962,32 @@
     // ===== IMPROVED Helpers for Q/A text =====
     function approx(a,b){ return Math.abs(Number(a)-Number(b))<1e-6; }
     function resolveQuestionTextWithLookup(lookup, qScore) {
-      const candidates = [ qScore.questionId, qScore.questionContextId, safeGet(qScore, 'question.id'), safeGet(qScore, 'question.contextId'), safeGet(qScore, 'question.questionId') ].filter(Boolean);
-      for (const id of candidates) { const t = lookup.questionText.get(id); if (t) return t; }
-      const questionText = safeGet(qScore, 'question.text') || safeGet(qScore, 'question.label');
+      // First try to get question text from lookup using various IDs
+      const candidates = [ 
+        qScore.questionId, 
+        qScore.questionContextId, 
+        safeGet(qScore, 'question.id'), 
+        safeGet(qScore, 'question.contextId'), 
+        safeGet(qScore, 'question.questionId') 
+      ].filter(Boolean);
+      
+      for (const id of candidates) { 
+        const t = lookup.questionText.get(id); 
+        if (t) return t; 
+      }
+      
+      // If lookup failed, try to get from qScore directly
+      const questionText = safeGet(qScore, 'question.text') || safeGet(qScore, 'question.label') || safeGet(qScore, 'question.title');
       if (questionText) return questionText;
-      return candidates.length > 0 ? `Question (${candidates[0]})` : 'Question';
+      
+      // Last resort - use questionId if available
+      if (qScore.questionId) return `Question (${qScore.questionId.substring(0,8)}...)`;
+      
+      return 'Unknown Question';
     }
 
     function resolveAnswerTextWithLookup(lookup, qScore) {
+      // Try to get answer text from lookup
       const ids = new Set();
       (qScore.selectedAnswerIds || []).forEach(x => ids.add(x));
       (qScore.selectedAnswerOptionIds || []).forEach(x => ids.add(x));
@@ -978,21 +997,36 @@
       const a = qScore.answer || {};
       [a.id, a.contextId, a.answerId, a.answerOptionId].filter(Boolean).forEach(x => ids.add(x));
       (qScore.answers || []).forEach(ans => { [ans.id, ans.contextId, ans.answerId, ans.answerOptionId].filter(Boolean).forEach(x => ids.add(x)); });
+      
       const texts = [];
-      Array.from(ids).forEach(id => { const t = lookup.answerText.get(id); if (t) texts.push(t); });
+      Array.from(ids).forEach(id => { 
+        const t = lookup.answerText.get(id); 
+        if (t) texts.push(t); 
+      });
+      
       if (texts.length) return texts.join(', ');
+      
+      // If no answer text found, try to match score to answer options
       const qIds = [ qScore.questionId, qScore.questionContextId, safeGet(qScore, 'question.id'), safeGet(qScore, 'question.contextId') ].filter(Boolean);
       const q = qIds.map(id => lookup.questionObj.get(id)).find(Boolean);
       if (q && Array.isArray(q.answerOptions) && q.answerOptions.length) {
         const s = Number(qScore.score);
-        const match = q.answerOptions.find(o => approx(s, o.value) || approx(s / 100, o.value) || approx(s, o.value * 100) || (o.value === 0 && s === 0) );
+        const match = q.answerOptions.find(o => 
+          approx(s, o.value) || 
+          approx(s / 100, o.value) || 
+          approx(s, o.value * 100) || 
+          (o.value === 0 && s === 0) 
+        );
         if (match) { return match.text ?? String(match.value ?? ''); }
         if (qScore.score !== null && qScore.score !== undefined) { return `Score: ${qScore.score}`; }
       }
+      
+      // Fallbacks
       if (qScore.freeTextAnswer) return String(qScore.freeTextAnswer);
       if (qScore.numericAnswer !== undefined && qScore.numericAnswer !== null) return String(qScore.numericAnswer);
       if (safeGet(qScore, 'answer.text')) return qScore.answer.text;
       if (qScore.score !== null && qScore.score !== undefined) { return `Score: ${qScore.score}`; }
+      
       return 'No answer';
     }
 
@@ -1178,6 +1212,7 @@
       `;
       tableSorter('mediaTable');
 
+      // FIXED: Use the improved question text resolution
       const failMap=new Map();
       for(const e of evals){
         const lookup = await getCombinedLookupForEval(e);
@@ -1196,14 +1231,18 @@
           }
         }));
       }
+      
+      // FIXED: Ensure we show the question text properly in the table
       const repeatRows = Array.from(failMap.values())
         .sort((a,b)=>(b.fatal+b.critical)-(a.fatal+a.critical))
         .map(r=>`<tr>
-          <td>${r.formName}</td><td>${r.qText}</td>
+          <td>${r.formName}</td>
+          <td>${r.qText}</td>
           <td data-sort="${r.critical}">${r.critical}</td>
           <td data-sort="${r.fatal}">${r.fatal}</td>
           <td data-sort="${r.critical+r.fatal}">${r.critical+r.fatal}</td></tr>`)
         .join('');
+        
       document.getElementById('repeatFailsTable').innerHTML = `
         <thead><tr>
           <th data-type="text">Form</th><th data-type="text">Question</th>
@@ -1313,6 +1352,7 @@
         let qRows = '';
         questionGroups.forEach(group => {
           (group.questionScores || []).forEach(qScore => {
+            // FIXED: Use the improved question text resolution
             const questionText = resolveQuestionTextWithLookup(lookup,qScore);
             const answerText = resolveAnswerTextWithLookup(lookup,qScore);
             const ansScore = qScore.score ?? null;
@@ -1380,6 +1420,7 @@
         const qGroups = safeGet(e,'answers.questionGroupScores') || [];
         qGroups.forEach(g=>{
           (g.questionScores||[]).forEach(qs=>{
+            // FIXED: Use the improved question text resolution
             const qText = resolveQuestionTextWithLookup(lookup,qs);
             const qIds = [qs.questionId, qs.questionContextId, safeGet(qs, 'question.id'), safeGet(qs, 'question.contextId')].filter(Boolean);
             const questionObj = qIds.map(id => lookup.questionObj.get(id)).find(Boolean);

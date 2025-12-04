@@ -330,10 +330,7 @@
 
       formDetailsCache: new Map(),
       formLookupCache: new Map(),
-      combinedLookupCache: new Map(),
-      
-      // NEW: Track forms that need to be loaded
-      formsToLoad: new Set()
+      combinedLookupCache: new Map()
     };
 
     const dropdowns = { users:null, teams:null, forms:null, analyticsTeams:null };
@@ -844,7 +841,7 @@
           formPromises.add(getFormDetails(formId, formVersionId));
         }
         
-        // Also add form without version as fallback
+        // Always add form without version as fallback
         if (formId) {
           formPromises.add(getFormDetails(formId, null));
         }
@@ -852,18 +849,8 @@
       
       console.log(`Loading ${formPromises.size} form details...`);
       
-      // Load all form details in parallel with limited concurrency
-      const promisesArray = Array.from(formPromises);
-      const BATCH_SIZE = 5;
-      
-      for (let i = 0; i < promisesArray.length; i += BATCH_SIZE) {
-        const batch = promisesArray.slice(i, i + BATCH_SIZE);
-        await Promise.all(batch);
-        if (i + BATCH_SIZE < promisesArray.length) {
-          await sleep(500); // Brief pause between batches
-        }
-      }
-      
+      // Load all form details
+      await Promise.allSettled(Array.from(formPromises));
       console.log('All form details loaded.');
     }
 
@@ -953,11 +940,8 @@
       
       // Return cached if available
       if (state.formDetailsCache.has(key)) {
-        console.log(`Form ${key} already cached`);
         return state.formDetailsCache.get(key);
       }
-      
-      console.log(`Loading form details for ${key}`);
       
       let url;
       if (versionId === '__published__') {
@@ -989,7 +973,6 @@
         state.formDetailsCache.set(key, data);
         state.formLookupCache.set(key, buildFormLookup(data || {}));
         
-        console.log(`Form ${key} loaded successfully: ${data?.name || 'Unnamed form'}`);
         return data;
       } catch (e) {
         console.error(`Failed to load form ${key}:`, e.message);
@@ -1000,14 +983,11 @@
 
     // IMPROVED form lookup
     function buildFormLookup(form){
-      console.log(`Building lookup for form: ${form?.name || 'Unknown'}`);
-      
       const questionText = new Map();
       const answerText = new Map();
       const questionObj = new Map();
       
       if (!form) {
-        console.log('No form data provided');
         return { questionText, answerText, questionObj };
       }
 
@@ -1019,37 +999,28 @@
         return a.text || a.label || a.title || String(a.value || '');
       }
 
-      function addQuestion(q, path = '') {
+      function addQuestion(q) {
         if (!q) return;
         
         const qText = extractQuestionText(q);
-        const qPath = path ? `${path}.${q.id || 'q'}` : (q.id || 'root');
         
-        console.log(`Processing question: ${qText} (ID: ${q.id}, Path: ${qPath})`);
+        // Map ALL possible IDs
+        const ids = [];
+        if (q.id) ids.push(q.id);
+        if (q.contextId) ids.push(q.contextId);
+        if (q.questionId) ids.push(q.questionId);
+        if (q.questionContextId) ids.push(q.questionContextId);
         
-        // Collect all possible IDs
-        const allIds = [];
-        if (q.id) allIds.push(q.id);
-        if (q.contextId) allIds.push(q.contextId);
-        if (q.questionId) allIds.push(q.questionId);
-        if (q.questionContextId) allIds.push(q.questionContextId);
-        
-        // For questions without proper IDs, generate one from the path
-        if (allIds.length === 0 && qPath) {
-          allIds.push(qPath);
-        }
-        
-        // Map all IDs to question text
-        allIds.forEach(id => {
+        // Map IDs to question text
+        ids.forEach(id => {
           if (id && qText) {
             questionText.set(id, qText);
             questionObj.set(id, q);
-            console.log(`  Mapped ID ${id} -> "${qText}"`);
           }
         });
         
         // Handle answer options
-        (q.answerOptions || []).forEach((a, idx) => {
+        (q.answerOptions || []).forEach(a => {
           const aText = extractAnswerText(a);
           const answerIds = [];
           
@@ -1058,47 +1029,33 @@
           if (a.answerId) answerIds.push(a.answerId);
           if (a.answerOptionId) answerIds.push(a.answerOptionId);
           
-          // Generate ID if none exists
-          if (answerIds.length === 0) {
-            answerIds.push(`${qPath}.answer.${idx}`);
-          }
-          
           answerIds.forEach(id => {
             if (id && aText) {
               answerText.set(id, aText);
-              console.log(`  Mapped answer ID ${id} -> "${aText}"`);
             }
           });
         });
         
         // Handle nested questions
-        (q.multipleSelectOptionQuestions || []).forEach(nested => 
-          addQuestion(nested, `${qPath}.nested`));
-        (q.nestedQuestions || []).forEach(nested => 
-          addQuestion(nested, `${qPath}.nested`));
+        (q.multipleSelectOptionQuestions || []).forEach(addQuestion);
+        (q.nestedQuestions || []).forEach(addQuestion);
       }
 
-      function walkQuestionGroups(groups, path = '') {
-        (groups || []).forEach((g, gIdx) => {
-          const groupPath = path ? `${path}.group${gIdx}` : `group${gIdx}`;
-          
+      function walkQuestionGroups(groups) {
+        (groups || []).forEach(g => {
           // Process questions in group
-          (g.questions || []).forEach((q, qIdx) => 
-            addQuestion(q, `${groupPath}.q${qIdx}`));
-          
+          (g.questions || []).forEach(addQuestion);
           // Recursively walk nested groups
-          walkQuestionGroups(g.questionGroups || [], groupPath);
+          walkQuestionGroups(g.questionGroups || []);
         });
       }
       
       // Process top-level questions
-      (form.questions || []).forEach((q, idx) => 
-        addQuestion(q, `q${idx}`));
+      (form.questions || []).forEach(addQuestion);
       
       // Process question groups
       walkQuestionGroups(form.questionGroups || []);
       
-      console.log(`Lookup built: ${questionText.size} questions, ${answerText.size} answers`);
       return { questionText, answerText, questionObj };
     }
 
@@ -1107,89 +1064,83 @@
       const formId = safeGet(e, 'form.id') || e.formId;
       const formVersionId = safeGet(e, 'form.versionId') || e.formVersionId || safeGet(e, 'form.version');
       
-      // Create a more robust cache key
-      const comboKey = [
-        pubId ? `pub:${pubId}` : '',
-        formId ? `form:${formId}` : '',
-        formVersionId ? `ver:${formVersionId}` : '',
-        e.id ? `eval:${e.id}` : ''
-      ].filter(Boolean).join('|') || 'none';
+      // Create cache key
+      const comboKey = `${pubId || 'no-pub'}|${formId || 'no-form'}|${formVersionId || 'no-ver'}`;
       
       if (state.combinedLookupCache.has(comboKey)) {
         return state.combinedLookupCache.get(comboKey);
       }
       
-      console.log(`Creating combined lookup for evaluation: ${comboKey}`);
+      // Load BOTH published form AND specific form
+      const loadPromises = [];
       
-      // Load ALL possible form details
-      const detailsPromises = [];
-      
+      // Always try published form first
       if (pubId) {
-        detailsPromises.push(getFormDetails(pubId, '__published__'));
+        loadPromises.push(getFormDetails(pubId, '__published__'));
       }
       
+      // Try specific form version
       if (formId && formVersionId) {
-        detailsPromises.push(getFormDetails(formId, formVersionId));
+        loadPromises.push(getFormDetails(formId, formVersionId));
       }
       
-      if (formId && !formVersionId) {
-        detailsPromises.push(getFormDetails(formId, null));
-      }
-      
-      // Always try to get the form regardless of version
+      // Always try form without version
       if (formId) {
-        detailsPromises.push(getFormDetails(formId, null));
+        loadPromises.push(getFormDetails(formId, null));
       }
       
-      const details = (await Promise.all(detailsPromises)).filter(Boolean);
+      // Wait for all form details to load
+      const results = await Promise.allSettled(loadPromises);
+      const details = results
+        .filter(r => r.status === 'fulfilled' && r.value)
+        .map(r => r.value);
       
-      if (details.length === 0) {
-        console.warn(`No form details found for evaluation ${e.id}`);
-      }
-      
+      // Build combined lookup
       const merged = { 
         questionText: new Map(), 
         answerText: new Map(), 
-        questionObj: new Map() 
+        questionObj: new Map()
       };
       
-      const names = [];
-      
       details.forEach(d => {
-        if (d?.name) names.push(d.name);
         const lk = buildFormLookup(d || {});
-        
-        // Merge all lookups
         lk.questionText.forEach((v, k) => merged.questionText.set(k, v));
         lk.answerText.forEach((v, k) => merged.answerText.set(k, v));
         lk.questionObj.forEach((v, k) => merged.questionObj.set(k, v));
       });
       
+      // Get form name
       const formName = safeGet(e, 'evaluationForm.name') || 
                       safeGet(e, 'form.name') || 
-                      names[0] || 
+                      (details[0]?.name) || 
                       '(Unknown Form)';
       
       const combined = {
         ...merged,
         formName,
-        formId: formId,
-        formVersionId: formVersionId,
-        pubId: pubId
+        formId,
+        formVersionId,
+        pubId
       };
       
       state.combinedLookupCache.set(comboKey, combined);
-      
-      console.log(`Combined lookup created: ${merged.questionText.size} questions for form "${formName}"`);
       return combined;
     }
 
-    // ===== Question Text Resolution =====
+    // ===== IMPROVED Question Text Resolution =====
     function approx(a,b){ return Math.abs(Number(a)-Number(b))<1e-6; }
     
     function resolveQuestionTextWithLookup(lookup, qScore) {
-      // First, try direct lookup with all possible IDs
-      const possibleIds = [
+      // Strategy 1: Try to get from qScore.question directly
+      if (qScore.question) {
+        const directText = qScore.question.text || qScore.question.label || qScore.question.title;
+        if (directText) {
+          return directText;
+        }
+      }
+      
+      // Strategy 2: Try lookup with all possible IDs
+      const idsToTry = [
         qScore.questionId,
         qScore.questionContextId,
         safeGet(qScore, 'question.id'),
@@ -1199,55 +1150,58 @@
         safeGet(qScore, 'id')
       ].filter(Boolean);
       
-      for (const id of possibleIds) {
+      for (const id of idsToTry) {
         const text = lookup.questionText.get(id);
         if (text) {
           return text;
         }
       }
       
-      // If no ID match, try to find by scanning all questions for matching text
-      if (qScore.questionId || qScore.questionContextId) {
-        // Try to find question with similar ID pattern
+      // Strategy 3: Try to find by scanning all question objects for partial matches
+      if (idsToTry.length > 0) {
         const allQuestionIds = Array.from(lookup.questionText.keys());
-        const targetId = qScore.questionId || qScore.questionContextId;
-        
-        // Look for partial matches
         for (const questionId of allQuestionIds) {
-          if (questionId.includes(targetId) || targetId.includes(questionId)) {
-            const text = lookup.questionText.get(questionId);
-            if (text) return text;
+          // Check for partial matches (sometimes IDs are truncated)
+          for (const searchId of idsToTry) {
+            if (questionId.includes(searchId) || searchId.includes(questionId)) {
+              const text = lookup.questionText.get(questionId);
+              if (text) return text;
+            }
           }
         }
       }
       
-      // Try to get from qScore directly
-      const directText = safeGet(qScore, 'question.text') || 
-                        safeGet(qScore, 'question.label') || 
-                        safeGet(qScore, 'question.title') ||
-                        safeGet(qScore, 'text');
-      
-      if (directText) {
-        return directText;
+      // Strategy 4: Try the qScore itself
+      const qScoreText = qScore.text || qScore.label || qScore.title;
+      if (qScoreText) {
+        return qScoreText;
       }
       
-      // Try to extract from the question object if available
-      const questionObj = safeGet(qScore, 'question');
-      if (questionObj) {
-        const objText = questionObj.text || questionObj.label || questionObj.title;
-        if (objText) return objText;
+      // Strategy 5: Try to extract from answer options if score matches
+      const allQuestionObjs = Array.from(lookup.questionObj.values());
+      for (const questionObj of allQuestionObjs) {
+        if (questionObj.answerOptions && qScore.score !== undefined) {
+          const matchingOption = questionObj.answerOptions.find(opt => 
+            approx(opt.value, qScore.score) || 
+            (opt.value === 0 && qScore.score === 0)
+          );
+          if (matchingOption) {
+            return questionObj.text || questionObj.label || questionObj.title || 'Question';
+          }
+        }
       }
       
-      // Last resort - show something informative
-      const firstId = possibleIds[0];
-      if (firstId) {
-        // Check if this might be a contextId vs questionId issue
-        console.warn(`Question text not found for ID: ${firstId}`);
-        console.warn(`Available question IDs in lookup:`, Array.from(lookup.questionText.keys()));
-        return `Question (${firstId.substring(0, Math.min(12, firstId.length))}${firstId.length > 12 ? '...' : ''})`;
+      // Last resort: Show ID or generic text
+      if (idsToTry[0]) {
+        // Check if ID might actually be the question text (some systems store text as ID)
+        const firstId = idsToTry[0];
+        if (firstId.length < 100 && !firstId.includes('-') && !firstId.match(/^[a-f0-9]{8}-/i)) {
+          return firstId;
+        }
+        return `Question (${firstId.substring(0, Math.min(8, firstId.length))}...)`;
       }
       
-      return 'Unknown Question';
+      return 'Question';
     }
 
     function resolveAnswerTextWithLookup(lookup, qScore) {

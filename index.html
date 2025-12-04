@@ -23,7 +23,7 @@
     #messageContainer{display:none;margin-top:12px}
     .error-message{color:#b4231a;background:#fee2e2;border:1px solid #fecaca;padding:10px;border-radius:6px}
     .success-message{color:#14532d;background:#dcfce7;border:1px solid #bbf7d0;padding:10px;border-radius:6px}
-    .info-message{color:#6b4e16;background:#fff7ed;border:1px solid #ffedd5;padding:10px;border-radius:6px}
+    .info-message{color:#6b4e16;background:#fff7ed;border:1px solid #ffedd5;padding:10px;border-radius:6x}
 
     table{width:100%;border-collapse:collapse;margin-top:12px;border:1px solid var(--border-color);border-radius:6px;overflow:hidden}
     th,td{padding:10px 12px;text-align:left;border-bottom:1px solid var(--border-color);vertical-align:top}
@@ -909,27 +909,81 @@
       }catch(e){ state.formDetailsCache.set(key,null); return null; }
     }
 
+    // IMPROVED: Better form lookup that handles different question structures
     function buildFormLookup(form){
       const questionText=new Map(), answerText=new Map(), questionObj=new Map();
+      
+      function extractQuestionText(q) {
+        return q.text || q.label || q.title || q.questionText || '';
+      }
+      
+      function extractAnswerText(a) {
+        return a.text || a.label || a.title || String(a.value || '');
+      }
+      
       function addQ(q){
         if(!q) return;
-        const qTxt=q.text || q.label || q.title || '';
-        // Map multiple possible IDs to the question text
-        [q.id, q.contextId, q.questionId, q.questionContextId].filter(Boolean).forEach(id=>{
-          questionText.set(id,qTxt); 
-          questionObj.set(id,q);
+        const qTxt = extractQuestionText(q);
+        
+        // Map ALL possible IDs from the question object
+        const allIds = [];
+        
+        // Collect all possible ID fields
+        if (q.id) allIds.push(q.id);
+        if (q.contextId) allIds.push(q.contextId);
+        if (q.questionId) allIds.push(q.questionId);
+        if (q.questionContextId) allIds.push(q.questionContextId);
+        
+        // Also try to generate possible ID variations
+        if (q.id && q.id.includes('_')) {
+          const parts = q.id.split('_');
+          if (parts.length > 1) {
+            // Try without suffix
+            allIds.push(parts.slice(0, -1).join('_'));
+          }
+        }
+        
+        // Map all IDs to the question text
+        allIds.forEach(id => {
+          if (id) {
+            questionText.set(id, qTxt);
+            questionObj.set(id, q);
+          }
         });
+        
+        // Handle answer options
         (q.answerOptions||[]).forEach(a=>{
-          const aTxt=a.text ?? String(a.value ?? '');
-          [a.id, a.contextId, a.answerId, a.answerOptionId].filter(Boolean).forEach(id=>{
-            answerText.set(id,aTxt);
+          const aTxt = extractAnswerText(a);
+          const answerIds = [];
+          if (a.id) answerIds.push(a.id);
+          if (a.contextId) answerIds.push(a.contextId);
+          if (a.answerId) answerIds.push(a.answerId);
+          if (a.answerOptionId) answerIds.push(a.answerOptionId);
+          
+          answerIds.forEach(id => {
+            if (id) answerText.set(id, aTxt);
           });
         });
+        
+        // Recursively handle nested questions
         (q.multipleSelectOptionQuestions||[]).forEach(addQ);
+        (q.nestedQuestions||[]).forEach(addQ);
       }
-      function walk(groups){ (groups||[]).forEach(g=>{ (g.questions||[]).forEach(addQ); (g.questionGroups||[]).forEach(walk); }); }
-      (form?.questions||[]).forEach(addQ); walk(form?.questionGroups);
-      return {questionText,answerText,questionObj};
+      
+      function walk(groups){ 
+        (groups||[]).forEach(g=>{ 
+          (g.questions||[]).forEach(addQ); 
+          (g.questionGroups||[]).forEach(walk);
+        }); 
+      }
+      
+      // Process questions directly on form
+      (form?.questions||[]).forEach(addQ);
+      
+      // Process question groups
+      walk(form?.questionGroups);
+      
+      return {questionText, answerText, questionObj};
     }
 
     async function getCombinedLookupForEval(e){
@@ -937,15 +991,19 @@
       const formId = safeGet(e,'form.id') || e.formId;
       const formVersionId = safeGet(e,'form.versionId') || e.formVersionId || safeGet(e,'form.version');
       const comboKey = [ pubId ? `pub:${pubId}` : '', formId ? `form:${formId}` : '', formVersionId ? `ver:${formVersionId}` : '' ].filter(Boolean).join('|') || 'none';
+      
       if(state.combinedLookupCache.has(comboKey)) return state.combinedLookupCache.get(comboKey);
+      
       const detailsPromises = [];
       if (pubId) { detailsPromises.push(getFormDetails(pubId, '__published__')); }
       if (formId && formVersionId) { detailsPromises.push(getFormDetails(formId, formVersionId)); }
       if (formId && !formVersionId) { detailsPromises.push(getFormDetails(formId, null)); }
       if (formId) { detailsPromises.push(getFormDetails(formId, null)); }
+      
       const details = (await Promise.all(detailsPromises)).filter(Boolean);
       const merged = { questionText: new Map(), answerText: new Map(), questionObj: new Map() };
       const names = [];
+      
       details.forEach(d => {
         if(d?.name) names.push(d.name);
         const lk = buildFormLookup(d || {});
@@ -953,35 +1011,61 @@
         lk.answerText.forEach((v,k) => merged.answerText.set(k,v));
         lk.questionObj.forEach((v,k) => merged.questionObj.set(k,v));
       });
+      
       const formName = safeGet(e,'evaluationForm.name') || safeGet(e,'form.name') || names[0] || '(Form)';
       const combined = {...merged, formName};
       state.combinedLookupCache.set(comboKey, combined);
       return combined;
     }
 
-    // ===== IMPROVED Helpers for Q/A text =====
+    // ===== IMPROVED Question Text Resolution =====
     function approx(a,b){ return Math.abs(Number(a)-Number(b))<1e-6; }
+    
     function resolveQuestionTextWithLookup(lookup, qScore) {
-      // First try to get question text from lookup using various IDs
-      const candidates = [ 
-        qScore.questionId, 
-        qScore.questionContextId, 
-        safeGet(qScore, 'question.id'), 
-        safeGet(qScore, 'question.contextId'), 
-        safeGet(qScore, 'question.questionId') 
+      // DEBUG: Log what we're working with
+      console.log('Resolving question text for:', qScore);
+      
+      // Try to get from lookup using ALL possible IDs from qScore
+      const possibleIds = [
+        qScore.questionId,
+        qScore.questionContextId,
+        safeGet(qScore, 'question.id'),
+        safeGet(qScore, 'question.contextId'),
+        safeGet(qScore, 'question.questionId'),
+        safeGet(qScore, 'question.questionContextId'),
+        safeGet(qScore, 'id')
       ].filter(Boolean);
       
-      for (const id of candidates) { 
-        const t = lookup.questionText.get(id); 
-        if (t) return t; 
+      console.log('Possible IDs to try:', possibleIds);
+      
+      // Try each ID
+      for (const id of possibleIds) {
+        const text = lookup.questionText.get(id);
+        if (text) {
+          console.log('Found question text for ID', id, ':', text);
+          return text;
+        }
       }
       
-      // If lookup failed, try to get from qScore directly
-      const questionText = safeGet(qScore, 'question.text') || safeGet(qScore, 'question.label') || safeGet(qScore, 'question.title');
-      if (questionText) return questionText;
+      // If lookup failed, check the lookup cache contents
+      console.log('Lookup cache question IDs:', Array.from(lookup.questionText.keys()));
       
-      // Last resort - use questionId if available
-      if (qScore.questionId) return `Question (${qScore.questionId.substring(0,8)}...)`;
+      // Try to get from qScore directly (some forms store text directly)
+      const directText = safeGet(qScore, 'question.text') || 
+                        safeGet(qScore, 'question.label') || 
+                        safeGet(qScore, 'question.title') ||
+                        safeGet(qScore, 'text');
+      
+      if (directText) {
+        console.log('Found direct question text:', directText);
+        return directText;
+      }
+      
+      // Last resort - show something informative
+      const firstId = possibleIds[0];
+      if (firstId) {
+        return `Question (${firstId.substring(0, Math.min(12, firstId.length))}${firstId.length > 12 ? '...' : ''})`;
+      }
       
       return 'Unknown Question';
     }
@@ -989,14 +1073,20 @@
     function resolveAnswerTextWithLookup(lookup, qScore) {
       // Try to get answer text from lookup
       const ids = new Set();
+      
+      // Collect ALL possible answer IDs
       (qScore.selectedAnswerIds || []).forEach(x => ids.add(x));
       (qScore.selectedAnswerOptionIds || []).forEach(x => ids.add(x));
       if (qScore.selectedAnswerId) ids.add(qScore.selectedAnswerId);
       if (qScore.answerOptionId) ids.add(qScore.answerOptionId);
       if (qScore.answerId) ids.add(qScore.answerId);
+      
       const a = qScore.answer || {};
       [a.id, a.contextId, a.answerId, a.answerOptionId].filter(Boolean).forEach(x => ids.add(x));
-      (qScore.answers || []).forEach(ans => { [ans.id, ans.contextId, ans.answerId, ans.answerOptionId].filter(Boolean).forEach(x => ids.add(x)); });
+      
+      (qScore.answers || []).forEach(ans => { 
+        [ans.id, ans.contextId, ans.answerId, ans.answerOptionId].filter(Boolean).forEach(x => ids.add(x)); 
+      });
       
       const texts = [];
       Array.from(ids).forEach(id => { 
@@ -1009,6 +1099,7 @@
       // If no answer text found, try to match score to answer options
       const qIds = [ qScore.questionId, qScore.questionContextId, safeGet(qScore, 'question.id'), safeGet(qScore, 'question.contextId') ].filter(Boolean);
       const q = qIds.map(id => lookup.questionObj.get(id)).find(Boolean);
+      
       if (q && Array.isArray(q.answerOptions) && q.answerOptions.length) {
         const s = Number(qScore.score);
         const match = q.answerOptions.find(o => 
@@ -1017,8 +1108,12 @@
           approx(s, o.value * 100) || 
           (o.value === 0 && s === 0) 
         );
-        if (match) { return match.text ?? String(match.value ?? ''); }
-        if (qScore.score !== null && qScore.score !== undefined) { return `Score: ${qScore.score}`; }
+        if (match) { 
+          return match.text || match.label || String(match.value || ''); 
+        }
+        if (qScore.score !== null && qScore.score !== undefined) { 
+          return `Score: ${qScore.score}`; 
+        }
       }
       
       // Fallbacks
@@ -1212,7 +1307,7 @@
       `;
       tableSorter('mediaTable');
 
-      // FIXED: Use the improved question text resolution
+      // DEBUG: Add logging to see what's happening with question text resolution
       const failMap=new Map();
       for(const e of evals){
         const lookup = await getCombinedLookupForEval(e);
@@ -1232,7 +1327,6 @@
         }));
       }
       
-      // FIXED: Ensure we show the question text properly in the table
       const repeatRows = Array.from(failMap.values())
         .sort((a,b)=>(b.fatal+b.critical)-(a.fatal+a.critical))
         .map(r=>`<tr>
@@ -1352,7 +1446,7 @@
         let qRows = '';
         questionGroups.forEach(group => {
           (group.questionScores || []).forEach(qScore => {
-            // FIXED: Use the improved question text resolution
+            // Use the improved question text resolution
             const questionText = resolveQuestionTextWithLookup(lookup,qScore);
             const answerText = resolveAnswerTextWithLookup(lookup,qScore);
             const ansScore = qScore.score ?? null;
@@ -1420,7 +1514,6 @@
         const qGroups = safeGet(e,'answers.questionGroupScores') || [];
         qGroups.forEach(g=>{
           (g.questionScores||[]).forEach(qs=>{
-            // FIXED: Use the improved question text resolution
             const qText = resolveQuestionTextWithLookup(lookup,qs);
             const qIds = [qs.questionId, qs.questionContextId, safeGet(qs, 'question.id'), safeGet(qs, 'question.contextId')].filter(Boolean);
             const questionObj = qIds.map(id => lookup.questionObj.get(id)).find(Boolean);

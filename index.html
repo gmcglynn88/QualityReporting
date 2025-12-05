@@ -2,7 +2,6 @@
 <html lang="en">
 <head>
   <meta charset="UTF-8" />
-  <title>QA Evaluations – Monthly View</title>
   <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
   <style>
     :root{ --primary-color:#63AB8F; --secondary-color:#4A8C7D; --border-color:#DEE2E6;
@@ -141,16 +140,22 @@
     .sort-header:hover { background-color: rgba(255,255,255,0.2); }
     .sort-arrow { margin-left: 5px; }
     .contact-info { font-size: 12px; color: var(--text-light); margin-top: 2px; }
+    
+    /* New styles for trends tab */
+    .trend-controls { display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 16px; margin-bottom: 20px; }
+    .trend-chart-container { height: 500px; margin: 20px 0; }
+    .trend-table-container { margin-top: 30px; }
+    .trend-stats { display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 10px; margin: 20px 0; }
+    .trend-stat { background: #fff; border: 1px solid var(--border-color); border-radius: 8px; padding: 15px; text-align: center; }
+    .trend-stat .value { font-size: 24px; font-weight: bold; margin: 5px 0; }
+    .trend-stat .label { font-size: 12px; color: var(--text-light); }
+    .trend-stat.good .value { color: var(--ok); }
+    .trend-stat.warning .value { color: var(--warn); }
+    .trend-stat.bad .value { color: var(--bad); }
   </style>
   <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
 </head>
 <body>
-  <div id="logo-container">
-    <img id="logo" src="https://raw.githubusercontent.com/gmcglynn88/Management-Unit-Search/main/Consultinglogo%20(2).png" alt="Company Logo">
-  </div>
-
-  <h1>QA Evaluations – Monthly View</h1>
-
   <div id="authCard" class="card">
     <div id="auth-message" class="info-message">Authenticating with PureCloud...</div>
   </div>
@@ -192,6 +197,7 @@
         <div id="tabs">
           <div id="overviewTabButton" class="tab active">Overview</div>
           <div id="analyticsTabButton" class="tab">Analytics</div>
+          <div id="trendsTabButton" class="tab">Trends</div>
           <div id="detailsTabButton" class="tab">Evaluation Details</div>
           <div id="criticalTabButton" class="tab">Critical / Fatal Summary</div>
         </div>
@@ -233,13 +239,6 @@
             <input id="amberBand" type="number" min="0" max="20" value="5">
           </div>
           <div>
-            <label for="timePeriodSelect">Time Period View</label>
-            <select id="timePeriodSelect" class="full-width-btn">
-              <option value="month">Month over Month</option>
-              <option value="week">Week over Week</option>
-            </select>
-          </div>
-          <div>
             <label>&nbsp;</label>
             <button id="loadAnalyticsBtn" class="full-width-btn">
               <span class="loading-spinner" style="display:none"></span>
@@ -249,20 +248,6 @@
         </div>
 
         <div id="analyticsKPIs" class="kpis"></div>
-
-        <!-- Month over Month / Week over Week View -->
-        <div id="timePeriodView" class="card" style="padding:16px;margin-top:10px;display:none;">
-          <h3 class="section-title" style="margin:0 0 8px" id="timePeriodTitle">Month over Month Performance</h3>
-          <div class="stacked-bar-container">
-            <canvas id="timePeriodChart"></canvas>
-          </div>
-          <div class="legend">
-            <div class="key"><span class="swatch" style="background:var(--ok)"></span>Passed</div>
-            <div class="key"><span class="swatch" style="background:var(--warn)"></span>Amber</div>
-            <div class="key"><span class="swatch" style="background:var(--bad)"></span>Failed</div>
-            <div class="key"><span class="swatch" style="background:#3b82f6"></span>Avg Score</div>
-          </div>
-        </div>
 
         <div class="card" style="padding:16px;margin-top:10px">
           <h3 class="section-title" style="margin:0 0 8px">Scores by Media Type per Agent</h3>
@@ -307,6 +292,82 @@
           <div class="table-container">
             <table id="bottomAgentsTable"></table>
           </div>
+        </div>
+      </div>
+
+      <div id="trendsTab" class="tab-content">
+        <h2 class="section-title">Performance Trends</h2>
+        
+        <div class="controls" style="margin-top:8px">
+          <div>
+            <label for="trendFrom">From (Month)</label>
+            <input id="trendFrom" type="month">
+          </div>
+          <div>
+            <label for="trendTo">To (Month)</label>
+            <input id="trendTo" type="month">
+          </div>
+          <div>
+            <label for="trendTeamDropdown">Filter by Work Team</label>
+            <div id="trendTeamDropdown" class="checkbox-dropdown"></div>
+          </div>
+        </div>
+
+        <div class="controls" style="margin-top:8px">
+          <div>
+            <label for="trendPassTarget">Pass target (%)</label>
+            <input id="trendPassTarget" type="number" min="0" max="100" value="85">
+          </div>
+          <div>
+            <label for="trendAmberBand">Amber band (±%)</label>
+            <input id="trendAmberBand" type="number" min="0" max="20" value="5">
+          </div>
+          <div>
+            <label for="trendPeriodSelect">Time Period View</label>
+            <select id="trendPeriodSelect" class="full-width-btn">
+              <option value="month">Month over Month</option>
+              <option value="week">Week over Week</option>
+            </select>
+          </div>
+          <div>
+            <label>&nbsp;</label>
+            <button id="loadTrendsBtn" class="full-width-btn">
+              <span class="loading-spinner" style="display:none"></span>
+              <span class="btn-text">Load Trends</span>
+            </button>
+          </div>
+        </div>
+
+        <div id="trendsKPIs" class="kpis"></div>
+
+        <!-- Month over Month / Week over Week View -->
+        <div id="trendsView" style="display:none;">
+          <div class="card" style="padding:16px;margin-top:10px;">
+            <h3 class="section-title" style="margin:0 0 8px" id="trendsTitle">Month over Month Performance</h3>
+            <div class="trend-chart-container">
+              <canvas id="trendsChart"></canvas>
+            </div>
+            <div class="legend">
+              <div class="key"><span class="swatch" style="background:var(--ok)"></span>Passed</div>
+              <div class="key"><span class="swatch" style="background:var(--warn)"></span>Amber</div>
+              <div class="key"><span class="swatch" style="background:var(--bad)"></span>Failed</div>
+            </div>
+          </div>
+
+          <!-- Trend Statistics -->
+          <div class="trend-stats" id="trendStats"></div>
+
+          <!-- Trend Improvement Table -->
+          <div class="trend-table-container">
+            <h3 class="section-title">Agent Performance Trends</h3>
+            <div class="table-container">
+              <table id="trendImprovementTable" class="sortable"></table>
+            </div>
+          </div>
+        </div>
+
+        <div id="trendsNoData" class="info-message" style="margin-top:20px;display:none;">
+          No trend data available. Please load data for the selected period.
         </div>
       </div>
 
@@ -355,6 +416,9 @@
 
       analyticsEvals: null,
       analyticsRange: null,
+      
+      trendsEvals: null,
+      trendsRange: null,
 
       formDetailsCache: new Map(),
       formLookupCache: new Map(),
@@ -365,7 +429,13 @@
       detailsSortDirection: 'desc'
     };
 
-    const dropdowns = { users:null, teams:null, forms:null, analyticsTeams:null };
+    const dropdowns = { 
+      users: null, 
+      teams: null, 
+      forms: null, 
+      analyticsTeams: null,
+      trendTeams: null 
+    };
 
     // Chart colours resolved from CSS vars (Chart.js can't read CSS vars directly)
     const cssVar = k => getComputedStyle(document.documentElement).getPropertyValue(k).trim();
@@ -395,7 +465,7 @@
       const spinner=button.querySelector('.loading-spinner');
       const text=button.querySelector('.btn-text');
       if(isLoading){ spinner.style.display='inline-block'; text.textContent='Loading...'; button.disabled=true; }
-      else{ spinner.style.display='none'; text.textContent = (button.id==='loadAnalyticsBtn'?'Load Range':'Load Evaluations'); button.disabled=false; }
+      else{ spinner.style.display='none'; text.textContent = button.id==='loadTrendsBtn'?'Load Trends':(button.id==='loadAnalyticsBtn'?'Load Range':'Load Evaluations'); button.disabled=false; }
     }
 
     // ===== Checkbox dropdown =====
@@ -436,7 +506,7 @@
             else selected.delete(o.value);
             updateSummary();
             updateSelectAllState();
-            if(containerId !== 'analyticsTeamDropdown') updateLoadButtonState();
+            if(containerId !== 'analyticsTeamDropdown' && containerId !== 'trendTeamDropdown') updateLoadButtonState();
           });
           list.appendChild(row);
         });
@@ -447,10 +517,10 @@
       trigger.addEventListener('click',()=>{ panel.classList.toggle('open'); search.focus(); });
       document.addEventListener('click',(e)=>{ if(!root.contains(e.target)) panel.classList.remove('open'); });
       search.addEventListener('input',()=>render(search.value));
-      clearBtn.addEventListener('click',()=>{ selected.clear(); render(search.value); updateSummary(); updateSelectAllState(); if(containerId !== 'analyticsTeamDropdown') updateLoadButtonState(); });
-      selectAll.addEventListener('change',()=>{ if(selectAll.checked) options.forEach(o=>selected.add(o.value)); else selected.clear(); render(search.value); updateSummary(); if(containerId !== 'analyticsTeamDropdown') updateLoadButtonState(); });
+      clearBtn.addEventListener('click',()=>{ selected.clear(); render(search.value); updateSummary(); updateSelectAllState(); if(containerId !== 'analyticsTeamDropdown' && containerId !== 'trendTeamDropdown') updateLoadButtonState(); });
+      selectAll.addEventListener('change',()=>{ if(selectAll.checked) options.forEach(o=>selected.add(o.value)); else selected.clear(); render(search.value); updateSummary(); if(containerId !== 'analyticsTeamDropdown' && containerId !== 'trendTeamDropdown') updateLoadButtonState(); });
 
-      function setOptions(newOptions){ options=newOptions||[]; selected.forEach(v=>{ if(!options.some(o=>o.value===v)) selected.delete(v); }); render(search.value); updateSummary(); updateSelectAllState(); if(containerId !== 'analyticsTeamDropdown') updateLoadButtonState(); }
+      function setOptions(newOptions){ options=newOptions||[]; selected.forEach(v=>{ if(!options.some(o=>o.value===v)) selected.delete(v); }); render(search.value); updateSummary(); updateSelectAllState(); if(containerId !== 'analyticsTeamDropdown' && containerId !== 'trendTeamDropdown') updateLoadButtonState(); }
       function getSelectedValues(){ return Array.from(selected); }
 
       render(''); return { setOptions, getSelectedValues };
@@ -520,22 +590,27 @@
       dropdowns.teams=createCheckboxDropdown('teamDropdown',{placeholder:'Select work teams (optional)',searchPlaceholder:'Search teams...'});
       dropdowns.forms=createCheckboxDropdown('formDropdown',{placeholder:'Select forms (optional)',searchPlaceholder:'Search forms...'});
       dropdowns.analyticsTeams=createCheckboxDropdown('analyticsTeamDropdown',{placeholder:'Filter teams (optional)',searchPlaceholder:'Search teams...'});
+      dropdowns.trendTeams=createCheckboxDropdown('trendTeamDropdown',{placeholder:'Filter teams (optional)',searchPlaceholder:'Search teams...'});
 
       document.getElementById('overviewTabButton').onclick=()=>setTab('overview');
       document.getElementById('analyticsTabButton').onclick=()=>setTab('analytics');
+      document.getElementById('trendsTabButton').onclick=()=>setTab('trends');
       document.getElementById('detailsTabButton').onclick=()=>setTab('details');
       document.getElementById('criticalTabButton').onclick=()=>setTab('critical');
       document.getElementById('loadBtn').onclick=loadEvaluations;
 
       document.getElementById('loadAnalyticsBtn').onclick=loadAnalyticsRange;
+      document.getElementById('loadTrendsBtn').onclick=loadTrendsData;
       document.getElementById('insightsSort').onchange=renderAgentInsights;
-      document.getElementById('timePeriodSelect').onchange=renderTimePeriodView;
+      document.getElementById('trendPeriodSelect').onchange=renderTrends;
 
       const m=new Date();
       const cur=`${m.getFullYear()}-${String(m.getMonth()+1).padStart(2,'0')}`;
       document.getElementById('monthInput').value = cur;
       document.getElementById('anaFrom').value = cur;
       document.getElementById('anaTo').value = cur;
+      document.getElementById('trendFrom').value = cur;
+      document.getElementById('trendTo').value = cur;
 
       updateMonthRange();
       document.getElementById('monthInput').addEventListener('change',()=>{ updateMonthRange(); updateLoadButtonState(); });
@@ -544,18 +619,20 @@
         .then(()=> {
           updateLoadButtonState();
           dropdowns.analyticsTeams.setOptions(state.teams.map(t=>({value:t.id,label:t.name})));
+          dropdowns.trendTeams.setOptions(state.teams.map(t=>({value:t.id,label:t.name})));
         })
         .catch(err => msg('Initial load failed: '+err.message,'error'));
     }
 
     function setTab(name){
-      ['overview','analytics','details','critical'].forEach(n=>{
+      ['overview','analytics','trends','details','critical'].forEach(n=>{
         document.getElementById(`${n}Tab`).classList.toggle('active', n===name);
         document.getElementById(`${n}TabButton`).classList.toggle('active', n===name);
       });
       if(name==='analytics') renderAnalytics();
       if(name==='details') renderDetails();
       if(name==='critical') renderCritical();
+      if(name==='trends') renderTrends();
     }
 
     function updateMonthRange(){
@@ -644,6 +721,12 @@
       const band=parseFloat(document.getElementById('amberBand').value||'5');
       return {pass, band};
     }
+    
+    function getTrendPassSettings(){
+      const pass=parseFloat(document.getElementById('trendPassTarget').value||'85');
+      const band=parseFloat(document.getElementById('trendAmberBand').value||'5');
+      return {pass, band};
+    }
 
     function colourFor(score, pass, band){
       if(score==null||!isFinite(score)) return COLORS.BAD;
@@ -710,28 +793,40 @@
       });
     }
 
-    // Time Period Chart (Month over Month / Week over Week)
-    let timePeriodChart = null;
-    function initializeTimePeriodChart(data, type) {
-      const ctx = document.getElementById('timePeriodChart').getContext('2d');
+    // Trends Chart (Month over Month / Week over Week)
+    let trendsChart = null;
+    function initializeTrendsChart(data, type) {
+      const ctx = document.getElementById('trendsChart').getContext('2d');
       const labels = data.map(d => d.label);
       const passedData = data.map(d => d.passed);
       const amberData = data.map(d => d.amber);
       const failedData = data.map(d => d.failed);
       const avgScoreData = data.map(d => d.avgScore || 0);
       
-      if (timePeriodChart) {
-        timePeriodChart.destroy();
+      if (trendsChart) {
+        trendsChart.destroy();
       }
       
-      timePeriodChart = new Chart(ctx, {
+      // Create secondary axis for average score
+      trendsChart = new Chart(ctx, {
         type: 'bar',
         data: { 
           labels, 
           datasets: [
-            { label: 'Passed', data: passedData, backgroundColor: COLORS.OK, borderColor: COLORS.OK, borderWidth: 1 },
-            { label: 'Amber', data: amberData, backgroundColor: COLORS.WARN, borderColor: COLORS.WARN, borderWidth: 1 },
-            { label: 'Failed', data: failedData, backgroundColor: COLORS.BAD, borderColor: COLORS.BAD, borderWidth: 1 }
+            { label: 'Passed', data: passedData, backgroundColor: COLORS.OK, borderColor: COLORS.OK, borderWidth: 1, stack: 'stack0' },
+            { label: 'Amber', data: amberData, backgroundColor: COLORS.WARN, borderColor: COLORS.WARN, borderWidth: 1, stack: 'stack0' },
+            { label: 'Failed', data: failedData, backgroundColor: COLORS.BAD, borderColor: COLORS.BAD, borderWidth: 1, stack: 'stack0' },
+            { 
+              label: 'Avg Score', 
+              data: avgScoreData, 
+              type: 'line',
+              borderColor: COLORS.BLUE,
+              backgroundColor: 'rgba(59, 130, 246, 0.1)',
+              borderWidth: 2,
+              pointRadius: 4,
+              pointBackgroundColor: COLORS.BLUE,
+              yAxisID: 'y1'
+            }
           ]
         },
         options: {
@@ -739,19 +834,43 @@
           maintainAspectRatio: false,
           scales: {
             x: { 
-              stacked: true, 
+              stacked: true,
               grid: { color: 'rgba(0,0,0,0.1)' } 
             },
             y: { 
-              stacked: true, 
+              stacked: true,
               beginAtZero: true, 
               title: { display: true, text: 'Number of Evaluations' }, 
-              grid: { color: 'rgba(0,0,0,0.1)' } 
+              grid: { color: 'rgba(0,0,0,0.1)' },
+              position: 'left'
+            },
+            y1: {
+              beginAtZero: true,
+              position: 'right',
+              title: { display: true, text: 'Average Score %' },
+              grid: { drawOnChartArea: false },
+              ticks: {
+                callback: function(value) {
+                  return value + '%';
+                }
+              },
+              min: 0,
+              max: 100
             }
           },
           plugins: {
             legend: { position: 'top', labels: { color: COLORS.TEXT } },
-            title: { display: true, text: `${type === 'month' ? 'Month over Month' : 'Week over Week'} Performance`, color: COLORS.TEXT }
+            tooltip: {
+              callbacks: {
+                label: function(context) {
+                  let label = context.dataset.label || '';
+                  if (label === 'Avg Score') {
+                    return `${label}: ${context.parsed.y.toFixed(1)}%`;
+                  }
+                  return `${label}: ${context.parsed.y}`;
+                }
+              }
+            }
           }
         }
       });
@@ -908,6 +1027,37 @@
         msg(`Analytics range loaded: ${data.length} evaluations.`, 'success');
         renderAnalytics();
       }catch(e){ console.error(e); msg('Failed to load analytics range: '+e.message,'error'); }
+      finally{ setLoading(btn,false); }
+    }
+
+    async function loadTrendsData(){
+      const from=document.getElementById('trendFrom').value;
+      const to=document.getElementById('trendTo').value;
+      if(!from || !to){ msg('Select both From and To months for Trends.','error'); return; }
+      const [fy,fm]=from.split('-').map(Number);
+      const [ty,tm]=to.split('-').map(Number);
+      const start=new Date(Date.UTC(fy, fm-1, 1, 0,0,0));
+      const end  =new Date(Date.UTC(ty, tm,   0, 23,59,59));
+      if(start>end){ msg('The From month must be before the To month.','error'); return; }
+
+      const formIds = dropdowns.forms.getSelectedValues();
+      const agentIds = await computeSelectedAgentIds();
+      if(agentIds.length===0 && formIds.length===0){
+        msg('Please select at least one agent, team, or form.','error'); return;
+      }
+
+      const btn=document.getElementById('loadTrendsBtn'); setLoading(btn,true);
+      try{
+        const agentList = agentIds.length ? agentIds : state.users.map(u=>u.id);
+        const data=await fetchDetailedEvaluations(agentList,formIds,start,end);
+        state.trendsEvals=data; state.trendsRange={start,end};
+        
+        // CRITICAL FIX: Load ALL form details for ALL forms found in trends evaluations
+        await loadAllFormDetailsFromEvaluations(data);
+        
+        msg(`Trends data loaded: ${data.length} evaluations.`, 'success');
+        renderTrends();
+      }catch(e){ console.error(e); msg('Failed to load trends data: '+e.message,'error'); }
       finally{ setLoading(btn,false); }
     }
 
@@ -1417,6 +1567,7 @@
     }
 
     function getAnalyticsSet(){ return (state.analyticsEvals && state.analyticsRange) ? state.analyticsEvals : state.evals; }
+    function getTrendsSet(){ return (state.trendsEvals && state.trendsRange) ? state.trendsEvals : state.evals; }
     function guessMediaType(e){ return standardiseMedia(safeGet(e,'mediaType') || safeGet(e,'conversation.mediaType') || 'Unknown'); }
     function buildDays(start,end){ const out=[]; for(let d=new Date(start); d<=end; d.setUTCDate(d.getUTCDate()+1)){ out.push(new Date(d)); } return out; }
 
@@ -1444,7 +1595,7 @@
 
     // New function to calculate time period data (month or week)
     function calculateTimePeriodData(evals, type) {
-      const {pass, band} = getPassSettings();
+      const {pass, band} = getTrendPassSettings();
       const periodMap = new Map();
       
       evals.forEach(e => {
@@ -1517,7 +1668,6 @@
         document.getElementById('topAgentsTable').innerHTML='';
         document.getElementById('bottomAgentsTable').innerHTML='';
         document.getElementById('agentMediaChart').innerHTML='';
-        document.getElementById('timePeriodView').style.display='none';
         return;
       }
 
@@ -1531,9 +1681,6 @@
       const dailyTrendData = calculateDailyTrendData(evals, start, end);
       if (dailyTrendChart) { dailyTrendChart.destroy(); }
       dailyTrendChart = initializeStackedBarChart(dailyTrendData);
-
-      // Render time period view
-      renderTimePeriodView();
 
       let withFatal=0, withCritical=0, totalCriticalMarks=0, totalFatalMarks=0;
       let sumScores=0, scored=0;
@@ -1728,24 +1875,238 @@
         <thead><tr><th>Bottom Agents</th><th>Evals</th><th>Avg</th></tr></thead><tbody>${bottom || '<tr><td colspan="3" class="muted">No data</td></tr>'}</tbody>`;
     }
 
-    // New function to render time period view
-    function renderTimePeriodView() {
-      const raw = getAnalyticsSet();
-      if (!raw || !raw.length) return;
+    // New function to render trends
+    async function renderTrends() {
+      const raw = getTrendsSet();
       
-      const timePeriod = document.getElementById('timePeriodSelect').value;
-      const data = calculateTimePeriodData(raw, timePeriod);
-      
-      if (data.length === 0) {
-        document.getElementById('timePeriodView').style.display = 'none';
+      // Hide/show appropriate sections
+      if (!raw || !raw.length) {
+        document.getElementById('trendsView').style.display = 'none';
+        document.getElementById('trendsNoData').style.display = 'block';
+        document.getElementById('trendsKPIs').innerHTML = '';
         return;
       }
       
-      document.getElementById('timePeriodView').style.display = 'block';
-      document.getElementById('timePeriodTitle').textContent = 
+      document.getElementById('trendsView').style.display = 'block';
+      document.getElementById('trendsNoData').style.display = 'none';
+
+      const teamFilter = dropdowns.trendTeams.getSelectedValues();
+      let allowedAgents = null;
+      if (teamFilter.length) { 
+        allowedAgents = new Set(await agentsForTeams(teamFilter)); 
+      }
+      const evals = allowedAgents ? raw.filter(e => allowedAgents.has(safeGet(e,'agent.id')||e.agentUserId)) : raw;
+
+      // Calculate KPIs
+      let totalEvals = evals.length;
+      let sumScores = 0;
+      let scored = 0;
+      let withFatal = 0;
+      let withCritical = 0;
+      
+      for (const e of evals) {
+        const score = getEvalPercent(e);
+        if (score != null && isFinite(score)) { 
+          sumScores += Number(score); 
+          scored++; 
+        }
+        
+        // Check for critical/fatal
+        const qgs = safeGet(e, 'answers.questionGroupScores') || [];
+        let evalHasFatal = false;
+        let evalHasCritical = false;
+        
+        for (const g of qgs) {
+          for (const q of (g.questionScores || [])) {
+            const lookup = await getCombinedLookupForEval(e);
+            const qIds = [q.questionId, q.questionContextId, safeGet(q, 'question.id'), safeGet(q, 'question.contextId')].filter(Boolean);
+            const questionObj = qIds.map(id => lookup.questionObj.get(id)).find(Boolean);
+            const { isFatal, isCritical } = detectCriticalFatalQuestions(q, questionObj);
+            if (isFatal) evalHasFatal = true;
+            if (isCritical) evalHasCritical = true;
+          }
+        }
+        
+        if (evalHasFatal) withFatal++;
+        if (evalHasCritical) withCritical++;
+      }
+      
+      const avgOverall = scored ? (sumScores / scored) : null;
+      const {pass} = getTrendPassSettings();
+      const passRate = totalEvals > 0 ? ((totalEvals - Math.max(withFatal, withCritical)) / totalEvals) * 100 : null;
+
+      document.getElementById('trendsKPIs').innerHTML = `
+        <div class="kpi"><div class="label">Total Evaluations</div><div class="value">${totalEvals}</div></div>
+        <div class="kpi"><div class="label">Average Score</div><div class="value">${avgOverall == null ? '-' : pct(avgOverall, 1)}</div></div>
+        <div class="kpi"><div class="label">Pass Rate</div><div class="value">${passRate == null ? '-' : pct(passRate, 1)}</div></div>
+        <div class="kpi"><div class="label">Failed Evaluations</div><div class="value">${withFatal + withCritical}</div></div>
+      `;
+
+      // Calculate time period data
+      const timePeriod = document.getElementById('trendPeriodSelect').value;
+      const data = calculateTimePeriodData(evals, timePeriod);
+      
+      if (data.length === 0) {
+        document.getElementById('trendsView').style.display = 'none';
+        document.getElementById('trendsNoData').style.display = 'block';
+        return;
+      }
+      
+      document.getElementById('trendsTitle').textContent = 
         timePeriod === 'month' ? 'Month over Month Performance' : 'Week over Week Performance';
       
-      initializeTimePeriodChart(data, timePeriod);
+      initializeTrendsChart(data, timePeriod);
+      
+      // Calculate trend statistics
+      let totalPassed = 0;
+      let totalAmber = 0;
+      let totalFailed = 0;
+      let totalAvgScore = 0;
+      
+      data.forEach(period => {
+        totalPassed += period.passed;
+        totalAmber += period.amber;
+        totalFailed += period.failed;
+        totalAvgScore += period.avgScore;
+      });
+      
+      const avgPeriodScore = data.length > 0 ? totalAvgScore / data.length : 0;
+      const bestPeriod = data.reduce((best, current) => 
+        (current.avgScore > best.avgScore) ? current : best, data[0] || {});
+      const worstPeriod = data.reduce((worst, current) => 
+        (current.avgScore < worst.avgScore) ? worst : current, data[0] || {});
+      
+      document.getElementById('trendStats').innerHTML = `
+        <div class="trend-stat good">
+          <div class="value">${pct(avgPeriodScore, 1)}</div>
+          <div class="label">Average Period Score</div>
+        </div>
+        <div class="trend-stat good">
+          <div class="value">${bestPeriod.label || '-'}</div>
+          <div class="label">Best Period (${bestPeriod.avgScore ? pct(bestPeriod.avgScore, 1) : '-'})</div>
+        </div>
+        <div class="trend-stat ${worstPeriod.avgScore < pass ? 'bad' : 'warning'}">
+          <div class="value">${worstPeriod.label || '-'}</div>
+          <div class="label">Worst Period (${worstPeriod.avgScore ? pct(worstPeriod.avgScore, 1) : '-'})</div>
+        </div>
+        <div class="trend-stat">
+          <div class="value">${totalPassed + totalAmber + totalFailed}</div>
+          <div class="label">Total Evaluations</div>
+        </div>
+      `;
+      
+      // Calculate agent improvement trends
+      const agentTrends = calculateAgentTrends(evals, timePeriod);
+      renderTrendImprovementTable(agentTrends);
+    }
+    
+    function calculateAgentTrends(evals, timePeriod) {
+      const agentMap = new Map();
+      
+      // Group evaluations by agent and time period
+      evals.forEach(e => {
+        const agentId = safeGet(e, 'agent.id') || e.agentUserId;
+        const agentName = resolveUserName(agentId);
+        const date = new Date(e.releaseDate || e.assignedDate || e.creationDate || e.evaluationDate || e.date || Date.now());
+        let periodKey;
+        
+        if (timePeriod === 'week') {
+          const weekNum = getWeekNumber(date);
+          const year = date.getFullYear();
+          periodKey = `${year}-W${weekNum}`;
+        } else {
+          const month = date.getMonth() + 1;
+          const year = date.getFullYear();
+          periodKey = `${year}-${String(month).padStart(2, '0')}`;
+        }
+        
+        if (!agentMap.has(agentName)) {
+          agentMap.set(agentName, new Map());
+        }
+        
+        const periodMap = agentMap.get(agentName);
+        if (!periodMap.has(periodKey)) {
+          periodMap.set(periodKey, { scores: [], count: 0 });
+        }
+        
+        const periodData = periodMap.get(periodKey);
+        const score = getEvalPercent(e);
+        if (score != null && isFinite(score)) {
+          periodData.scores.push(score);
+          periodData.count++;
+        }
+      });
+      
+      // Calculate trends for each agent
+      const trends = [];
+      
+      agentMap.forEach((periodMap, agentName) => {
+        const periods = Array.from(periodMap.entries())
+          .map(([periodKey, data]) => ({
+            periodKey,
+            avgScore: data.scores.length > 0 ? data.scores.reduce((a, b) => a + b, 0) / data.scores.length : 0,
+            count: data.count
+          }))
+          .sort((a, b) => a.periodKey.localeCompare(b.periodKey));
+        
+        if (periods.length >= 2) {
+          const firstPeriod = periods[0];
+          const lastPeriod = periods[periods.length - 1];
+          const improvement = lastPeriod.avgScore - firstPeriod.avgScore;
+          const percentImprovement = firstPeriod.avgScore > 0 ? (improvement / firstPeriod.avgScore) * 100 : 0;
+          
+          trends.push({
+            agentName,
+            firstPeriodScore: firstPeriod.avgScore,
+            lastPeriodScore: lastPeriod.avgScore,
+            improvement: improvement,
+            percentImprovement: percentImprovement,
+            totalEvals: periods.reduce((sum, p) => sum + p.count, 0),
+            periodsCount: periods.length
+          });
+        }
+      });
+      
+      return trends.sort((a, b) => b.improvement - a.improvement);
+    }
+    
+    function renderTrendImprovementTable(trends) {
+      if (trends.length === 0) {
+        document.getElementById('trendImprovementTable').innerHTML = 
+          '<tr><td colspan="6" class="muted">No trend data available for agents with multiple periods.</td></tr>';
+        return;
+      }
+      
+      const rows = trends.map(trend => {
+        const improvementClass = trend.improvement > 0 ? 'good' : trend.improvement < 0 ? 'bad' : '';
+        const improvementText = trend.improvement > 0 ? `+${pct(trend.improvement, 1)}` : pct(trend.improvement, 1);
+        const percentImprovementText = trend.percentImprovement > 0 ? `+${pct(trend.percentImprovement, 1)}` : pct(trend.percentImprovement, 1);
+        
+        return `<tr>
+          <td>${trend.agentName}</td>
+          <td data-sort="${trend.firstPeriodScore}">${pct(trend.firstPeriodScore, 1)}</td>
+          <td data-sort="${trend.lastPeriodScore}">${pct(trend.lastPeriodScore, 1)}</td>
+          <td data-sort="${trend.improvement}" class="${improvementClass}">${improvementText}</td>
+          <td data-sort="${trend.percentImprovement}" class="${improvementClass}">${percentImprovementText}</td>
+          <td data-sort="${trend.totalEvals}">${trend.totalEvals}</td>
+        </tr>`;
+      }).join('');
+      
+      document.getElementById('trendImprovementTable').innerHTML = `
+        <thead>
+          <tr>
+            <th data-type="text">Agent</th>
+            <th data-type="num">First Period</th>
+            <th data-type="num">Last Period</th>
+            <th data-type="num">Improvement</th>
+            <th data-type="num">% Change</th>
+            <th data-type="num">Total Evals</th>
+          </tr>
+        </thead>
+        <tbody>${rows}</tbody>
+      `;
+      
+      tableSorter('trendImprovementTable');
     }
 
     function renderAgentInsights(){

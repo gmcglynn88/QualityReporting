@@ -170,7 +170,7 @@
   <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
 </head>
 <body>
-  <div id="authCard" class="card">
+  <div id="authCard" class="card" style="display:block;">
     <div id="auth-message" class="info-message">Authenticating with PureCloud...</div>
   </div>
 
@@ -434,6 +434,32 @@
   </div>
 
   <script>
+    // ===== Global Functions for HTML onclick attributes =====
+    window.toggleRow = function(index) {
+      const row = document.getElementById(`details-row-${index}`);
+      const icon = document.querySelector(`#details-row-${index}`).previousElementSibling.querySelector('.expand-icon');
+      
+      if (row.style.display === 'none') {
+        row.style.display = 'table-row';
+        icon.textContent = '▼';
+        icon.classList.add('expanded');
+      } else {
+        row.style.display = 'none';
+        icon.textContent = '▶';
+        icon.classList.remove('expanded');
+      }
+    };
+
+    window.sortDetails = function(field) {
+      if (state.detailsSortField === field) {
+        state.detailsSortDirection = state.detailsSortDirection === 'asc' ? 'desc' : 'asc';
+      } else {
+        state.detailsSortField = field;
+        state.detailsSortDirection = 'desc';
+      }
+      renderDetails();
+    };
+
     // ===== OAuth Configuration =====
     const clientId = 'fe305808-b368-4547-8af9-325d28d552bb';
     const config = { REGION: 'mypurecloud.ie' };
@@ -580,6 +606,7 @@
     // ===== Boot (handles errors + expiry, avoids redirect loops) =====
     document.addEventListener('DOMContentLoaded', function () {
       resolveColors();
+      console.log('DOM loaded, starting OAuth flow...');
 
       const rawHash = (window.location.hash || '').replace(/^#/, '');
       const params = new URLSearchParams(rawHash);
@@ -588,6 +615,7 @@
       const oauthError = params.get('error');
       if (oauthError) {
         const desc = decodeURIComponent(params.get('error_description') || '');
+        console.error('OAuth error:', oauthError, desc);
         history.replaceState(null, document.title, window.location.pathname + window.location.search);
         sessionStorage.removeItem('purecloud_token');
         sessionStorage.removeItem('purecloud_token_exp');
@@ -600,6 +628,7 @@
       // 2) Token in hash
       const tokenFromHash = params.get('access_token');
       if (tokenFromHash) {
+        console.log('Token found in hash');
         const expiresIn = parseInt(params.get('expires_in') || '0', 10);
         const expAt = expiresIn ? Date.now() + (expiresIn - 60) * 1000 : 0; // pad by 60s
         sessionStorage.setItem('purecloud_token', tokenFromHash);
@@ -613,11 +642,13 @@
       const tokenFromSession = sessionStorage.getItem('purecloud_token');
       const exp = parseInt(sessionStorage.getItem('purecloud_token_exp') || '0', 10);
       if (tokenFromSession && (!exp || Date.now() < exp)) {
+        console.log('Token found in session storage');
         startApp(tokenFromSession);
         return;
       }
 
       // 4) No token yet - redirect to OAuth
+      console.log('No token found, redirecting to OAuth');
       document.getElementById('auth-message').textContent = 'Redirecting to Genesys Cloud for authentication...';
       setTimeout(function(){ window.location.href = oauthUrl; }, 200);
     });
@@ -647,6 +678,7 @@
     }
 
     function startApp(token){
+      console.log('Starting app with token');
       state.accessToken=token;
       document.getElementById('auth-message').textContent='Authenticated successfully!';
       document.getElementById('auth-message').className='success-message';
@@ -694,7 +726,10 @@
           dropdowns.analyticsTeams.setOptions(state.teams.map(t=>({value:t.id,label:t.name})));
           dropdowns.trendTeams.setOptions(state.teams.map(t=>({value:t.id,label:t.name})));
         })
-        .catch(err => msg('Initial load failed: '+err.message,'error'));
+        .catch(err => {
+          console.error('Initial load failed:', err);
+          msg('Initial load failed: '+err.message,'error');
+        });
     }
 
     function setTab(name){
@@ -876,18 +911,32 @@
 
     // ===== Lookups =====
     async function fetchAllUsers(){
-      const url=`https://api.${config.REGION}/api/v2/users?pageSize=100`;
-      const users=await fetchPaginatedGET(url);
-      state.users=users.map(u=>({id:u.id,name:(u.name || `${u.givenName||''} ${u.familyName||''}`).trim(),email:u.email||''})).sort((a,b)=>a.name.localeCompare(b.name));
-      dropdowns.users.setOptions(state.users.map(u=>({value:u.id,label:`${u.name}${u.email?` — ${u.email}`:''}`})));
+      try {
+        console.log('Fetching users...');
+        const url=`https://api.${config.REGION}/api/v2/users?pageSize=100`;
+        const users=await fetchPaginatedGET(url);
+        state.users=users.map(u=>({id:u.id,name:(u.name || `${u.givenName||''} ${u.familyName||''}`).trim(),email:u.email||''})).sort((a,b)=>a.name.localeCompare(b.name));
+        dropdowns.users.setOptions(state.users.map(u=>({value:u.id,label:`${u.name}${u.email?` — ${u.email}`:''}`})));
+        console.log(`Loaded ${state.users.length} users`);
+      } catch (err) {
+        console.error('Failed to fetch users:', err);
+        throw new Error('Failed to load users: ' + err.message);
+      }
     }
 
     async function fetchAllTeams(){
-      const url=`https://api.${config.REGION}/api/v2/teams?pageSize=100`;
-      const teams = await fetchPaginatedGET(url);
-      state.teams = teams.map(t=>({id:t.id,name:t.name||'(Unnamed team)'})).sort((a,b)=>a.name.localeCompare(b.name));
-      state.teamsById = Object.fromEntries(state.teams.map(t=>[t.id,t]));
-      dropdowns.teams.setOptions(state.teams.map(t=>({value:t.id,label:t.name})));
+      try {
+        console.log('Fetching teams...');
+        const url=`https://api.${config.REGION}/api/v2/teams?pageSize=100`;
+        const teams = await fetchPaginatedGET(url);
+        state.teams = teams.map(t=>({id:t.id,name:t.name||'(Unnamed team)'})).sort((a,b)=>a.name.localeCompare(b.name));
+        state.teamsById = Object.fromEntries(state.teams.map(t=>[t.id,t]));
+        dropdowns.teams.setOptions(state.teams.map(t=>({value:t.id,label:t.name})));
+        console.log(`Loaded ${state.teams.length} teams`);
+      } catch (err) {
+        console.error('Failed to fetch teams:', err);
+        throw new Error('Failed to load teams: ' + err.message);
+      }
     }
 
     async function ensureTeamMembersLoaded(teamIds){
@@ -904,11 +953,18 @@
     }
 
     async function fetchAllForms(){
-      const url=`https://api.${config.REGION}/api/v2/quality/forms/evaluations?pageSize=100`;
-      const forms=await fetchPaginatedGET(url);
-      state.forms=forms.map(f=>({id:f.id,name:f.name||f.title||'(Unnamed form)'})).sort((a,b)=>a.name.localeCompare(b.name));
-      state.formsById=Object.fromEntries(state.forms.map(f=>[f.id,f]));
-      dropdowns.forms.setOptions(state.forms.map(f=>({value:f.id,label:f.name})));
+      try {
+        console.log('Fetching forms...');
+        const url=`https://api.${config.REGION}/api/v2/quality/forms/evaluations?pageSize=100`;
+        const forms=await fetchPaginatedGET(url);
+        state.forms=forms.map(f=>({id:f.id,name:f.name||f.title||'(Unnamed form)'})).sort((a,b)=>a.name.localeCompare(b.name));
+        state.formsById=Object.fromEntries(state.forms.map(f=>[f.id,f]));
+        dropdowns.forms.setOptions(state.forms.map(f=>({value:f.id,label:f.name})));
+        console.log(`Loaded ${state.forms.length} forms`);
+      } catch (err) {
+        console.error('Failed to fetch forms:', err);
+        throw new Error('Failed to load forms: ' + err.message);
+      }
     }
 
     async function computeSelectedAgentIds(){
@@ -1529,7 +1585,7 @@
       return out; 
     }
 
-    // ===== ANALYTICS RENDERER =====
+    // ===== COMPLETE ANALYTICS RENDERER =====
     async function renderAnalytics(){
       const raw = getAnalyticsSet();
       if(!raw || !raw.length){
@@ -1587,7 +1643,6 @@
         <div class="kpi"><div class="label">Pass Rate</div><div class="value">${passRate==null?'-':pct(passRate*80,1)}</div></div>
       `;
 
-      // Rest of the analytics rendering code...
       const {pass, band} = getPassSettings();
       const byAgent=new Map(); // agent -> media -> {count,sum,scored}
       evals.forEach(e=>{
@@ -1602,8 +1657,564 @@
         const p=getEvalPercent(e);
         if(p!=null&&isFinite(p)){ o.sum+=Number(p); o.scored++; }
       });
+
+      // Build media table (agent × media)
+      const mediaTypes=['Voice','Email','Message','Social','Other'];
+      const mediaHead='<thead><tr><th>Agent</th>'+mediaTypes.map(mt=>`<th>${mt} (avg)</th>`).join('')+'<th>Overall</th><th>Evaluations</th></tr></thead>';
+      let mediaRows='';
+      const insightData=[];
       
-      // ... (rest of the renderAnalytics function)
+      for(const [aid,{name,map}] of byAgent.entries()){
+        const overall={count:0,sum:0,scored:0};
+        let fails=0;
+        const cells=[];
+        mediaTypes.forEach(mt=>{
+          const o=map.get(mt);
+          const avg=o&&o.scored? o.sum/o.scored : null;
+          overall.count+=(o?.count||0);
+          overall.sum+=(o?.sum||0);
+          overall.scored+=(o?.scored||0);
+          if(avg!==null && avg<pass-band) fails+=(o?.count||0);
+          const col=colourFor(avg,pass,band);
+          cells.push(`<td style="color:${col}">${avg==null?'-':pct(avg,1)} ${o?`(${o.count})`:''}</td>`);
+        });
+        const overallAvg=overall.scored? overall.sum/overall.scored : null;
+        const overallCol=colourFor(overallAvg,pass,band);
+        mediaRows+=`<tr>
+          <td><strong>${name}</strong></td>
+          ${cells.join('')}
+          <td style="color:${overallCol}"><strong>${overallAvg==null?'-':pct(overallAvg,1)}</strong></td>
+          <td>${overall.count}</td>
+        </tr>`;
+        insightData.push({name,avg:overallAvg,count:overall.count,fails});
+      }
+      
+      document.getElementById('mediaTable').innerHTML=mediaHead+'<tbody>'+mediaRows+'</tbody>';
+
+      // Store insight data for sorting
+      window._insightData = insightData;
+      renderAgentInsights();
+
+      // Build agent-media chart (horizontal bars)
+      const chartData = [];
+      mediaTypes.forEach(mt => {
+        const agents = Array.from(byAgent.entries())
+          .map(([aid, {name, map}]) => {
+            const o = map.get(mt);
+            const avg = o && o.scored ? o.sum / o.scored : null;
+            return { name, avg, count: o?.count || 0 };
+          })
+          .filter(a => a.count > 0)
+          .sort((a, b) => (b.avg || 0) - (a.avg || 0))
+          .slice(0, 15); // Top 15 agents per media type
+        
+        chartData.push({ mediaType: mt, agents });
+      });
+
+      let chartHtml = '';
+      chartData.forEach(item => {
+        if (item.agents.length === 0) return;
+        
+        const maxAvg = Math.max(...item.agents.map(a => a.avg || 0));
+        chartHtml += `<h4 style="margin-top:16px;margin-bottom:8px">${item.mediaType}</h4>`;
+        item.agents.forEach(agent => {
+          const width = maxAvg > 0 ? ((agent.avg || 0) / maxAvg * 100) : 0;
+          const col = colourFor(agent.avg, pass, band);
+          chartHtml += `<div class="chart-row">
+            <div class="chart-label">${agent.name}</div>
+            <div class="chart-svg" style="position:relative;height:20px">
+              <div style="position:absolute;top:0;left:0;width:${width}%;height:100%;background:${col};border-radius:4px"></div>
+              <div style="position:absolute;top:2px;left:6px;color:${agent.avg && agent.avg >= pass ? '#fff' : '#000'};font-size:12px;font-weight:600">
+                ${agent.avg == null ? '-' : pct(agent.avg, 1)}
+              </div>
+            </div>
+            <div style="width:60px;text-align:right;font-size:12px">${agent.count} eval${agent.count !== 1 ? 's' : ''}</div>
+          </div>`;
+        });
+      });
+      
+      document.getElementById('agentMediaChart').innerHTML = chartHtml || '<div class="muted">No media-specific data available.</div>';
+
+      // Repeat failures table
+      const repeatFails = new Map(); // question text -> {formName, agents: Map, count}
+      for (const e of evals) {
+        const lookup = await getCombinedLookupForEval(e);
+        const agentName = resolveUserName(safeGet(e, 'agent.id') || e.agentUserId);
+        const qGroups = safeGet(e, 'answers.questionGroupScores') || [];
+        qGroups.forEach(g => {
+          (g.questionScores || []).forEach(q => {
+            const qIds = [q.questionId, q.questionContextId, safeGet(q, 'question.id'), safeGet(q, 'question.contextId')].filter(Boolean);
+            const questionObj = qIds.map(id => lookup.questionObj.get(id)).find(Boolean);
+            const { isFatal, isCritical } = detectCriticalFatalQuestions(q, questionObj);
+            if (isFatal || isCritical) {
+              const qText = resolveQuestionTextWithLookup(lookup, q);
+              const key = `${lookup.formName}|${qText}`;
+              if (!repeatFails.has(key)) {
+                repeatFails.set(key, { formName: lookup.formName, qText, agents: new Map(), count: 0 });
+              }
+              const entry = repeatFails.get(key);
+              entry.count++;
+              entry.agents.set(agentName, (entry.agents.get(agentName) || 0) + 1);
+            }
+          });
+        });
+      }
+      
+      const repeatFailRows = Array.from(repeatFails.values())
+        .sort((a, b) => b.count - a.count)
+        .slice(0, 20)
+        .map(r => {
+          const agentsArr = Array.from(r.agents.entries()).sort((a, b) => b[1] - a[1]);
+          const agentsHtml = agentsArr.map(([name, count]) => 
+            `<span class="pill">${name} × ${count}</span>`
+          ).join(' ');
+          
+          return `<tr>
+            <td>${r.formName}</td>
+            <td>${r.qText}</td>
+            <td>${r.count}</td>
+            <td>${agentsArr.length}</td>
+            <td>${agentsHtml}</td>
+          </tr>`;
+        }).join('');
+      
+      document.getElementById('repeatFailsTable').innerHTML = repeatFailRows
+        ? `<thead><tr><th>Form</th><th>Question</th><th>Total Marks</th><th>Agents</th><th>Agent Breakdown</th></tr></thead><tbody>${repeatFailRows}</tbody>`
+        : '<tr><td class="muted">No repeat failures found.</td></tr>';
+
+      // Daily trend table
+      const days = buildDays(start, end);
+      const dayKeys = days.map(d => dayKeyUTC(d));
+      const dayLabels = days.map(d => toUKDate(d));
+      
+      // Agent trend data
+      const agentTrend = new Map(); // agent -> day -> {count, sum}
+      evals.forEach(e => {
+        const aid = safeGet(e, 'agent.id') || e.agentUserId;
+        const name = resolveUserName(aid);
+        const date = new Date(e.releaseDate || e.assignedDate || e.creationDate || e.evaluationDate || e.date || Date.now());
+        const day = dayKeyUTC(date);
+        const score = getEvalPercent(e);
+        
+        if (!agentTrend.has(name)) {
+          agentTrend.set(name, new Map());
+        }
+        const agentMap = agentTrend.get(name);
+        if (!agentMap.has(day)) {
+          agentMap.set(day, { count: 0, sum: 0 });
+        }
+        const dayData = agentMap.get(day);
+        dayData.count++;
+        if (score != null && isFinite(score)) {
+          dayData.sum += score;
+        }
+      });
+      
+      // Build table
+      let trendTable = `<table class="frozen-table">
+        <thead>
+          <tr>
+            <th>Agent</th>`;
+      
+      dayLabels.forEach(label => {
+        trendTable += `<th>${label}</th>`;
+      });
+      
+      trendTable += `</tr></thead><tbody>`;
+      
+      Array.from(agentTrend.entries())
+        .sort(([aName], [bName]) => aName.localeCompare(bName))
+        .forEach(([name, dayMap]) => {
+          trendTable += `<tr><td>${name}</td>`;
+          
+          dayKeys.forEach(day => {
+            const data = dayMap.get(day);
+            if (data && data.count > 0) {
+              const avg = data.sum / data.count;
+              const col = colourFor(avg, pass, band);
+              trendTable += `<td style="color:${col};text-align:center" title="${data.count} eval${data.count !== 1 ? 's' : ''}">
+                ${pct(avg, 0)}<br><small style="font-size:10px">(${data.count})</small>
+              </td>`;
+            } else {
+              trendTable += '<td style="text-align:center">-</td>';
+            }
+          });
+          
+          trendTable += '</tr>';
+        });
+      
+      trendTable += '</tbody></table>';
+      document.getElementById('trendTable').innerHTML = trendTable;
+
+      // Top/Bottom agents tables
+      const sortedAgents = insightData
+        .filter(a => a.count > 0)
+        .sort((a, b) => (b.avg || 0) - (a.avg || 0));
+      
+      const topAgents = sortedAgents.slice(0, 10);
+      const bottomAgents = sortedAgents.slice(-10).reverse();
+      
+      // Top agents table
+      let topHtml = '<thead><tr><th>Rank</th><th>Agent</th><th>Avg Score</th><th>Evaluations</th><th>Failures</th></tr></thead><tbody>';
+      topAgents.forEach((agent, i) => {
+        const col = colourFor(agent.avg, pass, band);
+        topHtml += `<tr>
+          <td>${i + 1}</td>
+          <td>${agent.name}</td>
+          <td style="color:${col}">${agent.avg == null ? '-' : pct(agent.avg, 1)}</td>
+          <td>${agent.count}</td>
+          <td>${agent.fails}</td>
+        </tr>`;
+      });
+      topHtml += '</tbody>';
+      document.getElementById('topAgentsTable').innerHTML = topHtml;
+      
+      // Bottom agents table
+      let bottomHtml = '<thead><tr><th>Rank</th><th>Agent</th><th>Avg Score</th><th>Evaluations</th><th>Failures</th></tr></thead><tbody>';
+      bottomAgents.forEach((agent, i) => {
+        const col = colourFor(agent.avg, pass, band);
+        bottomHtml += `<tr>
+          <td>${sortedAgents.length - i}</td>
+          <td>${agent.name}</td>
+          <td style="color:${col}">${agent.avg == null ? '-' : pct(agent.avg, 1)}</td>
+          <td>${agent.count}</td>
+          <td>${agent.fails}</td>
+        </tr>`;
+      });
+      bottomHtml += '</tbody>';
+      document.getElementById('bottomAgentsTable').innerHTML = bottomHtml;
+    }
+
+    // ===== COMPLETE TRENDS RENDERER =====
+    async function renderTrends() {
+      const raw = getTrendsSet();
+      const trendsView = document.getElementById('trendsView');
+      const trendsNoData = document.getElementById('trendsNoData');
+      
+      if (!raw || !raw.length) {
+        trendsView.style.display = 'none';
+        trendsNoData.style.display = 'block';
+        document.getElementById('trendsKPIs').innerHTML = '';
+        return;
+      }
+      
+      trendsView.style.display = 'block';
+      trendsNoData.style.display = 'none';
+      
+      const teamFilter = dropdowns.trendTeams.getSelectedValues();
+      let allowedAgents = null;
+      if (teamFilter.length) {
+        allowedAgents = new Set(await agentsForTeams(teamFilter));
+      }
+      const evals = allowedAgents ? raw.filter(e => allowedAgents.has(safeGet(e, 'agent.id') || e.agentUserId)) : raw;
+      
+      const { pass, band } = getTrendPassSettings();
+      const period = document.getElementById('trendPeriodSelect').value;
+      
+      // Group evaluations by period
+      const periodMap = new Map();
+      const agentPeriodMap = new Map(); // agent -> period -> {count, sum, passes, ambers, fails}
+      
+      evals.forEach(e => {
+        const date = new Date(e.releaseDate || e.assignedDate || e.creationDate || e.evaluationDate || e.date || Date.now());
+        let periodKey, periodLabel;
+        
+        if (period === 'week') {
+          periodKey = `${date.getFullYear()}-W${String(getWeekNumber(date)).padStart(2, '0')}`;
+          periodLabel = formatWeek(date);
+        } else {
+          periodKey = `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}`;
+          periodLabel = new Date(date.getFullYear(), date.getMonth(), 1).toLocaleDateString('en-GB', { month: 'short', year: 'numeric' });
+        }
+        
+        const score = getEvalPercent(e);
+        const agentId = safeGet(e, 'agent.id') || e.agentUserId;
+        const agentName = resolveUserName(agentId);
+        
+        // Update period totals
+        if (!periodMap.has(periodKey)) {
+          periodMap.set(periodKey, {
+            label: periodLabel,
+            count: 0,
+            sum: 0,
+            passes: 0,
+            ambers: 0,
+            fails: 0,
+            critical: 0,
+            fatal: 0
+          });
+        }
+        const periodData = periodMap.get(periodKey);
+        periodData.count++;
+        if (score != null && isFinite(score)) {
+          periodData.sum += score;
+          if (score >= pass) periodData.passes++;
+          else if (score >= pass - band) periodData.ambers++;
+          else periodData.fails++;
+        }
+        
+        // Check for critical/fatal
+        const qGroups = safeGet(e, 'answers.questionGroupScores') || [];
+        qGroups.forEach(g => {
+          (g.questionScores || []).forEach(q => {
+            const qIds = [q.questionId, q.questionContextId, safeGet(q, 'question.id'), safeGet(q, 'question.contextId')].filter(Boolean);
+            const questionObj = qIds.map(id => state.combinedLookupCache.get(`${safeGet(e, 'evaluationForm.id') || 'no-pub'}|${safeGet(e, 'form.id') || 'no-form'}|${safeGet(e, 'form.versionId') || 'no-ver'}`)?.questionObj.get(id)).find(Boolean);
+            const { isFatal, isCritical } = detectCriticalFatalQuestions(q, questionObj);
+            if (isFatal) periodData.fatal++;
+            if (isCritical) periodData.critical++;
+          });
+        });
+        
+        // Update agent-period data
+        if (!agentPeriodMap.has(agentName)) {
+          agentPeriodMap.set(agentName, new Map());
+        }
+        const agentMap = agentPeriodMap.get(agentName);
+        if (!agentMap.has(periodKey)) {
+          agentMap.set(periodKey, {
+            count: 0,
+            sum: 0,
+            passes: 0,
+            ambers: 0,
+            fails: 0
+          });
+        }
+        const agentPeriodData = agentMap.get(periodKey);
+        agentPeriodData.count++;
+        if (score != null && isFinite(score)) {
+          agentPeriodData.sum += score;
+          if (score >= pass) agentPeriodData.passes++;
+          else if (score >= pass - band) agentPeriodData.ambers++;
+          else agentPeriodData.fails++;
+        }
+      });
+      
+      // Sort periods chronologically
+      const sortedPeriods = Array.from(periodMap.keys()).sort();
+      const periodData = sortedPeriods.map(key => periodMap.get(key));
+      
+      // Calculate KPIs
+      let totalEvals = 0;
+      let totalScore = 0;
+      let totalPasses = 0;
+      let totalCritical = 0;
+      let totalFatal = 0;
+      
+      periodData.forEach(p => {
+        totalEvals += p.count;
+        totalScore += p.sum;
+        totalPasses += p.passes;
+        totalCritical += p.critical;
+        totalFatal += p.fatal;
+      });
+      
+      const avgScore = totalEvals > 0 ? totalScore / totalEvals : null;
+      const passRate = totalEvals > 0 ? (totalPasses / totalEvals) * 100 : null;
+      
+      document.getElementById('trendsKPIs').innerHTML = `
+        <div class="kpi"><div class="label">Total Evaluations</div><div class="value">${totalEvals}</div></div>
+        <div class="kpi"><div class="label">Avg Score</div><div class="value">${avgScore == null ? '-' : pct(avgScore, 1)}</div></div>
+        <div class="kpi"><div class="label">Pass Rate</div><div class="value">${passRate == null ? '-' : pct(passRate, 1)}</div></div>
+        <div class="kpi"><div class="label">Critical Marks</div><div class="value">${totalCritical}</div></div>
+        <div class="kpi"><div class="label">Fatal Marks</div><div class="value">${totalFatal}</div></div>
+        <div class="kpi"><div class="label">Periods</div><div class="value">${sortedPeriods.length}</div></div>
+      `;
+      
+      // Update chart title
+      document.getElementById('trendsTitle').textContent = 
+        period === 'week' ? 'Week over Week Performance' : 'Month over Month Performance';
+      
+      // Create Chart.js chart
+      const ctx = document.getElementById('trendsChart').getContext('2d');
+      
+      // Destroy existing chart if it exists
+      if (window.trendsChartInstance) {
+        window.trendsChartInstance.destroy();
+      }
+      
+      const labels = periodData.map(p => p.label);
+      const passData = periodData.map(p => p.passes);
+      const amberData = periodData.map(p => p.ambers);
+      const failData = periodData.map(p => p.fails);
+      
+      window.trendsChartInstance = new Chart(ctx, {
+        type: 'bar',
+        data: {
+          labels: labels,
+          datasets: [
+            {
+              label: 'Passed',
+              data: passData,
+              backgroundColor: COLORS.OK,
+              borderColor: COLORS.OK,
+              borderWidth: 1
+            },
+            {
+              label: 'Amber',
+              data: amberData,
+              backgroundColor: COLORS.WARN,
+              borderColor: COLORS.WARN,
+              borderWidth: 1
+            },
+            {
+              label: 'Failed',
+              data: failData,
+              backgroundColor: COLORS.BAD,
+              borderColor: COLORS.BAD,
+              borderWidth: 1
+            }
+          ]
+        },
+        options: {
+          responsive: true,
+          maintainAspectRatio: false,
+          scales: {
+            x: {
+              stacked: true,
+              title: {
+                display: true,
+                text: period === 'week' ? 'Week' : 'Month'
+              }
+            },
+            y: {
+              stacked: true,
+              beginAtZero: true,
+              title: {
+                display: true,
+                text: 'Number of Evaluations'
+              }
+            }
+          },
+          plugins: {
+            tooltip: {
+              mode: 'index',
+              intersect: false
+            },
+            legend: {
+              position: 'top'
+            }
+          }
+        }
+      });
+      
+      // Calculate trend statistics
+      let improvementCount = 0;
+      let declineCount = 0;
+      let stableCount = 0;
+      
+      if (periodData.length >= 2) {
+        const firstPeriod = periodData[0];
+        const lastPeriod = periodData[periodData.length - 1];
+        
+        const firstAvg = firstPeriod.count > 0 ? firstPeriod.sum / firstPeriod.count : 0;
+        const lastAvg = lastPeriod.count > 0 ? lastPeriod.sum / lastPeriod.count : 0;
+        const avgChange = lastAvg - firstAvg;
+        const percentChange = firstAvg > 0 ? (avgChange / firstAvg) * 100 : 0;
+        
+        const firstPassRate = firstPeriod.count > 0 ? (firstPeriod.passes / firstPeriod.count) * 100 : 0;
+        const lastPassRate = lastPeriod.count > 0 ? (lastPeriod.passes / lastPeriod.count) * 100 : 0;
+        const passRateChange = lastPassRate - firstPassRate;
+        
+        document.getElementById('trendStats').innerHTML = `
+          <div class="trend-stat ${avgChange > 0 ? 'good' : avgChange < 0 ? 'bad' : 'warning'}">
+            <div class="label">Avg Score Change</div>
+            <div class="value">${avgChange > 0 ? '+' : ''}${pct(avgChange, 1)}</div>
+            <div class="label">${firstPeriod.label} → ${lastPeriod.label}</div>
+          </div>
+          <div class="trend-stat ${passRateChange > 0 ? 'good' : passRateChange < 0 ? 'bad' : 'warning'}">
+            <div class="label">Pass Rate Change</div>
+            <div class="value">${passRateChange > 0 ? '+' : ''}${pct(passRateChange, 1)}</div>
+            <div class="label">${firstPeriod.label} → ${lastPeriod.label}</div>
+          </div>
+          <div class="trend-stat ${percentChange > 5 ? 'good' : percentChange < -5 ? 'bad' : 'warning'}">
+            <div class="label">% Change</div>
+            <div class="value">${percentChange > 0 ? '+' : ''}${fmt(percentChange, 1)}%</div>
+            <div class="label">Overall Change</div>
+          </div>
+          <div class="trend-stat">
+            <div class="label">Critical Marks</div>
+            <div class="value">${totalCritical}</div>
+            <div class="label">Total</div>
+          </div>
+          <div class="trend-stat">
+            <div class="label">Fatal Marks</div>
+            <div class="value">${totalFatal}</div>
+            <div class="label">Total</div>
+          </div>
+        `;
+      } else {
+        document.getElementById('trendStats').innerHTML = `
+          <div class="trend-stat">
+            <div class="label">Insufficient Data</div>
+            <div class="value">-</div>
+            <div class="label">Need at least 2 periods</div>
+          </div>
+        `;
+      }
+      
+      // Build agent improvement table
+      const agentImprovements = [];
+      
+      Array.from(agentPeriodMap.entries()).forEach(([agentName, periodMap]) => {
+        const periods = Array.from(periodMap.keys()).sort();
+        if (periods.length >= 2) {
+          const firstPeriod = periods[0];
+          const lastPeriod = periods[periods.length - 1];
+          
+          const firstData = periodMap.get(firstPeriod);
+          const lastData = periodMap.get(lastPeriod);
+          
+          const firstAvg = firstData.count > 0 ? firstData.sum / firstData.count : 0;
+          const lastAvg = lastData.count > 0 ? lastData.sum / lastData.count : 0;
+          
+          const firstPassRate = firstData.count > 0 ? (firstData.passes / firstData.count) * 100 : 0;
+          const lastPassRate = lastData.count > 0 ? (lastData.passes / lastData.count) * 100 : 0;
+          
+          const avgChange = lastAvg - firstAvg;
+          const passRateChange = lastPassRate - firstPassRate;
+          const totalEvals = Array.from(periodMap.values()).reduce((sum, data) => sum + data.count, 0);
+          
+          agentImprovements.push({
+            agentName,
+            firstAvg,
+            lastAvg,
+            avgChange,
+            firstPassRate,
+            lastPassRate,
+            passRateChange,
+            totalEvals,
+            trend: avgChange > 5 ? 'strong-improvement' : avgChange > 0 ? 'improvement' : avgChange < -5 ? 'decline' : 'stable'
+          });
+        }
+      });
+      
+      // Sort by improvement
+      agentImprovements.sort((a, b) => b.avgChange - a.avgChange);
+      
+      let improvementHtml = '<thead><tr><th>Agent</th><th>First Avg</th><th>Last Avg</th><th>Change</th><th>First Pass Rate</th><th>Last Pass Rate</th><th>Pass Rate Change</th><th>Total Evals</th><th>Trend</th></tr></thead><tbody>';
+      
+      agentImprovements.forEach(agent => {
+        const trendIcon = agent.trend === 'strong-improvement' ? '📈↑' :
+                         agent.trend === 'improvement' ? '📈' :
+                         agent.trend === 'decline' ? '📉' : '➡';
+        const trendClass = agent.trend.includes('improvement') ? 'good' :
+                          agent.trend === 'decline' ? 'bad' : 'warning';
+        
+        improvementHtml += `<tr>
+          <td>${agent.agentName}</td>
+          <td>${pct(agent.firstAvg, 1)}</td>
+          <td>${pct(agent.lastAvg, 1)}</td>
+          <td class="${trendClass}">${agent.avgChange > 0 ? '+' : ''}${pct(agent.avgChange, 1)}</td>
+          <td>${pct(agent.firstPassRate, 1)}</td>
+          <td>${pct(agent.lastPassRate, 1)}</td>
+          <td class="${trendClass}">${agent.passRateChange > 0 ? '+' : ''}${pct(agent.passRateChange, 1)}</td>
+          <td>${agent.totalEvals}</td>
+          <td class="${trendClass}">${trendIcon}</td>
+        </tr>`;
+      });
+      
+      improvementHtml += '</tbody>';
+      document.getElementById('trendImprovementTable').innerHTML = improvementHtml || '<tr><td colspan="9" class="muted">No trend data available for agents.</td></tr>';
     }
 
     // ===== DETAILS RENDERER =====
@@ -1833,33 +2444,6 @@
           row.style.display = 'none';
         }
       }
-    }
-
-    // Toggle row expansion
-    function toggleRow(index) {
-      const row = document.getElementById(`details-row-${index}`);
-      const icon = document.querySelector(`#details-row-${index}`).previousElementSibling.querySelector('.expand-icon');
-      
-      if (row.style.display === 'none') {
-        row.style.display = 'table-row';
-        icon.textContent = '▼';
-        icon.classList.add('expanded');
-      } else {
-        row.style.display = 'none';
-        icon.textContent = '▶';
-        icon.classList.remove('expanded');
-      }
-    }
-
-    // New function to sort details
-    function sortDetails(field) {
-      if (state.detailsSortField === field) {
-        state.detailsSortDirection = state.detailsSortDirection === 'asc' ? 'desc' : 'asc';
-      } else {
-        state.detailsSortField = field;
-        state.detailsSortDirection = 'desc';
-      }
-      renderDetails();
     }
 
     // ===== CRITICAL RENDERER =====

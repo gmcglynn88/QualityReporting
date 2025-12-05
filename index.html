@@ -2725,21 +2725,35 @@
         if(!map.has(key)) map.set(key,{formName,qText,count:0,agents:new Map()});
         const o=map.get(key); o.count++; o.agents.set(agentName,(o.agents.get(agentName)||0)+1);
         
-        // Add to agent failures
-        if (!agentFailures.has(agentName)) {
-          agentFailures.set(agentName, new Map());
-        }
-        const agentMap = agentFailures.get(agentName);
-        const questionKey = `${formName}: ${qText}`;
-        if (!agentMap.has(questionKey)) {
-          agentMap.set(questionKey, { dates: [], type });
-        }
-        const failure = agentMap.get(questionKey);
-        failure.dates.push(date);
-        // If any is fatal, mark as fatal
-        if (type === 'fatal') {
-          failure.type = 'fatal';
-        }
+  // Add to agent failures
+  if (!agentFailures.has(agentName)) {
+    agentFailures.set(agentName, { 
+      failures: new Map(), 
+      criticalCount: 0, 
+      fatalCount: 0 
+    });
+  }
+  const agentData = agentFailures.get(agentName);
+  const questionKey = `${formName}: ${qText}`;
+  
+  if (!agentData.failures.has(questionKey)) {
+    agentData.failures.set(questionKey, { 
+      dates: [], 
+      type: type,
+      count: 0
+    });
+  }
+  const failure = agentData.failures.get(questionKey);
+  failure.dates.push(date);
+  failure.count++;
+  
+  // Track counts separately
+  if (type === 'fatal') {
+    failure.type = 'fatal';
+    agentData.fatalCount++;
+  } else {
+    agentData.criticalCount++;
+  }
       }
 
       for (const e of state.evals){
@@ -2776,26 +2790,37 @@
           <div class="number">${totalFatal}</div>
           <div class="label">Total Fatal Marks</div>
         </div>
+        <div class="critical-kpi">
+          <div class="number">${totalCritical + totalFatal}</div>
+          <div class="label">Total Failures</div>
+        </div>
       `;
 
       // Render agent failures table
       const agentFailureRows = [];
       const agentFailureArray = Array.from(agentFailures.entries())
-        .filter(([agent, failures]) => failures.size > 0)
-        .sort((a, b) => b[1].size - a[1].size);
+        .filter(([agent, agentData]) => agentData.failures.size > 0)
+        .sort((a, b) => {
+          const aTotal = a[1].fatalCount + a[1].criticalCount;
+          const bTotal = b[1].fatalCount + b[1].criticalCount;
+          return bTotal - aTotal;
+        });
       
-      agentFailureArray.forEach(([agentName, failuresMap]) => {
+ agentFailureArray.forEach(([agentName, agentData]) => {
+        const failuresMap = agentData.failures;
         const failures = Array.from(failuresMap.entries())
           .sort((a, b) => {
             // Sort by type (fatal first) then by number of occurrences
             if (a[1].type === 'fatal' && b[1].type !== 'fatal') return -1;
             if (a[1].type !== 'fatal' && b[1].type === 'fatal') return 1;
-            return b[1].dates.length - a[1].dates.length;
+            return b[1].count - a[1].count;
           });
         
-        let hasFatal = false;
+        // Calculate totals
+        const totalFailures = agentData.fatalCount + agentData.criticalCount;
+        const hasFatal = agentData.fatalCount > 0;
+        
         const failureItems = failures.map(([question, data]) => {
-          if (data.type === 'fatal') hasFatal = true;
           const dates = [...new Set(data.dates)].sort().reverse();
           const recentDates = dates.slice(0, 3); // Show only 3 most recent dates
           const datesText = recentDates.join(', ') + (dates.length > 3 ? ` (+${dates.length - 3} more)` : '');
@@ -2804,17 +2829,20 @@
             <tr class="${data.type === 'fatal' ? 'fatal-agent' : ''}">
               <td>${question}</td>
               <td><span class="badge ${data.type === 'fatal' ? 'badge-fatal' : 'badge-critical'}">${data.type === 'fatal' ? 'Fatal' : 'Critical'}</span></td>
-              <td>${data.dates.length}</td>
+              <td>${data.count}</td>
               <td class="failure-dates">${datesText}</td>
             </tr>
           `;
         }).join('');
         
+        // Update the header to show both counts
+        const headerText = `${agentName} - ${totalFailures} Total (${agentData.fatalCount} Fatal, ${agentData.criticalCount} Critical)`;
+        
         agentFailureRows.push(`
           <table class="agent-failure-table">
             <thead>
               <tr class="${hasFatal ? 'fatal-agent' : ''}">
-                <th colspan="4">${agentName} - ${failures.length} ${failures.length === 1 ? 'Failure' : 'Failures'}</th>
+                <th colspan="4">${headerText}</th>
               </tr>
               <tr>
                 <th>Question</th>

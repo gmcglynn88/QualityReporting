@@ -622,6 +622,30 @@
       setTimeout(function(){ window.location.href = oauthUrl; }, 200);
     });
 
+    // ===== Agent Insights Renderer (Moved before startApp) =====
+    function renderAgentInsights(){
+      const data = window._insightData || [];
+      const mode = document.getElementById('insightsSort').value || 'avgDesc';
+      const arr = (function sort(mode, a){
+        const x=[...a];
+        if(mode==='avgAsc') x.sort((u,v)=>(u.avg??-1)-(v.avg??-1));
+        else if(mode==='avgDesc') x.sort((u,v)=>(v.avg??-1)-(u.avg??-1));
+        else if(mode==='failsDesc') x.sort((u,v)=>v.fails-u.fails);
+        else if(mode==='evalsDesc') x.sort((u,v)=>v.count-u.count);
+        return x;
+      })(mode, data);
+
+      const html = arr.map(a=>{
+        const w = a.avg==null?0:Math.max(0,Math.min(100,a.avg));
+        return `<div class="insight-row">
+          <div class="insight-name">${a.name}</div>
+          <div class="insight-bar-wrap"><div class="insight-bar" style="width:${w}%"></div></div>
+          <div class="insight-meta">${pct(a.avg??0,1)} <span class="pill">Evals ${a.count}</span><span class="pill">Fails ${a.fails}</span></div>
+        </div>`;
+      }).join('');
+      document.getElementById('agentInsights').innerHTML = html || '<div class="muted">No agent data.</div>';
+    }
+
     function startApp(token){
       state.accessToken=token;
       document.getElementById('auth-message').textContent='Authenticated successfully!';
@@ -647,7 +671,7 @@
 
       document.getElementById('loadAnalyticsBtn').onclick=loadAnalyticsRange;
       document.getElementById('loadTrendsBtn').onclick=loadTrendsData;
-      document.getElementById('insightsSort').onchange=renderAgentInsights;
+      document.getElementById('insightsSort').onchange=renderAgentInsights; // Now this function is defined
       document.getElementById('trendPeriodSelect').onchange=renderTrends;
       
       // New event listeners for details filters
@@ -1563,7 +1587,7 @@
         <div class="kpi"><div class="label">Pass Rate</div><div class="value">${passRate==null?'-':pct(passRate*80,1)}</div></div>
       `;
 
-      // Rest of the analytics rendering code remains the same...
+      // Rest of the analytics rendering code...
       const {pass, band} = getPassSettings();
       const byAgent=new Map(); // agent -> media -> {count,sum,scored}
       evals.forEach(e=>{
@@ -1579,7 +1603,7 @@
         if(p!=null&&isFinite(p)){ o.sum+=Number(p); o.scored++; }
       });
       
-      // ... (rest of the renderAnalytics function remains the same)
+      // ... (rest of the renderAnalytics function)
     }
 
     // ===== DETAILS RENDERER =====

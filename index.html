@@ -166,6 +166,9 @@
     .question-details-table th { background-color: var(--secondary-color); }
     .expand-icon { margin-right: 8px; transition: transform 0.3s; }
     .expanded .expand-icon { transform: rotate(90deg); }
+    
+    /* Analytics specific styles */
+    .analytics-chart-container { height: 400px; margin: 20px 0; }
   </style>
   <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
 </head>
@@ -263,13 +266,31 @@
 
         <div id="analyticsKPIs" class="kpis"></div>
 
+        <!-- Updated Analytics Visualizations -->
         <div class="card" style="padding:16px;margin-top:10px">
-          <h3 class="section-title" style="margin:0 0 8px">Scores by Media Type per Agent</h3>
-          <div id="agentMediaChart"></div>
+          <h3 class="section-title" style="margin:0 0 8px">Performance Distribution by Media Type</h3>
+          <div class="analytics-chart-container">
+            <canvas id="mediaTypeChart"></canvas>
+          </div>
           <div class="legend">
-            <div class="key"><span class="swatch" style="background:var(--ok)"></span>Green: ≥ target</div>
-            <div class="key"><span class="swatch" style="background:var(--warn)"></span>Amber: within band</div>
-            <div class="key"><span class="swatch" style="background:var(--bad)"></span>Red: below band</div>
+            <div class="key"><span class="swatch" style="background:var(--ok)"></span>Pass (≥85%)</div>
+            <div class="key"><span class="swatch" style="background:var(--warn)"></span>Amber (80-84%)</div>
+            <div class="key"><span class="swatch" style="background:var(--bad)"></span>Fail (<80%)</div>
+          </div>
+        </div>
+
+        <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(400px,1fr));gap:16px;margin-top:16px">
+          <div class="card">
+            <h3 class="section-title" style="margin:0 0 8px">Agent Performance Trends</h3>
+            <div style="height:300px">
+              <canvas id="agentTrendChart"></canvas>
+            </div>
+          </div>
+          <div class="card">
+            <h3 class="section-title" style="margin:0 0 8px">Score Distribution</h3>
+            <div style="height:300px">
+              <canvas id="scoreDistributionChart"></canvas>
+            </div>
           </div>
         </div>
 
@@ -508,12 +529,14 @@
 
     // Chart colours resolved from CSS vars (Chart.js can't read CSS vars directly)
     const cssVar = k => getComputedStyle(document.documentElement).getPropertyValue(k).trim();
-    let COLORS = { OK: '#22c55e', WARN: '#f59e0b', BAD: '#ef4444', TEXT: '#2C3E50', BLUE: '#3b82f6' };
+    let COLORS = { OK: '#22c55e', WARN: '#f59e0b', BAD: '#ef4444', TEXT: '#2C3E50', BLUE: '#3b82f6', PRIMARY: '#63AB8F', SECONDARY: '#4A8C7D' };
     function resolveColors() {
       COLORS.OK   = cssVar('--ok')          || COLORS.OK;
       COLORS.WARN = cssVar('--warn')        || COLORS.WARN;
       COLORS.BAD  = cssVar('--bad')         || COLORS.BAD;
       COLORS.TEXT = cssVar('--text-color')  || COLORS.TEXT;
+      COLORS.PRIMARY = cssVar('--primary-color') || COLORS.PRIMARY;
+      COLORS.SECONDARY = cssVar('--secondary-color') || COLORS.SECONDARY;
     }
 
     // Throttle + backoff
@@ -694,7 +717,7 @@
       document.getElementById('overviewTabButton').onclick=()=>setTab('overview');
       document.getElementById('analyticsTabButton').onclick=()=>{
         setTab('analytics');
-        renderAnalytics(); // FIX: Added renderAnalytics call
+        renderAnalytics();
       };
       document.getElementById('trendsTabButton').onclick=()=>setTab('trends');
       document.getElementById('detailsTabButton').onclick=()=>setTab('details');
@@ -703,7 +726,7 @@
 
       document.getElementById('loadAnalyticsBtn').onclick=loadAnalyticsRange;
       document.getElementById('loadTrendsBtn').onclick=loadTrendsData;
-      document.getElementById('insightsSort').onchange=renderAgentInsights; // Now this function is defined
+      document.getElementById('insightsSort').onchange=renderAgentInsights;
       document.getElementById('trendPeriodSelect').onchange=renderTrends;
       
       // New event listeners for details filters
@@ -1585,7 +1608,7 @@
       return out; 
     }
 
-    // ===== COMPLETE ANALYTICS RENDERER =====
+    // ===== UPDATED ANALYTICS RENDERER WITH PROPER CHART.JS VISUALS =====
     async function renderAnalytics(){
       const raw = getAnalyticsSet();
       if(!raw || !raw.length){
@@ -1596,7 +1619,18 @@
         document.getElementById('trendTable').innerHTML='';
         document.getElementById('topAgentsTable').innerHTML='';
         document.getElementById('bottomAgentsTable').innerHTML='';
-        document.getElementById('agentMediaChart').innerHTML='';
+        
+        // Clear charts
+        ['mediaTypeChart', 'agentTrendChart', 'scoreDistributionChart'].forEach(id => {
+          const canvas = document.getElementById(id);
+          if (canvas) {
+            const ctx = canvas.getContext('2d');
+            ctx.clearRect(0, 0, canvas.width, canvas.height);
+            const container = canvas.parentElement;
+            container.innerHTML = '<div class="muted" style="text-align:center;padding:40px">No data available</div>';
+          }
+        });
+        
         return;
       }
 
@@ -1644,23 +1678,283 @@
       `;
 
       const {pass, band} = getPassSettings();
+      
+      // Data for charts
+      const mediaTypeData = { Voice: { pass: 0, amber: 0, fail: 0 }, 
+                             Email: { pass: 0, amber: 0, fail: 0 }, 
+                             Message: { pass: 0, amber: 0, fail: 0 }, 
+                             Social: { pass: 0, amber: 0, fail: 0 }, 
+                             Other: { pass: 0, amber: 0, fail: 0 } };
+      
+      const agentTrendData = new Map(); // agent -> {dates: [], scores: []}
+      const scoreDistribution = Array(10).fill(0); // 0-10, 11-20, ..., 91-100
+      
       const byAgent=new Map(); // agent -> media -> {count,sum,scored}
       evals.forEach(e=>{
         const aid=safeGet(e,'agent.id')||e.agentUserId||'(unknown)';
         const name=resolveUserName(aid);
         const mt=guessMediaType(e);
+        const p=getEvalPercent(e);
+        
+        // Media type chart data
+        if (p != null && isFinite(p)) {
+          if (p >= pass) mediaTypeData[mt].pass++;
+          else if (p >= pass - band) mediaTypeData[mt].amber++;
+          else mediaTypeData[mt].fail++;
+        }
+        
+        // Agent trend data
+        if (!agentTrendData.has(name)) {
+          agentTrendData.set(name, { dates: [], scores: [] });
+        }
+        const date = new Date(e.releaseDate || e.assignedDate || e.creationDate || e.evaluationDate || e.date || Date.now());
+        agentTrendData.get(name).dates.push(date);
+        agentTrendData.get(name).scores.push(p || 0);
+        
+        // Score distribution
+        if (p != null && isFinite(p)) {
+          const bucket = Math.floor(p / 10);
+          const idx = bucket === 10 ? 9 : bucket;
+          scoreDistribution[idx]++;
+        }
+        
+        // Existing media table data
         if(!byAgent.has(aid)) byAgent.set(aid,{name,map:new Map()});
         const m=byAgent.get(aid).map;
         if(!m.has(mt)) m.set(mt,{count:0,sum:0,scored:0});
         const o=m.get(mt);
         o.count++;
-        const p=getEvalPercent(e);
         if(p!=null&&isFinite(p)){ o.sum+=Number(p); o.scored++; }
       });
 
-      // Build media table (agent × media)
-      const mediaTypes=['Voice','Email','Message','Social','Other'];
-      const mediaHead='<thead><tr><th>Agent</th>'+mediaTypes.map(mt=>`<th>${mt} (avg)</th>`).join('')+'<th>Overall</th><th>Evaluations</th></tr></thead>';
+      // 1. Media Type Chart (Stacked Bar)
+      const mediaTypeCtx = document.getElementById('mediaTypeChart').getContext('2d');
+      if (window.mediaTypeChartInstance) {
+        window.mediaTypeChartInstance.destroy();
+      }
+      
+      const mediaTypes = ['Voice', 'Email', 'Message', 'Social', 'Other'];
+      window.mediaTypeChartInstance = new Chart(mediaTypeCtx, {
+        type: 'bar',
+        data: {
+          labels: mediaTypes,
+          datasets: [
+            {
+              label: 'Pass',
+              data: mediaTypes.map(mt => mediaTypeData[mt].pass),
+              backgroundColor: COLORS.OK,
+              borderColor: COLORS.OK,
+              borderWidth: 1
+            },
+            {
+              label: 'Amber',
+              data: mediaTypes.map(mt => mediaTypeData[mt].amber),
+              backgroundColor: COLORS.WARN,
+              borderColor: COLORS.WARN,
+              borderWidth: 1
+            },
+            {
+              label: 'Fail',
+              data: mediaTypes.map(mt => mediaTypeData[mt].fail),
+              backgroundColor: COLORS.BAD,
+              borderColor: COLORS.BAD,
+              borderWidth: 1
+            }
+          ]
+        },
+        options: {
+          responsive: true,
+          maintainAspectRatio: false,
+          scales: {
+            x: {
+              stacked: true,
+              title: {
+                display: true,
+                text: 'Media Type'
+              }
+            },
+            y: {
+              stacked: true,
+              beginAtZero: true,
+              title: {
+                display: true,
+                text: 'Number of Evaluations'
+              }
+            }
+          },
+          plugins: {
+            tooltip: {
+              mode: 'index',
+              intersect: false
+            },
+            legend: {
+              position: 'top'
+            }
+          }
+        }
+      });
+
+      // 2. Agent Trend Chart (Line chart for top 5 agents)
+      const agentTrendCtx = document.getElementById('agentTrendChart').getContext('2d');
+      if (window.agentTrendChartInstance) {
+        window.agentTrendChartInstance.destroy();
+      }
+      
+      // Get top 5 agents by number of evaluations
+      const topAgents = Array.from(agentTrendData.entries())
+        .sort((a, b) => b[1].scores.length - a[1].scores.length)
+        .slice(0, 5);
+      
+      // Prepare data for line chart
+      const allDates = Array.from(new Set(topAgents.flatMap(([name, data]) => 
+        data.dates.map(d => d.toISOString().split('T')[0])
+      ))).sort();
+      
+      const datasets = topAgents.map(([name, data], idx) => {
+        // Create map of date to average score for that day
+        const dateScoreMap = new Map();
+        data.dates.forEach((date, i) => {
+          const dateStr = date.toISOString().split('T')[0];
+          const score = data.scores[i];
+          if (!dateScoreMap.has(dateStr)) {
+            dateScoreMap.set(dateStr, []);
+          }
+          dateScoreMap.get(dateStr).push(score);
+        });
+        
+        // Calculate average for each date
+        const scoresByDate = allDates.map(date => {
+          const scores = dateScoreMap.get(date);
+          return scores && scores.length > 0 
+            ? scores.reduce((sum, s) => sum + s, 0) / scores.length 
+            : null;
+        });
+        
+        // Generate distinct color
+        const hue = (idx * 360 / topAgents.length) % 360;
+        const color = `hsl(${hue}, 70%, 50%)`;
+        
+        return {
+          label: name,
+          data: scoresByDate,
+          borderColor: color,
+          backgroundColor: color + '20',
+          borderWidth: 2,
+          fill: false,
+          tension: 0.4
+        };
+      });
+      
+      window.agentTrendChartInstance = new Chart(agentTrendCtx, {
+        type: 'line',
+        data: {
+          labels: allDates.map(d => new Date(d).toLocaleDateString('en-GB', { day: 'numeric', month: 'short' })),
+          datasets: datasets
+        },
+        options: {
+          responsive: true,
+          maintainAspectRatio: false,
+          scales: {
+            x: {
+              title: {
+                display: true,
+                text: 'Date'
+              }
+            },
+            y: {
+              beginAtZero: false,
+              min: 0,
+              max: 100,
+              title: {
+                display: true,
+                text: 'Score (%)'
+              },
+              ticks: {
+                callback: function(value) {
+                  return value + '%';
+                }
+              }
+            }
+          },
+          plugins: {
+            tooltip: {
+              callbacks: {
+                label: function(context) {
+                  return `${context.dataset.label}: ${context.parsed.y ? pct(context.parsed.y, 1) : 'N/A'}`;
+                }
+              }
+            },
+            legend: {
+              position: 'top'
+            }
+          }
+        }
+      });
+
+      // 3. Score Distribution Chart (Histogram)
+      const scoreDistCtx = document.getElementById('scoreDistributionChart').getContext('2d');
+      if (window.scoreDistributionChartInstance) {
+        window.scoreDistributionChartInstance.destroy();
+      }
+      
+      const scoreLabels = ['0-10%', '11-20%', '21-30%', '31-40%', '41-50%', '51-60%', '61-70%', '71-80%', '81-90%', '91-100%'];
+      
+      // Color bars based on score ranges
+      const backgroundColors = scoreLabels.map((label, idx) => {
+        const minScore = idx * 10;
+        if (minScore >= pass) return COLORS.OK;
+        if (minScore >= pass - band) return COLORS.WARN;
+        return COLORS.BAD;
+      });
+      
+      window.scoreDistributionChartInstance = new Chart(scoreDistCtx, {
+        type: 'bar',
+        data: {
+          labels: scoreLabels,
+          datasets: [{
+            label: 'Number of Evaluations',
+            data: scoreDistribution,
+            backgroundColor: backgroundColors,
+            borderColor: backgroundColors.map(c => c.replace('0.8', '1')),
+            borderWidth: 1
+          }]
+        },
+        options: {
+          responsive: true,
+          maintainAspectRatio: false,
+          scales: {
+            x: {
+              title: {
+                display: true,
+                text: 'Score Range'
+              }
+            },
+            y: {
+              beginAtZero: true,
+              title: {
+                display: true,
+                text: 'Number of Evaluations'
+              }
+            }
+          },
+          plugins: {
+            legend: {
+              display: false
+            },
+            tooltip: {
+              callbacks: {
+                label: function(context) {
+                  return `${context.parsed.y} evaluation${context.parsed.y !== 1 ? 's' : ''}`;
+                }
+              }
+            }
+          }
+        }
+      });
+
+      // Build media table (agent × media) - KEEPING EXISTING TABLE
+      const mediaTypesTable=['Voice','Email','Message','Social','Other'];
+      const mediaHead='<thead><tr><th>Agent</th>'+mediaTypesTable.map(mt=>`<th>${mt} (avg)</th>`).join('')+'<th>Overall</th><th>Evaluations</th></tr></thead>';
       let mediaRows='';
       const insightData=[];
       
@@ -1668,7 +1962,7 @@
         const overall={count:0,sum:0,scored:0};
         let fails=0;
         const cells=[];
-        mediaTypes.forEach(mt=>{
+        mediaTypesTable.forEach(mt=>{
           const o=map.get(mt);
           const avg=o&&o.scored? o.sum/o.scored : null;
           overall.count+=(o?.count||0);
@@ -1694,46 +1988,6 @@
       // Store insight data for sorting
       window._insightData = insightData;
       renderAgentInsights();
-
-      // Build agent-media chart (horizontal bars)
-      const chartData = [];
-      mediaTypes.forEach(mt => {
-        const agents = Array.from(byAgent.entries())
-          .map(([aid, {name, map}]) => {
-            const o = map.get(mt);
-            const avg = o && o.scored ? o.sum / o.scored : null;
-            return { name, avg, count: o?.count || 0 };
-          })
-          .filter(a => a.count > 0)
-          .sort((a, b) => (b.avg || 0) - (a.avg || 0))
-          .slice(0, 15); // Top 15 agents per media type
-        
-        chartData.push({ mediaType: mt, agents });
-      });
-
-      let chartHtml = '';
-      chartData.forEach(item => {
-        if (item.agents.length === 0) return;
-        
-        const maxAvg = Math.max(...item.agents.map(a => a.avg || 0));
-        chartHtml += `<h4 style="margin-top:16px;margin-bottom:8px">${item.mediaType}</h4>`;
-        item.agents.forEach(agent => {
-          const width = maxAvg > 0 ? ((agent.avg || 0) / maxAvg * 100) : 0;
-          const col = colourFor(agent.avg, pass, band);
-          chartHtml += `<div class="chart-row">
-            <div class="chart-label">${agent.name}</div>
-            <div class="chart-svg" style="position:relative;height:20px">
-              <div style="position:absolute;top:0;left:0;width:${width}%;height:100%;background:${col};border-radius:4px"></div>
-              <div style="position:absolute;top:2px;left:6px;color:${agent.avg && agent.avg >= pass ? '#fff' : '#000'};font-size:12px;font-weight:600">
-                ${agent.avg == null ? '-' : pct(agent.avg, 1)}
-              </div>
-            </div>
-            <div style="width:60px;text-align:right;font-size:12px">${agent.count} eval${agent.count !== 1 ? 's' : ''}</div>
-          </div>`;
-        });
-      });
-      
-      document.getElementById('agentMediaChart').innerHTML = chartHtml || '<div class="muted">No media-specific data available.</div>';
 
       // Repeat failures table
       const repeatFails = new Map(); // question text -> {formName, agents: Map, count}
@@ -1787,8 +2041,8 @@
       const dayKeys = days.map(d => dayKeyUTC(d));
       const dayLabels = days.map(d => toUKDate(d));
       
-      // Agent trend data
-      const agentTrend = new Map(); // agent -> day -> {count, sum}
+      // Agent trend data for table
+      const agentTrendTable = new Map(); // agent -> day -> {count, sum}
       evals.forEach(e => {
         const aid = safeGet(e, 'agent.id') || e.agentUserId;
         const name = resolveUserName(aid);
@@ -1796,10 +2050,10 @@
         const day = dayKeyUTC(date);
         const score = getEvalPercent(e);
         
-        if (!agentTrend.has(name)) {
-          agentTrend.set(name, new Map());
+        if (!agentTrendTable.has(name)) {
+          agentTrendTable.set(name, new Map());
         }
-        const agentMap = agentTrend.get(name);
+        const agentMap = agentTrendTable.get(name);
         if (!agentMap.has(day)) {
           agentMap.set(day, { count: 0, sum: 0 });
         }
@@ -1822,7 +2076,7 @@
       
       trendTable += `</tr></thead><tbody>`;
       
-      Array.from(agentTrend.entries())
+      Array.from(agentTrendTable.entries())
         .sort(([aName], [bName]) => aName.localeCompare(bName))
         .forEach(([name, dayMap]) => {
           trendTable += `<tr><td>${name}</td>`;
@@ -1851,12 +2105,12 @@
         .filter(a => a.count > 0)
         .sort((a, b) => (b.avg || 0) - (a.avg || 0));
       
-      const topAgents = sortedAgents.slice(0, 10);
-      const bottomAgents = sortedAgents.slice(-10).reverse();
+      const topAgentsTable = sortedAgents.slice(0, 10);
+      const bottomAgentsTable = sortedAgents.slice(-10).reverse();
       
       // Top agents table
       let topHtml = '<thead><tr><th>Rank</th><th>Agent</th><th>Avg Score</th><th>Evaluations</th><th>Failures</th></tr></thead><tbody>';
-      topAgents.forEach((agent, i) => {
+      topAgentsTable.forEach((agent, i) => {
         const col = colourFor(agent.avg, pass, band);
         topHtml += `<tr>
           <td>${i + 1}</td>
@@ -1871,7 +2125,7 @@
       
       // Bottom agents table
       let bottomHtml = '<thead><tr><th>Rank</th><th>Agent</th><th>Avg Score</th><th>Evaluations</th><th>Failures</th></tr></thead><tbody>';
-      bottomAgents.forEach((agent, i) => {
+      bottomAgentsTable.forEach((agent, i) => {
         const col = colourFor(agent.avg, pass, band);
         bottomHtml += `<tr>
           <td>${sortedAgents.length - i}</td>
@@ -1885,7 +2139,7 @@
       document.getElementById('bottomAgentsTable').innerHTML = bottomHtml;
     }
 
-    // ===== COMPLETE TRENDS RENDERER =====
+    // ===== TRENDS RENDERER (Keep existing) =====
     async function renderTrends() {
       const raw = getTrendsSet();
       const trendsView = document.getElementById('trendsView');

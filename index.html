@@ -40,10 +40,41 @@
     .frozen-table tr:hover td { background-color: rgba(99,171,143,.05); }
     .frozen-table tr:hover td:first-child { background: rgba(99,171,143,.1); }
 
-    .tab{display:inline-block;padding:12px 20px;margin-right:10px;background:#eee;cursor:pointer;border-radius:6px;font-weight:500}
-    .tab.active{background:var(--primary-color);color:white}
-    .tab-content{display:none}
-    .tab-content.active{display:block}
+    /* Tab styling - Updated to match your reference app */
+    .tab-container {
+      display: flex;
+      gap: 12px;
+      margin-top: 20px;
+      flex-wrap: wrap;
+    }
+
+    .tab-button {
+      padding: 10px 16px;
+      background: #ffffff;
+      border: 2px solid var(--primary-color);
+      border-radius: 6px;
+      cursor: pointer;
+      font-weight: 600;
+      color: var(--primary-color);
+      transition: background .2s, color .2s;
+    }
+
+    .tab-button:hover {
+      background: var(--pill);
+    }
+
+    .tab-button.active {
+      background: var(--primary-color);
+      color: #ffffff;
+    }
+
+    .tab-content {
+      display: none;
+    }
+
+    .tab-content.active {
+      display: block;
+    }
 
     .badge{display:inline-block;padding:2px 8px;border-radius:12px;font-size:12px;border:1px solid var(--border-color);background:#fff}
     .badge-critical{color:#b4231a;border-color:#fecaca;background:#fee2e2}
@@ -169,6 +200,12 @@
     
     /* Analytics specific styles */
     .analytics-chart-container { height: 400px; margin: 20px 0; }
+    
+    /* How to Use tab specific styles */
+    .guide-step { margin: 20px 0; padding-left: 20px; border-left: 3px solid var(--primary-color); }
+    .guide-step h3 { margin-top: 0; color: var(--secondary-color); }
+    .guide-step p { margin: 8px 0; }
+    .guide-note { background: var(--pill); border: 1px solid var(--border-color); border-radius: 8px; padding: 12px; margin: 12px 0; }
   </style>
   <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
 </head>
@@ -180,278 +217,388 @@
   <div id="appContent" style="display:none;">
     <div id="messageContainer"></div>
 
-    <div class="card">
-      <h2 class="section-title">Configuration</h2>
-      <div class="controls">
-        <div>
-          <label for="userDropdown">Agents</label>
-          <div id="userDropdown" class="checkbox-dropdown"></div>
-        </div>
-        <div>
-          <label for="teamDropdown">Work Teams</label>
-          <div id="teamDropdown" class="checkbox-dropdown"></div>
-        </div>
-        <div>
-          <label for="formDropdown">Evaluation Forms</label>
-          <div id="formDropdown" class="checkbox-dropdown"></div>
-        </div>
-        <div>
-          <label for="monthInput">Month</label>
-          <input id="monthInput" type="month">
-        </div>
-        <div>
-          <label>&nbsp;</label>
-          <button id="loadBtn" class="full-width-btn" disabled>
-            <span class="loading-spinner" style="display:none"></span>
-            <span class="btn-text">Load Evaluations</span>
-          </button>
-        </div>
-      </div>
+    <!-- Tab Navigation -->
+    <div class="tab-container">
+      <button class="tab-button active" data-tab="tab-main">Quality Reporting</button>
+      <button class="tab-button" data-tab="tab-guide">How to Use</button>
     </div>
 
-    <div class="card">
-      <div style="margin-bottom:10px;">
-        <div id="tabs">
-          <div id="overviewTabButton" class="tab active">Overview</div>
-          <div id="analyticsTabButton" class="tab">Analytics</div>
-          <div id="trendsTabButton" class="tab">Trends</div>
-          <div id="detailsTabButton" class="tab">Evaluation Details</div>
-          <div id="criticalTabButton" class="tab">Critical / Fatal Summary</div>
-        </div>
-      </div>
-
-      <div id="overviewTab" class="tab-content active">
-        <h2 class="section-title">Monthly Overview</h2>
-        <div id="overviewKPIs" class="kpis"></div>
-        <div class="table-container">
-          <table id="agentSummaryTable"></table>
-        </div>
-      </div>
-
-      <div id="analyticsTab" class="tab-content">
-        <h2 class="section-title">Analytics</h2>
-
-        <div class="controls" style="margin-top:8px">
+    <!-- Main Content Tab -->
+    <div id="tab-main" class="tab-content active">
+      <div class="card">
+        <h2 class="section-title">Configuration</h2>
+        <div class="controls">
           <div>
-            <label for="anaFrom">From (Month)</label>
-            <input id="anaFrom" type="month">
+            <label for="userDropdown">Agents</label>
+            <div id="userDropdown" class="checkbox-dropdown"></div>
           </div>
           <div>
-            <label for="anaTo">To (Month)</label>
-            <input id="anaTo" type="month">
+            <label for="teamDropdown">Work Teams</label>
+            <div id="teamDropdown" class="checkbox-dropdown"></div>
           </div>
           <div>
-            <label for="analyticsTeamDropdown">Filter by Work Team</label>
-            <div id="analyticsTeamDropdown" class="checkbox-dropdown"></div>
-          </div>
-        </div>
-
-        <div class="controls" style="margin-top:8px">
-          <div>
-            <label for="passTarget">Pass target (%)</label>
-            <input id="passTarget" type="number" min="0" max="100" value="85">
+            <label for="formDropdown">Evaluation Forms</label>
+            <div id="formDropdown" class="checkbox-dropdown"></div>
           </div>
           <div>
-            <label for="amberBand">Amber band (±%)</label>
-            <input id="amberBand" type="number" min="0" max="20" value="5">
+            <label for="monthInput">Month</label>
+            <input id="monthInput" type="month">
           </div>
           <div>
             <label>&nbsp;</label>
-            <button id="loadAnalyticsBtn" class="full-width-btn">
+            <button id="loadBtn" class="full-width-btn" disabled>
               <span class="loading-spinner" style="display:none"></span>
-              <span class="btn-text">Load Range</span>
+              <span class="btn-text">Load Evaluations</span>
             </button>
           </div>
         </div>
+      </div>
 
-        <div id="analyticsKPIs" class="kpis"></div>
-
-        <!-- Updated Analytics Visualizations -->
-        <div class="card" style="padding:16px;margin-top:10px">
-          <h3 class="section-title" style="margin:0 0 8px">Performance Distribution by Media Type</h3>
-          <div class="analytics-chart-container">
-            <canvas id="mediaTypeChart"></canvas>
-          </div>
-          <div class="legend">
-            <div class="key"><span class="swatch" style="background:var(--ok)"></span>Pass (≥85%)</div>
-            <div class="key"><span class="swatch" style="background:var(--warn)"></span>Amber (80-84%)</div>
-            <div class="key"><span class="swatch" style="background:var(--bad)"></span>Fail (<80%)</div>
+      <div class="card">
+        <div style="margin-bottom:10px;">
+          <div id="tabs">
+            <div id="overviewTabButton" class="tab-button active">Overview</div>
+            <div id="analyticsTabButton" class="tab-button">Analytics</div>
+            <div id="trendsTabButton" class="tab-button">Trends</div>
+            <div id="detailsTabButton" class="tab-button">Evaluation Details</div>
+            <div id="criticalTabButton" class="tab-button">Critical / Fatal Summary</div>
           </div>
         </div>
 
-        <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(400px,1fr));gap:16px;margin-top:16px">
-          <div class="card">
-            <h3 class="section-title" style="margin:0 0 8px">Agent Performance Trends</h3>
-            <div style="height:300px">
-              <canvas id="agentTrendChart"></canvas>
-            </div>
-          </div>
-          <div class="card">
-            <h3 class="section-title" style="margin:0 0 8px">Score Distribution</h3>
-            <div style="height:300px">
-              <canvas id="scoreDistributionChart"></canvas>
-            </div>
+        <div id="overviewTab" class="tab-content active">
+          <h2 class="section-title">Monthly Overview</h2>
+          <div id="overviewKPIs" class="kpis"></div>
+          <div class="table-container">
+            <table id="agentSummaryTable"></table>
           </div>
         </div>
 
-        <div class="table-container">
-          <table id="mediaTable" class="sortable"></table>
-        </div>
-        <div class="table-container">
-          <table id="repeatFailsTable" class="sortable"></table>
-        </div>
+        <div id="analyticsTab" class="tab-content">
+          <h2 class="section-title">Analytics</h2>
 
-        <div class="card" style="padding:16px;margin-top:16px">
-          <div style="display:flex;align-items:center;gap:10px;justify-content:space-between">
-            <h3 class="section-title" style="margin:0">Agent Insights</h3>
+          <div class="controls" style="margin-top:8px">
             <div>
-              <label class="muted" style="margin-right:6px">Sort by:</label>
-              <select id="insightsSort">
-                <option value="avgDesc">Avg score (high→low)</option>
-                <option value="avgAsc">Avg score (low→high)</option>
-                <option value="failsDesc">Fails (high→low)</option>
-                <option value="evalsDesc">Evals (high→low)</option>
-              </select>
+              <label for="anaFrom">From (Month)</label>
+              <input id="anaFrom" type="month">
+            </div>
+            <div>
+              <label for="anaTo">To (Month)</label>
+              <input id="anaTo" type="month">
+            </div>
+            <div>
+              <label for="analyticsTeamDropdown">Filter by Work Team</label>
+              <div id="analyticsTeamDropdown" class="checkbox-dropdown"></div>
             </div>
           </div>
-          <div id="agentInsights" style="margin-top:8px"></div>
-        </div>
 
-        <h3 class="section-title" style="margin-top:18px">Daily Trend by Agent (Selected Period)</h3>
-        <div id="trendTable" class="frozen-table-container"></div>
+          <div class="controls" style="margin-top:8px">
+            <div>
+              <label for="passTarget">Pass target (%)</label>
+              <input id="passTarget" type="number" min="0" max="100" value="85">
+            </div>
+            <div>
+              <label for="amberBand">Amber band (±%)</label>
+              <input id="amberBand" type="number" min="0" max="20" value="5">
+            </div>
+            <div>
+              <label>&nbsp;</label>
+              <button id="loadAnalyticsBtn" class="full-width-btn">
+                <span class="loading-spinner" style="display:none"></span>
+                <span class="btn-text">Load Range</span>
+              </button>
+            </div>
+          </div>
 
-        <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(260px,1fr));gap:16px;margin-top:16px">
-          <div class="table-container">
-            <table id="topAgentsTable"></table>
-          </div>
-          <div class="table-container">
-            <table id="bottomAgentsTable"></table>
-          </div>
-        </div>
-      </div>
+          <div id="analyticsKPIs" class="kpis"></div>
 
-      <div id="trendsTab" class="tab-content">
-        <h2 class="section-title">Performance Trends</h2>
-        
-        <div class="controls" style="margin-top:8px">
-          <div>
-            <label for="trendFrom">From (Month)</label>
-            <input id="trendFrom" type="month">
-          </div>
-          <div>
-            <label for="trendTo">To (Month)</label>
-            <input id="trendTo" type="month">
-          </div>
-          <div>
-            <label for="trendTeamDropdown">Filter by Work Team</label>
-            <div id="trendTeamDropdown" class="checkbox-dropdown"></div>
-          </div>
-        </div>
-
-        <div class="controls" style="margin-top:8px">
-          <div>
-            <label for="trendPassTarget">Pass target (%)</label>
-            <input id="trendPassTarget" type="number" min="0" max="100" value="85">
-          </div>
-          <div>
-            <label for="trendAmberBand">Amber band (±%)</label>
-            <input id="trendAmberBand" type="number" min="0" max="20" value="5">
-          </div>
-          <div>
-            <label for="trendPeriodSelect">Time Period View</label>
-            <select id="trendPeriodSelect" class="full-width-btn">
-              <option value="month">Month over Month</option>
-              <option value="week">Week over Week</option>
-            </select>
-          </div>
-          <div>
-            <label>&nbsp;</label>
-            <button id="loadTrendsBtn" class="full-width-btn">
-              <span class="loading-spinner" style="display:none"></span>
-              <span class="btn-text">Load Trends</span>
-            </button>
-          </div>
-        </div>
-
-        <div id="trendsKPIs" class="kpis"></div>
-
-        <!-- Month over Month / Week over Week View -->
-        <div id="trendsView" style="display:none;">
-          <div class="card" style="padding:16px;margin-top:10px;">
-            <h3 class="section-title" style="margin:0 0 8px" id="trendsTitle">Month over Month Performance</h3>
-            <div class="trend-chart-container">
-              <canvas id="trendsChart"></canvas>
+          <!-- Updated Analytics Visualizations -->
+          <div class="card" style="padding:16px;margin-top:10px">
+            <h3 class="section-title" style="margin:0 0 8px">Performance Distribution by Media Type</h3>
+            <div class="analytics-chart-container">
+              <canvas id="mediaTypeChart"></canvas>
             </div>
             <div class="legend">
-              <div class="key"><span class="swatch" style="background:var(--ok)"></span>Passed</div>
-              <div class="key"><span class="swatch" style="background:var(--warn)"></span>Amber</div>
-              <div class="key"><span class="swatch" style="background:var(--bad)"></span>Failed</div>
+              <div class="key"><span class="swatch" style="background:var(--ok)"></span>Pass (≥85%)</div>
+              <div class="key"><span class="swatch" style="background:var(--warn)"></span>Amber (80-84%)</div>
+              <div class="key"><span class="swatch" style="background:var(--bad)"></span>Fail (<80%)</div>
             </div>
           </div>
 
-          <!-- Trend Statistics -->
-          <div class="trend-stats" id="trendStats"></div>
+          <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(400px,1fr));gap:16px;margin-top:16px">
+            <div class="card">
+              <h3 class="section-title" style="margin:0 0 8px">Agent Performance Trends</h3>
+              <div style="height:300px">
+                <canvas id="agentTrendChart"></canvas>
+              </div>
+            </div>
+            <div class="card">
+              <h3 class="section-title" style="margin:0 0 8px">Score Distribution</h3>
+              <div style="height:300px">
+                <canvas id="scoreDistributionChart"></canvas>
+              </div>
+            </div>
+          </div>
 
-          <!-- Trend Improvement Table -->
-          <div class="trend-table-container">
-            <h3 class="section-title">Agent Performance Trends</h3>
+          <div class="table-container">
+            <table id="mediaTable" class="sortable"></table>
+          </div>
+          <div class="table-container">
+            <table id="repeatFailsTable" class="sortable"></table>
+          </div>
+
+          <div class="card" style="padding:16px;margin-top:16px">
+            <div style="display:flex;align-items:center;gap:10px;justify-content:space-between">
+              <h3 class="section-title" style="margin:0">Agent Insights</h3>
+              <div>
+                <label class="muted" style="margin-right:6px">Sort by:</label>
+                <select id="insightsSort">
+                  <option value="avgDesc">Avg score (high→low)</option>
+                  <option value="avgAsc">Avg score (low→high)</option>
+                  <option value="failsDesc">Fails (high→low)</option>
+                  <option value="evalsDesc">Evals (high→low)</option>
+                </select>
+              </div>
+            </div>
+            <div id="agentInsights" style="margin-top:8px"></div>
+          </div>
+
+          <h3 class="section-title" style="margin-top:18px">Daily Trend by Agent (Selected Period)</h3>
+          <div id="trendTable" class="frozen-table-container"></div>
+
+          <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(260px,1fr));gap:16px;margin-top:16px">
             <div class="table-container">
-              <table id="trendImprovementTable" class="sortable"></table>
+              <table id="topAgentsTable"></table>
+            </div>
+            <div class="table-container">
+              <table id="bottomAgentsTable"></table>
             </div>
           </div>
         </div>
 
-        <div id="trendsNoData" class="info-message" style="margin-top:20px;display:none;">
-          No trend data available. Please load data for the selected period.
-        </div>
-      </div>
+        <div id="trendsTab" class="tab-content">
+          <h2 class="section-title">Performance Trends</h2>
+          
+          <div class="controls" style="margin-top:8px">
+            <div>
+              <label for="trendFrom">From (Month)</label>
+              <input id="trendFrom" type="month">
+            </div>
+            <div>
+              <label for="trendTo">To (Month)</label>
+              <input id="trendTo" type="month">
+            </div>
+            <div>
+              <label for="trendTeamDropdown">Filter by Work Team</label>
+              <div id="trendTeamDropdown" class="checkbox-dropdown"></div>
+            </div>
+          </div>
 
-      <div id="detailsTab" class="tab-content">
-        <h2 class="section-title">Evaluation Details (with Question Scores)</h2>
-        
-        <!-- Filter Controls -->
-        <div class="details-filters">
-          <div class="filter-group">
-            <label for="detailsAgentFilter">Filter by Agent</label>
-            <select id="detailsAgentFilter" class="full-width-btn">
-              <option value="all">All Agents</option>
-            </select>
+          <div class="controls" style="margin-top:8px">
+            <div>
+              <label for="trendPassTarget">Pass target (%)</label>
+              <input id="trendPassTarget" type="number" min="0" max="100" value="85">
+            </div>
+            <div>
+              <label for="trendAmberBand">Amber band (±%)</label>
+              <input id="trendAmberBand" type="number" min="0" max="20" value="5">
+            </div>
+            <div>
+              <label for="trendPeriodSelect">Time Period View</label>
+              <select id="trendPeriodSelect" class="full-width-btn">
+                <option value="month">Month over Month</option>
+                <option value="week">Week over Week</option>
+              </select>
+            </div>
+            <div>
+              <label>&nbsp;</label>
+              <button id="loadTrendsBtn" class="full-width-btn">
+                <span class="loading-spinner" style="display:none"></span>
+                <span class="btn-text">Load Trends</span>
+              </button>
+            </div>
           </div>
-          <div class="filter-group">
-            <label for="detailsScoreFilter">Filter by Score</label>
-            <select id="detailsScoreFilter" class="full-width-btn">
-              <option value="all">All Scores</option>
-              <option value="pass">Pass (≥85%)</option>
-              <option value="amber">Amber (80-84%)</option>
-              <option value="fail">Fail (<80%)</option>
-              <option value="critical">With Critical Marks</option>
-              <option value="fatal">With Fatal Marks</option>
-            </select>
-          </div>
-          <div class="filter-group">
-            <label>&nbsp;</label>
-            <button id="applyFiltersBtn" class="full-width-btn">Apply Filters</button>
-          </div>
-        </div>
-        
-        <div id="detailsContainer"></div>
-      </div>
 
-      <div id="criticalTab" class="tab-content">
-        <h2 class="section-title">Critical / Fail Question Counts</h2>
-        <div id="criticalSummaryKPIs" class="critical-summary-kpis"></div>
-        
-        <!-- New Agent Failure Table -->
-        <div class="card" style="margin-top:20px;">
-          <h3 class="section-title">Agent Mark Downs by Question</h3>
-          <div id="agentFailuresContainer"></div>
+          <div id="trendsKPIs" class="kpis"></div>
+
+          <!-- Month over Month / Week over Week View -->
+          <div id="trendsView" style="display:none;">
+            <div class="card" style="padding:16px;margin-top:10px;">
+              <h3 class="section-title" style="margin:0 0 8px" id="trendsTitle">Month over Month Performance</h3>
+              <div class="trend-chart-container">
+                <canvas id="trendsChart"></canvas>
+              </div>
+              <div class="legend">
+                <div class="key"><span class="swatch" style="background:var(--ok)"></span>Passed</div>
+                <div class="key"><span class="swatch" style="background:var(--warn)"></span>Amber</div>
+                <div class="key"><span class="swatch" style="background:var(--bad)"></span>Failed</div>
+              </div>
+            </div>
+
+            <!-- Trend Statistics -->
+            <div class="trend-stats" id="trendStats"></div>
+
+            <!-- Trend Improvement Table -->
+            <div class="trend-table-container">
+              <h3 class="section-title">Agent Performance Trends</h3>
+              <div class="table-container">
+                <table id="trendImprovementTable" class="sortable"></table>
+              </div>
+            </div>
+          </div>
+
+          <div id="trendsNoData" class="info-message" style="margin-top:20px;display:none;">
+            No trend data available. Please load data for the selected period.
+          </div>
         </div>
-        
-        <div class="table-container">
-          <table id="criticalTable"></table>
+
+        <div id="detailsTab" class="tab-content">
+          <h2 class="section-title">Evaluation Details (with Question Scores)</h2>
+          
+          <!-- Filter Controls -->
+          <div class="details-filters">
+            <div class="filter-group">
+              <label for="detailsAgentFilter">Filter by Agent</label>
+              <select id="detailsAgentFilter" class="full-width-btn">
+                <option value="all">All Agents</option>
+              </select>
+            </div>
+            <div class="filter-group">
+              <label for="detailsScoreFilter">Filter by Score</label>
+              <select id="detailsScoreFilter" class="full-width-btn">
+                <option value="all">All Scores</option>
+                <option value="pass">Pass (≥85%)</option>
+                <option value="amber">Amber (80-84%)</option>
+                <option value="fail">Fail (<80%)</option>
+                <option value="critical">With Critical Marks</option>
+                <option value="fatal">With Fatal Marks</option>
+              </select>
+            </div>
+            <div class="filter-group">
+              <label>&nbsp;</label>
+              <button id="applyFiltersBtn" class="full-width-btn">Apply Filters</button>
+            </div>
+          </div>
+          
+          <div id="detailsContainer"></div>
+        </div>
+
+        <div id="criticalTab" class="tab-content">
+          <h2 class="section-title">Critical / Fail Question Counts</h2>
+          <div id="criticalSummaryKPIs" class="critical-summary-kpis"></div>
+          
+          <!-- New Agent Failure Table -->
+          <div class="card" style="margin-top:20px;">
+            <h3 class="section-title">Agent Mark Downs by Question</h3>
+            <div id="agentFailuresContainer"></div>
+          </div>
+          
+          <div class="table-container">
+            <table id="criticalTable"></table>
+          </div>
         </div>
       </div>
-    </div>
+    </div> <!-- end tab-main -->
+
+    <!-- How to Use Tab -->
+    <div id="tab-guide" class="tab-content">
+      <div class="card">
+        <h2 class="section-title">How to Use the Quality Reporting Tool</h2>
+        
+        <div class="guide-step">
+          <h3>1. Initial Setup</h3>
+          <p><strong>Authentication:</strong> The app automatically authenticates with Genesys Cloud using OAuth. You'll be redirected to login if needed.</p>
+          <p><strong>Loading Data:</strong> Once authenticated, the app loads available agents, teams, and evaluation forms.</p>
+        </div>
+
+        <div class="guide-step">
+          <h3>2. Configuration Panel</h3>
+          <p><strong>Agents:</strong> Select individual agents you want to analyze. Use the search box to find specific agents.</p>
+          <p><strong>Work Teams:</strong> Select entire teams to include all agents within those teams.</p>
+          <p><strong>Evaluation Forms:</strong> Choose specific evaluation forms to filter results.</p>
+          <p><strong>Month Selection:</strong> Pick the month you want to analyze evaluations from.</p>
+          <p><strong>Load Evaluations:</strong> Click this button after making your selections to load the data.</p>
+          <div class="guide-note">
+            <strong>Note:</strong> You must select at least one agent, team, or form before loading evaluations.
+          </div>
+        </div>
+
+        <div class="guide-step">
+          <h3>3. Overview Tab</h3>
+          <p><strong>KPIs:</strong> View key metrics including total evaluations, number of agents, and average scores.</p>
+          <p><strong>Agent Summary Table:</strong> See each agent's evaluation count and average score for the selected period.</p>
+        </div>
+
+        <div class="guide-step">
+          <h3>4. Analytics Tab</h3>
+          <p><strong>Date Range:</strong> Select a custom date range for deeper analysis.</p>
+          <p><strong>Team Filtering:</strong> Filter analytics by specific work teams.</p>
+          <p><strong>Pass Target Settings:</strong> Adjust the pass threshold (default 85%) and amber band (±5%).</p>
+          <p><strong>Visualizations:</strong>
+            <ul>
+              <li><strong>Media Type Chart:</strong> Shows performance distribution across different media types</li>
+              <li><strong>Agent Trends:</strong> Line chart showing score trends for top agents</li>
+              <li><strong>Score Distribution:</strong> Histogram showing how scores are distributed</li>
+            </ul>
+          </p>
+          <p><strong>Media Table:</strong> Detailed breakdown of agent performance by media type.</p>
+          <p><strong>Repeat Failures:</strong> Identifies questions that frequently receive critical/fatal marks.</p>
+          <p><strong>Agent Insights:</strong> Sortable list of agents with their performance metrics.</p>
+          <p><strong>Daily Trends:</strong> Frozen table showing daily performance for each agent.</p>
+          <p><strong>Top/Bottom Agents:</strong> Leaderboards showing best and worst performers.</p>
+        </div>
+
+        <div class="guide-step">
+          <h3>5. Trends Tab</h3>
+          <p><strong>Time Period Analysis:</strong> Compare performance month-over-month or week-over-week.</p>
+          <p><strong>Trend Chart:</strong> Visual representation of pass/amber/fail trends over time.</p>
+          <p><strong>Trend Statistics:</strong> Key metrics showing improvement or decline over the selected period.</p>
+          <p><strong>Agent Improvement Table:</strong> Shows which agents improved or declined over time.</p>
+        </div>
+
+        <div class="guide-step">
+          <h3>6. Evaluation Details Tab</h3>
+          <p><strong>Filtering:</strong> Filter evaluations by agent and score range.</p>
+          <p><strong>Sorting:</strong> Click column headers to sort by date, agent, form, or score.</p>
+          <p><strong>Expandable Rows:</strong> Click any evaluation row to see detailed question scores, comments, and critical/fatal flags.</p>
+          <p><strong>Contact Info:</strong> View customer contact information extracted from each evaluation.</p>
+        </div>
+
+        <div class="guide-step">
+          <h3>7. Critical / Fatal Summary Tab</h3>
+          <p><strong>Summary KPIs:</strong> Quick view of total critical and fatal marks.</p>
+          <p><strong>Agent Failure Analysis:</strong> Detailed breakdown showing which agents received which critical/fatal marks and when.</p>
+          <p><strong>Question Analysis:</strong> Identifies which questions most frequently receive critical/fatal marks across all agents.</p>
+        </div>
+
+        <div class="guide-step">
+          <h3>8. Tips & Best Practices</h3>
+          <div class="guide-note">
+            <strong>Data Loading:</strong> Loading large date ranges or many agents may take a moment. Be patient during initial load.
+          </div>
+          <div class="guide-note">
+            <strong>Critical vs Fatal:</strong> Fatal marks automatically fail the entire evaluation. Critical marks indicate serious issues but don't necessarily fail the evaluation.
+          </div>
+          <div class="guide-note">
+            <strong>Exporting Data:</strong> Use your browser's print function (Ctrl+P) to export tables and charts as PDFs.
+          </div>
+          <div class="guide-note">
+            <strong>Session Management:</strong> Your authentication token lasts for several hours. If you get logged out, simply refresh the page.
+          </div>
+        </div>
+
+        <div class="guide-step">
+          <h3>9. Troubleshooting</h3>
+          <p><strong>No Data Loaded:</strong> Ensure you've selected at least one agent, team, or form and clicked "Load Evaluations".</p>
+          <p><strong>Authentication Errors:</strong> Refresh the page to restart the OAuth flow.</p>
+          <p><strong>Missing Form Details:</strong> Some evaluation forms may not load completely. This is normal for older or deleted forms.</p>
+          <p><strong>Performance Issues:</strong> For very large datasets, try narrowing your date range or filtering by specific teams.</p>
+        </div>
+
+        <div class="guide-note" style="margin-top: 20px;">
+          <strong>Need Help?</strong> This tool extracts and analyzes quality evaluation data from Genesys Cloud. All data is read-only and doesn't modify any evaluations in the system.
+        </div>
+      </div>
+    </div> <!-- end tab-guide -->
   </div>
 
   <script>
@@ -626,9 +773,37 @@
       document.getElementById('loadBtn').disabled=!(hasMonth && (hasUsers || hasTeams || hasForms));
     }
 
+    // ===== Tab Switching Function =====
+    function setupTabSwitching() {
+      document.addEventListener("click", function(e) {
+        if (!e.target.classList.contains("tab-button")) return;
+
+        // Handle main app tabs
+        if (e.target.id && e.target.id.includes('TabButton')) {
+          const tabName = e.target.id.replace('TabButton', '').toLowerCase();
+          setTab(tabName);
+          return;
+        }
+
+        // Handle main content tabs (How to Use vs Quality Reporting)
+        document.querySelectorAll(".tab-button").forEach(btn =>
+          btn.classList.remove("active")
+        );
+        e.target.classList.add("active");
+
+        const target = e.target.dataset.tab;
+
+        document.querySelectorAll(".tab-content").forEach(tab =>
+          tab.classList.remove("active")
+        );
+        document.getElementById(target).classList.add("active");
+      });
+    }
+
     // ===== Boot (handles errors + expiry, avoids redirect loops) =====
     document.addEventListener('DOMContentLoaded', function () {
       resolveColors();
+      setupTabSwitching();
       console.log('DOM loaded, starting OAuth flow...');
 
       const rawHash = (window.location.hash || '').replace(/^#/, '');
@@ -714,6 +889,7 @@
       dropdowns.analyticsTeams=createCheckboxDropdown('analyticsTeamDropdown',{placeholder:'Filter teams (optional)',searchPlaceholder:'Search teams...'});
       dropdowns.trendTeams=createCheckboxDropdown('trendTeamDropdown',{placeholder:'Filter teams (optional)',searchPlaceholder:'Search teams...'});
 
+      // Update tab button event listeners to use new tab-button class
       document.getElementById('overviewTabButton').onclick=()=>setTab('overview');
       document.getElementById('analyticsTabButton').onclick=()=>{
         setTab('analytics');
@@ -2501,7 +2677,7 @@
         let hasCritical = false;
         let hasFatal = false;
         const qGroups = safeGet(e, 'answers.questionGroupScores') || [];
-        for (const g of qGroups) {
+        for (const g of qgs) {
           for (const q of (g.questionScores || [])) {
             const qIds = [q.questionId, q.questionContextId, safeGet(q, 'question.id'), safeGet(q, 'question.contextId')].filter(Boolean);
             const questionObj = qIds.map(id => lookup.questionObj.get(id)).find(Boolean);

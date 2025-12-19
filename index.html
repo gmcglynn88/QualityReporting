@@ -40,15 +40,16 @@
     .frozen-table tr:hover td { background-color: rgba(99,171,143,.05); }
     .frozen-table tr:hover td:first-child { background: rgba(99,171,143,.1); }
 
-    /* Tab styling - Updated to match your reference app */
-    .tab-container {
+    /* Tab styling - Updated to match your reference app but keep original structure */
+    .main-tab-container {
       display: flex;
       gap: 12px;
       margin-top: 20px;
       flex-wrap: wrap;
+      margin-bottom: 20px;
     }
 
-    .tab-button {
+    .main-tab-button {
       padding: 10px 16px;
       background: #ffffff;
       border: 2px solid var(--primary-color);
@@ -59,22 +60,28 @@
       transition: background .2s, color .2s;
     }
 
-    .tab-button:hover {
+    .main-tab-button:hover {
       background: var(--pill);
     }
 
-    .tab-button.active {
+    .main-tab-button.active {
       background: var(--primary-color);
       color: #ffffff;
     }
 
-    .tab-content {
+    .main-tab-content {
       display: none;
     }
 
-    .tab-content.active {
+    .main-tab-content.active {
       display: block;
     }
+
+    /* Original tab styling for the nested tabs (unchanged) */
+    .tab{display:inline-block;padding:12px 20px;margin-right:10px;background:#eee;cursor:pointer;border-radius:6px;font-weight:500}
+    .tab.active{background:var(--primary-color);color:white}
+    .tab-content{display:none}
+    .tab-content.active{display:block}
 
     .badge{display:inline-block;padding:2px 8px;border-radius:12px;font-size:12px;border:1px solid var(--border-color);background:#fff}
     .badge-critical{color:#b4231a;border-color:#fecaca;background:#fee2e2}
@@ -217,14 +224,14 @@
   <div id="appContent" style="display:none;">
     <div id="messageContainer"></div>
 
-    <!-- Tab Navigation -->
-    <div class="tab-container">
-      <button class="tab-button active" data-tab="tab-main">Quality Reporting</button>
-      <button class="tab-button" data-tab="tab-guide">How to Use</button>
+    <!-- Main Tab Navigation - Quality Reporting vs How to Use -->
+    <div class="main-tab-container">
+      <button class="main-tab-button active" data-tab="tab-quality">Quality Reporting</button>
+      <button class="main-tab-button" data-tab="tab-guide">How to Use</button>
     </div>
 
-    <!-- Main Content Tab -->
-    <div id="tab-main" class="tab-content active">
+    <!-- Quality Reporting Tab (Original App) -->
+    <div id="tab-quality" class="main-tab-content active">
       <div class="card">
         <h2 class="section-title">Configuration</h2>
         <div class="controls">
@@ -256,12 +263,13 @@
 
       <div class="card">
         <div style="margin-bottom:10px;">
+          <!-- ORIGINAL TABS - UNCHANGED -->
           <div id="tabs">
-            <div id="overviewTabButton" class="tab-button active">Overview</div>
-            <div id="analyticsTabButton" class="tab-button">Analytics</div>
-            <div id="trendsTabButton" class="tab-button">Trends</div>
-            <div id="detailsTabButton" class="tab-button">Evaluation Details</div>
-            <div id="criticalTabButton" class="tab-button">Critical / Fatal Summary</div>
+            <div id="overviewTabButton" class="tab active">Overview</div>
+            <div id="analyticsTabButton" class="tab">Analytics</div>
+            <div id="trendsTabButton" class="tab">Trends</div>
+            <div id="detailsTabButton" class="tab">Evaluation Details</div>
+            <div id="criticalTabButton" class="tab">Critical / Fatal Summary</div>
           </div>
         </div>
 
@@ -497,10 +505,10 @@
           </div>
         </div>
       </div>
-    </div> <!-- end tab-main -->
+    </div> <!-- end tab-quality -->
 
     <!-- How to Use Tab -->
-    <div id="tab-guide" class="tab-content">
+    <div id="tab-guide" class="main-tab-content">
       <div class="card">
         <h2 class="section-title">How to Use the Quality Reporting Tool</h2>
         
@@ -773,27 +781,20 @@
       document.getElementById('loadBtn').disabled=!(hasMonth && (hasUsers || hasTeams || hasForms));
     }
 
-    // ===== Tab Switching Function =====
-    function setupTabSwitching() {
+    // ===== Main Tab Switching Function =====
+    function setupMainTabSwitching() {
       document.addEventListener("click", function(e) {
-        if (!e.target.classList.contains("tab-button")) return;
+        if (!e.target.classList.contains("main-tab-button")) return;
 
-        // Handle main app tabs
-        if (e.target.id && e.target.id.includes('TabButton')) {
-          const tabName = e.target.id.replace('TabButton', '').toLowerCase();
-          setTab(tabName);
-          return;
-        }
-
-        // Handle main content tabs (How to Use vs Quality Reporting)
-        document.querySelectorAll(".tab-button").forEach(btn =>
+        // Handle main tabs (Quality Reporting vs How to Use)
+        document.querySelectorAll(".main-tab-button").forEach(btn =>
           btn.classList.remove("active")
         );
         e.target.classList.add("active");
 
         const target = e.target.dataset.tab;
 
-        document.querySelectorAll(".tab-content").forEach(tab =>
+        document.querySelectorAll(".main-tab-content").forEach(tab =>
           tab.classList.remove("active")
         );
         document.getElementById(target).classList.add("active");
@@ -803,7 +804,7 @@
     // ===== Boot (handles errors + expiry, avoids redirect loops) =====
     document.addEventListener('DOMContentLoaded', function () {
       resolveColors();
-      setupTabSwitching();
+      setupMainTabSwitching();
       console.log('DOM loaded, starting OAuth flow...');
 
       const rawHash = (window.location.hash || '').replace(/^#/, '');
@@ -889,7 +890,7 @@
       dropdowns.analyticsTeams=createCheckboxDropdown('analyticsTeamDropdown',{placeholder:'Filter teams (optional)',searchPlaceholder:'Search teams...'});
       dropdowns.trendTeams=createCheckboxDropdown('trendTeamDropdown',{placeholder:'Filter teams (optional)',searchPlaceholder:'Search teams...'});
 
-      // Update tab button event listeners to use new tab-button class
+      // ORIGINAL tab event listeners - UNCHANGED
       document.getElementById('overviewTabButton').onclick=()=>setTab('overview');
       document.getElementById('analyticsTabButton').onclick=()=>{
         setTab('analytics');
@@ -2677,7 +2678,7 @@
         let hasCritical = false;
         let hasFatal = false;
         const qGroups = safeGet(e, 'answers.questionGroupScores') || [];
-        for (const g of qgs) {
+        for (const g of qGroups) {
           for (const q of (g.questionScores || [])) {
             const qIds = [q.questionId, q.questionContextId, safeGet(q, 'question.id'), safeGet(q, 'question.contextId')].filter(Boolean);
             const questionObj = qIds.map(id => lookup.questionObj.get(id)).find(Boolean);

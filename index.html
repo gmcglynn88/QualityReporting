@@ -1241,6 +1241,12 @@
         // CRITICAL FIX: Load ALL form details for ALL forms found in analytics evaluations
         await loadAllFormDetailsFromEvaluations(data);
         
+        // NEW: Copy the date range to trends tab
+        document.getElementById('trendFrom').value = from;
+        document.getElementById('trendTo').value = to;
+        document.getElementById('trendPassTarget').value = document.getElementById('passTarget').value;
+        document.getElementById('trendAmberBand').value = document.getElementById('amberBand').value;
+        
         msg(`Analytics range loaded: ${data.length} evaluations.`, 'success');
         renderAnalytics();
       }catch(e){ console.error(e); msg('Failed to load analytics range: '+e.message,'error'); }
@@ -1788,8 +1794,15 @@
     // ===== UPDATED ANALYTICS RENDERER WITH PROPER CHART.JS VISUALS =====
     async function renderAnalytics(){
       const raw = getAnalyticsSet();
+      
+      // Get chart canvas elements
+      const mediaTypeCanvas = document.getElementById('mediaTypeChart');
+      const agentTrendCanvas = document.getElementById('agentTrendChart');
+      const scoreDistCanvas = document.getElementById('scoreDistributionChart');
+      
+      // Check if charts should be rendered
       if(!raw || !raw.length){
-        document.getElementById('analyticsKPIs').innerHTML='';
+        document.getElementById('analyticsKPIs').innerHTML='<div class="muted" style="padding:20px;text-align:center">No analytics data loaded. Use "Load Range" button to load data.</div>';
         document.getElementById('mediaTable').innerHTML='<tr><td class="muted">No data loaded yet.</td></tr>';
         document.getElementById('repeatFailsTable').innerHTML='';
         document.getElementById('agentInsights').innerHTML='';
@@ -1797,14 +1810,38 @@
         document.getElementById('topAgentsTable').innerHTML='';
         document.getElementById('bottomAgentsTable').innerHTML='';
         
-        // Clear charts
+        // Clear any existing charts properly
         ['mediaTypeChart', 'agentTrendChart', 'scoreDistributionChart'].forEach(id => {
           const canvas = document.getElementById(id);
           if (canvas) {
             const ctx = canvas.getContext('2d');
             ctx.clearRect(0, 0, canvas.width, canvas.height);
+            
+            // Destroy existing Chart.js instances
+            if (id === 'mediaTypeChart' && window.mediaTypeChartInstance) {
+              window.mediaTypeChartInstance.destroy();
+              window.mediaTypeChartInstance = null;
+            }
+            if (id === 'agentTrendChart' && window.agentTrendChartInstance) {
+              window.agentTrendChartInstance.destroy();
+              window.agentTrendChartInstance = null;
+            }
+            if (id === 'scoreDistributionChart' && window.scoreDistributionChartInstance) {
+              window.scoreDistributionChartInstance.destroy();
+              window.scoreDistributionChartInstance = null;
+            }
+            
+            // Create a placeholder message
             const container = canvas.parentElement;
-            container.innerHTML = '<div class="muted" style="text-align:center;padding:40px">No data available</div>';
+            if (container) {
+              container.innerHTML = `
+                <div class="muted" style="text-align:center;padding:40px;background:#f8f9fa;border-radius:6px;">
+                  <div style="font-size:14px;margin-bottom:8px;">📊</div>
+                  <div style="font-size:12px;">No data available</div>
+                  <div style="font-size:11px;margin-top:4px;">Load analytics data first</div>
+                </div>
+              `;
+            }
           }
         });
         
@@ -1905,229 +1942,260 @@
       });
 
       // 1. Media Type Chart (Stacked Bar)
-      const mediaTypeCtx = document.getElementById('mediaTypeChart').getContext('2d');
-      if (window.mediaTypeChartInstance) {
-        window.mediaTypeChartInstance.destroy();
-      }
-      
-      const mediaTypes = ['Voice', 'Email', 'Message', 'Social', 'Other'];
-      window.mediaTypeChartInstance = new Chart(mediaTypeCtx, {
-        type: 'bar',
-        data: {
-          labels: mediaTypes,
-          datasets: [
-            {
-              label: 'Pass',
-              data: mediaTypes.map(mt => mediaTypeData[mt].pass),
-              backgroundColor: COLORS.OK,
-              borderColor: COLORS.OK,
-              borderWidth: 1
-            },
-            {
-              label: 'Amber',
-              data: mediaTypes.map(mt => mediaTypeData[mt].amber),
-              backgroundColor: COLORS.WARN,
-              borderColor: COLORS.WARN,
-              borderWidth: 1
-            },
-            {
-              label: 'Fail',
-              data: mediaTypes.map(mt => mediaTypeData[mt].fail),
-              backgroundColor: COLORS.BAD,
-              borderColor: COLORS.BAD,
-              borderWidth: 1
-            }
-          ]
-        },
-        options: {
-          responsive: true,
-          maintainAspectRatio: false,
-          scales: {
-            x: {
-              stacked: true,
-              title: {
-                display: true,
-                text: 'Media Type'
+      try {
+        const mediaTypeCtx = document.getElementById('mediaTypeChart').getContext('2d');
+        if (window.mediaTypeChartInstance) {
+          window.mediaTypeChartInstance.destroy();
+        }
+        
+        // Make sure container has canvas again
+        const mediaChartContainer = document.querySelector('.analytics-chart-container');
+        if (mediaChartContainer && !mediaChartContainer.querySelector('canvas')) {
+          mediaChartContainer.innerHTML = '<canvas id="mediaTypeChart"></canvas>';
+        }
+        
+        const mediaTypes = ['Voice', 'Email', 'Message', 'Social', 'Other'];
+        window.mediaTypeChartInstance = new Chart(mediaTypeCtx, {
+          type: 'bar',
+          data: {
+            labels: mediaTypes,
+            datasets: [
+              {
+                label: 'Pass',
+                data: mediaTypes.map(mt => mediaTypeData[mt].pass),
+                backgroundColor: COLORS.OK,
+                borderColor: COLORS.OK,
+                borderWidth: 1
+              },
+              {
+                label: 'Amber',
+                data: mediaTypes.map(mt => mediaTypeData[mt].amber),
+                backgroundColor: COLORS.WARN,
+                borderColor: COLORS.WARN,
+                borderWidth: 1
+              },
+              {
+                label: 'Fail',
+                data: mediaTypes.map(mt => mediaTypeData[mt].fail),
+                backgroundColor: COLORS.BAD,
+                borderColor: COLORS.BAD,
+                borderWidth: 1
               }
-            },
-            y: {
-              stacked: true,
-              beginAtZero: true,
-              title: {
-                display: true,
-                text: 'Number of Evaluations'
-              }
-            }
+            ]
           },
-          plugins: {
-            tooltip: {
-              mode: 'index',
-              intersect: false
+          options: {
+            responsive: true,
+            maintainAspectRatio: false,
+            scales: {
+              x: {
+                stacked: true,
+                title: {
+                  display: true,
+                  text: 'Media Type'
+                }
+              },
+              y: {
+                stacked: true,
+                beginAtZero: true,
+                title: {
+                  display: true,
+                  text: 'Number of Evaluations'
+                }
+              }
             },
-            legend: {
-              position: 'top'
+            plugins: {
+              tooltip: {
+                mode: 'index',
+                intersect: false
+              },
+              legend: {
+                position: 'top'
+              }
             }
           }
+        });
+      } catch (chartError) {
+        console.error('Error creating mediaTypeChart:', chartError);
+        // Show error message
+        const container = document.querySelector('.analytics-chart-container');
+        if (container) {
+          container.innerHTML = `<div class="error-message" style="margin:20px">Chart error: ${chartError.message}</div>`;
         }
-      });
+      }
 
       // 2. Agent Trend Chart (Line chart for top 5 agents)
-      const agentTrendCtx = document.getElementById('agentTrendChart').getContext('2d');
-      if (window.agentTrendChartInstance) {
-        window.agentTrendChartInstance.destroy();
-      }
-      
-      // Get top 5 agents by number of evaluations
-      const topAgents = Array.from(agentTrendData.entries())
-        .sort((a, b) => b[1].scores.length - a[1].scores.length)
-        .slice(0, 5);
-      
-      // Prepare data for line chart
-      const allDates = Array.from(new Set(topAgents.flatMap(([name, data]) => 
-        data.dates.map(d => d.toISOString().split('T')[0])
-      ))).sort();
-      
-      const datasets = topAgents.map(([name, data], idx) => {
-        // Create map of date to average score for that day
-        const dateScoreMap = new Map();
-        data.dates.forEach((date, i) => {
-          const dateStr = date.toISOString().split('T')[0];
-          const score = data.scores[i];
-          if (!dateScoreMap.has(dateStr)) {
-            dateScoreMap.set(dateStr, []);
-          }
-          dateScoreMap.get(dateStr).push(score);
-        });
-        
-        // Calculate average for each date
-        const scoresByDate = allDates.map(date => {
-          const scores = dateScoreMap.get(date);
-          return scores && scores.length > 0 
-            ? scores.reduce((sum, s) => sum + s, 0) / scores.length 
-            : null;
-        });
-        
-        // Generate distinct color
-        const hue = (idx * 360 / topAgents.length) % 360;
-        const color = `hsl(${hue}, 70%, 50%)`;
-        
-        return {
-          label: name,
-          data: scoresByDate,
-          borderColor: color,
-          backgroundColor: color + '20',
-          borderWidth: 2,
-          fill: false,
-          tension: 0.4
-        };
-      });
-      
-      window.agentTrendChartInstance = new Chart(agentTrendCtx, {
-        type: 'line',
-        data: {
-          labels: allDates.map(d => new Date(d).toLocaleDateString('en-GB', { day: 'numeric', month: 'short' })),
-          datasets: datasets
-        },
-        options: {
-          responsive: true,
-          maintainAspectRatio: false,
-          scales: {
-            x: {
-              title: {
-                display: true,
-                text: 'Date'
-              }
-            },
-            y: {
-              beginAtZero: false,
-              min: 0,
-              max: 100,
-              title: {
-                display: true,
-                text: 'Score (%)'
-              },
-              ticks: {
-                callback: function(value) {
-                  return value + '%';
-                }
-              }
-            }
-          },
-          plugins: {
-            tooltip: {
-              callbacks: {
-                label: function(context) {
-                  return `${context.dataset.label}: ${context.parsed.y ? pct(context.parsed.y, 1) : 'N/A'}`;
-                }
-              }
-            },
-            legend: {
-              position: 'top'
-            }
-          }
+      try {
+        const agentTrendCtx = document.getElementById('agentTrendChart').getContext('2d');
+        if (window.agentTrendChartInstance) {
+          window.agentTrendChartInstance.destroy();
         }
-      });
+        
+        // Get top 5 agents by number of evaluations
+        const topAgents = Array.from(agentTrendData.entries())
+          .sort((a, b) => b[1].scores.length - a[1].scores.length)
+          .slice(0, 5);
+        
+        // Prepare data for line chart
+        const allDates = Array.from(new Set(topAgents.flatMap(([name, data]) => 
+          data.dates.map(d => d.toISOString().split('T')[0])
+        ))).sort();
+        
+        const datasets = topAgents.map(([name, data], idx) => {
+          // Create map of date to average score for that day
+          const dateScoreMap = new Map();
+          data.dates.forEach((date, i) => {
+            const dateStr = date.toISOString().split('T')[0];
+            const score = data.scores[i];
+            if (!dateScoreMap.has(dateStr)) {
+              dateScoreMap.set(dateStr, []);
+            }
+            dateScoreMap.get(dateStr).push(score);
+          });
+          
+          // Calculate average for each date
+          const scoresByDate = allDates.map(date => {
+            const scores = dateScoreMap.get(date);
+            return scores && scores.length > 0 
+              ? scores.reduce((sum, s) => sum + s, 0) / scores.length 
+              : null;
+          });
+          
+          // Generate distinct color
+          const hue = (idx * 360 / topAgents.length) % 360;
+          const color = `hsl(${hue}, 70%, 50%)`;
+          
+          return {
+            label: name,
+            data: scoresByDate,
+            borderColor: color,
+            backgroundColor: color + '20',
+            borderWidth: 2,
+            fill: false,
+            tension: 0.4
+          };
+        });
+        
+        window.agentTrendChartInstance = new Chart(agentTrendCtx, {
+          type: 'line',
+          data: {
+            labels: allDates.map(d => new Date(d).toLocaleDateString('en-GB', { day: 'numeric', month: 'short' })),
+            datasets: datasets
+          },
+          options: {
+            responsive: true,
+            maintainAspectRatio: false,
+            scales: {
+              x: {
+                title: {
+                  display: true,
+                  text: 'Date'
+                }
+              },
+              y: {
+                beginAtZero: false,
+                min: 0,
+                max: 100,
+                title: {
+                  display: true,
+                  text: 'Score (%)'
+                },
+                ticks: {
+                  callback: function(value) {
+                    return value + '%';
+                  }
+                }
+              }
+            },
+            plugins: {
+              tooltip: {
+                callbacks: {
+                  label: function(context) {
+                    return `${context.dataset.label}: ${context.parsed.y ? pct(context.parsed.y, 1) : 'N/A'}`;
+                  }
+                }
+              },
+              legend: {
+                position: 'top'
+              }
+            }
+          }
+        });
+      } catch (chartError) {
+        console.error('Error creating agentTrendChart:', chartError);
+        const container = document.querySelectorAll('.card')[9]; // Find the right container
+        if (container && container.querySelector('.card > div')) {
+          container.querySelector('.card > div').innerHTML = `<div class="error-message" style="margin:20px">Chart error: ${chartError.message}</div>`;
+        }
+      }
 
       // 3. Score Distribution Chart (Histogram)
-      const scoreDistCtx = document.getElementById('scoreDistributionChart').getContext('2d');
-      if (window.scoreDistributionChartInstance) {
-        window.scoreDistributionChartInstance.destroy();
-      }
-      
-      const scoreLabels = ['0-10%', '11-20%', '21-30%', '31-40%', '41-50%', '51-60%', '61-70%', '71-80%', '81-90%', '91-100%'];
-      
-      // Color bars based on score ranges
-      const backgroundColors = scoreLabels.map((label, idx) => {
-        const minScore = idx * 10;
-        if (minScore >= pass) return COLORS.OK;
-        if (minScore >= pass - band) return COLORS.WARN;
-        return COLORS.BAD;
-      });
-      
-      window.scoreDistributionChartInstance = new Chart(scoreDistCtx, {
-        type: 'bar',
-        data: {
-          labels: scoreLabels,
-          datasets: [{
-            label: 'Number of Evaluations',
-            data: scoreDistribution,
-            backgroundColor: backgroundColors,
-            borderColor: backgroundColors.map(c => c.replace('0.8', '1')),
-            borderWidth: 1
-          }]
-        },
-        options: {
-          responsive: true,
-          maintainAspectRatio: false,
-          scales: {
-            x: {
-              title: {
-                display: true,
-                text: 'Score Range'
-              }
-            },
-            y: {
-              beginAtZero: true,
-              title: {
-                display: true,
-                text: 'Number of Evaluations'
-              }
-            }
+      try {
+        const scoreDistCtx = document.getElementById('scoreDistributionChart').getContext('2d');
+        if (window.scoreDistributionChartInstance) {
+          window.scoreDistributionChartInstance.destroy();
+        }
+        
+        const scoreLabels = ['0-10%', '11-20%', '21-30%', '31-40%', '41-50%', '51-60%', '61-70%', '71-80%', '81-90%', '91-100%'];
+        
+        // Color bars based on score ranges
+        const backgroundColors = scoreLabels.map((label, idx) => {
+          const minScore = idx * 10;
+          if (minScore >= pass) return COLORS.OK;
+          if (minScore >= pass - band) return COLORS.WARN;
+          return COLORS.BAD;
+        });
+        
+        window.scoreDistributionChartInstance = new Chart(scoreDistCtx, {
+          type: 'bar',
+          data: {
+            labels: scoreLabels,
+            datasets: [{
+              label: 'Number of Evaluations',
+              data: scoreDistribution,
+              backgroundColor: backgroundColors,
+              borderColor: backgroundColors.map(c => c.replace('0.8', '1')),
+              borderWidth: 1
+            }]
           },
-          plugins: {
-            legend: {
-              display: false
+          options: {
+            responsive: true,
+            maintainAspectRatio: false,
+            scales: {
+              x: {
+                title: {
+                  display: true,
+                  text: 'Score Range'
+                }
+              },
+              y: {
+                beginAtZero: true,
+                title: {
+                  display: true,
+                  text: 'Number of Evaluations'
+                }
+              }
             },
-            tooltip: {
-              callbacks: {
-                label: function(context) {
-                  return `${context.parsed.y} evaluation${context.parsed.y !== 1 ? 's' : ''}`;
+            plugins: {
+              legend: {
+                display: false
+              },
+              tooltip: {
+                callbacks: {
+                  label: function(context) {
+                    return `${context.parsed.y} evaluation${context.parsed.y !== 1 ? 's' : ''}`;
+                  }
                 }
               }
             }
           }
+        });
+      } catch (chartError) {
+        console.error('Error creating scoreDistributionChart:', chartError);
+        const container = document.querySelectorAll('.card')[10]; // Find the right container
+        if (container && container.querySelector('.card > div')) {
+          container.querySelector('.card > div').innerHTML = `<div class="error-message" style="margin:20px">Chart error: ${chartError.message}</div>`;
         }
-      });
+      }
 
       // Build media table (agent × media) - KEEPING EXISTING TABLE
       const mediaTypesTable=['Voice','Email','Message','Social','Other'];
@@ -2678,7 +2746,7 @@
         let hasCritical = false;
         let hasFatal = false;
         const qGroups = safeGet(e, 'answers.questionGroupScores') || [];
-        for (const g of qGroups) {
+        for (const g of qgs) {
           for (const q of (g.questionScores || [])) {
             const qIds = [q.questionId, q.questionContextId, safeGet(q, 'question.id'), safeGet(q, 'question.contextId')].filter(Boolean);
             const questionObj = qIds.map(id => lookup.questionObj.get(id)).find(Boolean);

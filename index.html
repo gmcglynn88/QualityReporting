@@ -975,27 +975,13 @@
       // New event listeners for details filters
       document.getElementById('applyFiltersBtn').onclick=applyDetailsFilters;
 
-      // Set default dates: current month for main, previous month for analytics/trends
       const m=new Date();
-      const curMonth=`${m.getFullYear()}-${String(m.getMonth()+1).padStart(2,'0')}`;
-      
-      // Calculate previous month
-      let prevYear = m.getFullYear();
-      let prevMonth = m.getMonth(); // Month is 0-indexed
-      if (prevMonth === 0) {
-        prevYear--;
-        prevMonth = 11;
-      } else {
-        prevMonth--;
-      }
-      const prevMonthStr=`${prevYear}-${String(prevMonth+1).padStart(2,'0')}`;
-      
-      // Set defaults
-      document.getElementById('monthInput').value = curMonth;
-      document.getElementById('anaFrom').value = prevMonthStr;
-      document.getElementById('anaTo').value = curMonth;
-      document.getElementById('trendFrom').value = prevMonthStr;
-      document.getElementById('trendTo').value = curMonth;
+      const cur=`${m.getFullYear()}-${String(m.getMonth()+1).padStart(2,'0')}`;
+      document.getElementById('monthInput').value = cur;
+      document.getElementById('anaFrom').value = cur;
+      document.getElementById('anaTo').value = cur;
+      document.getElementById('trendFrom').value = cur;
+      document.getElementById('trendTo').value = cur;
 
       updateMonthRange();
       document.getElementById('monthInput').addEventListener('change',()=>{ updateMonthRange(); updateLoadButtonState(); });
@@ -3182,37 +3168,39 @@
       function add(map, formName, qText, agentName, date, type){
         const key=formName+'|'+qText;
         if(!map.has(key)) map.set(key,{formName,qText,count:0,agents:new Map()});
-        const o=map.get(key); o.count++; o.agents.set(agentName,(o.agents.get(agentName)||0)+1;
+        const o=map.get(key); 
+        o.count++; 
+        o.agents.set(agentName,(o.agents.get(agentName)||0)+1);
         
-  // Add to agent failures
-  if (!agentFailures.has(agentName)) {
-    agentFailures.set(agentName, { 
-      failures: new Map(), 
-      criticalCount: 0, 
-      fatalCount: 0 
-    });
-  }
-  const agentData = agentFailures.get(agentName);
-  const questionKey = `${formName}: ${qText}`;
-  
-  if (!agentData.failures.has(questionKey)) {
-    agentData.failures.set(questionKey, { 
-      dates: [], 
-      type: type,
-      count: 0
-    });
-  }
-  const failure = agentData.failures.get(questionKey);
-  failure.dates.push(date);
-  failure.count++;
-  
-  // Track counts separately
-  if (type === 'fatal') {
-    failure.type = 'fatal';
-    agentData.fatalCount++;
-  } else {
-    agentData.criticalCount++;
-  }
+        // Add to agent failures
+        if (!agentFailures.has(agentName)) {
+          agentFailures.set(agentName, { 
+            failures: new Map(), 
+            criticalCount: 0, 
+            fatalCount: 0 
+          });
+        }
+        const agentData = agentFailures.get(agentName);
+        const questionKey = `${formName}: ${qText}`;
+        
+        if (!agentData.failures.has(questionKey)) {
+          agentData.failures.set(questionKey, { 
+            dates: [], 
+            type: type,
+            count: 0
+          });
+        }
+        const failure = agentData.failures.get(questionKey);
+        failure.dates.push(date);
+        failure.count++;
+        
+        // Track counts separately
+        if (type === 'fatal') {
+          failure.type = 'fatal';
+          agentData.fatalCount++;
+        } else {
+          agentData.criticalCount++;
+        }
       }
 
       for (const e of state.evals){
@@ -3265,7 +3253,7 @@
           return bTotal - aTotal;
         });
       
- agentFailureArray.forEach(([agentName, agentData]) => {
+      agentFailureArray.forEach(([agentName, agentData]) => {
         const failuresMap = agentData.failures;
         const failures = Array.from(failuresMap.entries())
           .sort((a, b) => {

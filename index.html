@@ -3875,232 +3875,233 @@
     }
 
     // ===== DETAILS RENDERER =====
-// ===== DETAILS RENDERER =====
-async function applyDetailsFilters() {
-  state.detailsAgentFilter = document.getElementById('detailsAgentFilter').value;
-  state.detailsScoreFilter = document.getElementById('detailsScoreFilter').value;
-  renderDetails();
-}
+    async function applyDetailsFilters() {
+      state.detailsAgentFilter = document.getElementById('detailsAgentFilter').value;
+      state.detailsScoreFilter = document.getElementById('detailsScoreFilter').value;
+      renderDetails();
+    }
 
-async function renderDetails() {
-  const c = document.getElementById('detailsContainer');
-  if (!state.evals.length) { 
-    c.innerHTML = '<div class="muted">No evaluations loaded.</div>'; 
-    return; 
-  }
-  
-  c.innerHTML = '<div class="info-message">Loading evaluation details...</div>';
+    async function renderDetails() {
+      const c = document.getElementById('detailsContainer');
+      if (!state.evals.length) { 
+        c.innerHTML = '<div class="muted">No evaluations loaded.</div>'; 
+        return; 
+      }
+      
+      c.innerHTML = '<div class="info-message">Loading evaluation details...</div>';
 
-  // Create evaluation data with all needed information
-  const evaluationData = await Promise.all(state.evals.map(async (e) => {
-    const agent = resolveUserName(safeGet(e, 'agent.id') || e.agentUserId);
-    const lookup = await getCombinedLookupForEval(e);
-    const formName = lookup.formName;
-    const date = new Date(e.releaseDate || e.assignedDate || e.creationDate || e.evaluationDate || e.date || Date.now());
-    const when = toDateTime(date);
-    const contactInfo = extractContactInfo(e);
-    const score = getEvalPercent(e);
-    
-    // Check for critical/fatal marks
-    let hasCritical = false;
-    let hasFatal = false;
-    const qGroups = safeGet(e, 'answers.questionGroupScores') || [];
-    for (const g of qGroups) {
-      for (const q of (g.questionScores || [])) {
-        const qIds = [q.questionId, q.questionContextId, safeGet(q, 'question.id'), safeGet(q, 'question.contextId')].filter(Boolean);
-        const questionObj = qIds.map(id => lookup.questionObj.get(id)).find(Boolean);
-        const { isFatal, isCritical } = detectCriticalFatalQuestions(q, questionObj);
-        if (isFatal) hasFatal = true;
-        if (isCritical) hasCritical = true;
+      // Create evaluation data with all needed information
+      const evaluationData = await Promise.all(state.evals.map(async (e) => {
+        const agent = resolveUserName(safeGet(e, 'agent.id') || e.agentUserId);
+        const lookup = await getCombinedLookupForEval(e);
+        const formName = lookup.formName;
+        const date = new Date(e.releaseDate || e.assignedDate || e.creationDate || e.evaluationDate || e.date || Date.now());
+        const when = toDateTime(date);
+        const contactInfo = extractContactInfo(e);
+        const score = getEvalPercent(e);
+        
+        // Check for critical/fatal marks - FIXED: changed qgs to qGroups
+        let hasCritical = false;
+        let hasFatal = false;
+        const qGroups = safeGet(e, 'answers.questionGroupScores') || [];
+        for (const g of qGroups) { // FIXED: qgs changed to qGroups
+          for (const q of (g.questionScores || [])) {
+            const qIds = [q.questionId, q.questionContextId, safeGet(q, 'question.id'), safeGet(q, 'question.contextId')].filter(Boolean);
+            const questionObj = qIds.map(id => lookup.questionObj.get(id)).find(Boolean);
+            const { isFatal, isCritical } = detectCriticalFatalQuestions(q, questionObj);
+            if (isFatal) hasFatal = true;
+            if (isCritical) hasCritical = true;
+          }
+        }
+        
+        return {
+          agent,
+          formName,
+          date,
+          when,
+          contactInfo,
+          score,
+          hasCritical,
+          hasFatal,
+          evalObj: e,
+          lookup
+        };
+      }));
+
+      // Apply filters
+      let filteredData = evaluationData;
+      
+      // Agent filter
+      if (state.detailsAgentFilter !== 'all') {
+        filteredData = filteredData.filter(d => d.agent === state.detailsAgentFilter);
+      }
+      
+      // Score filter
+      if (state.detailsScoreFilter !== 'all') {
+        switch(state.detailsScoreFilter) {
+          case 'pass':
+            filteredData = filteredData.filter(d => d.score >= 85);
+            break;
+          case 'amber':
+            filteredData = filteredData.filter(d => d.score >= 80 && d.score < 85);
+            break;
+          case 'fail':
+            filteredData = filteredData.filter(d => d.score < 80);
+            break;
+          case 'critical':
+            filteredData = filteredData.filter(d => d.hasCritical);
+            break;
+          case 'fatal':
+            filteredData = filteredData.filter(d => d.hasFatal);
+            break;
+        }
+      }
+
+      // Sort the data based on current sort settings
+      filteredData.sort((a, b) => {
+        let aVal, bVal;
+        
+        switch(state.detailsSortField) {
+          case 'date':
+            aVal = a.date.getTime();
+            bVal = b.date.getTime();
+            break;
+          case 'agent':
+            aVal = a.agent.toLowerCase();
+            bVal = b.agent.toLowerCase();
+            break;
+          case 'form':
+            aVal = a.formName.toLowerCase();
+            bVal = b.formName.toLowerCase();
+            break;
+          case 'score':
+            aVal = a.score || 0;
+            bVal = b.score || 0;
+            break;
+          default:
+            aVal = a.date.getTime();
+            bVal = b.date.getTime();
+        }
+        
+        if (state.detailsSortDirection === 'desc') {
+          return bVal - aVal || (bVal < aVal ? 1 : -1);
+        } else {
+          return aVal - bVal || (aVal < bVal ? -1 : 1);
+        }
+      });
+
+      // Update agent filter dropdown
+      const uniqueAgents = [...new Set(evaluationData.map(d => d.agent))].sort();
+      const agentFilter = document.getElementById('detailsAgentFilter');
+      agentFilter.innerHTML = '<option value="all">All Agents</option>' + 
+        uniqueAgents.map(agent => `<option value="${agent}" ${state.detailsAgentFilter === agent ? 'selected' : ''}>${agent}</option>`).join('');
+
+      // Create sortable header
+      const sortArrow = (field) => {
+        if (state.detailsSortField === field) {
+          return state.detailsSortDirection === 'asc' ? ' ▲' : ' ▼';
+        }
+        return '';
+      };
+
+      const header = `
+        <table class="frozen-table details-table sortable">
+          <thead>
+            <tr>
+              <th class="sort-header" onclick="sortDetails('date')">Time${sortArrow('date')}</th>
+              <th class="sort-header" onclick="sortDetails('agent')">Agent${sortArrow('agent')}</th>
+              <th class="sort-header" onclick="sortDetails('form')">Form${sortArrow('form')}</th>
+              <th class="sort-header" onclick="sortDetails('score')">Score${sortArrow('score')}</th>
+              <th>Contact Info</th>
+              <th>Details</th>
+            </tr>
+          </thead>
+          <tbody>
+      `;
+
+      // Create rows
+      const rows = await Promise.all(filteredData.map(async (data, index) => {
+        const { agent, formName, when, contactInfo, score, evalObj, lookup, hasCritical, hasFatal } = data;
+        
+        let qRows = '';
+        const questionGroups = safeGet(evalObj, 'answers.questionGroupScores') || [];
+        
+        questionGroups.forEach(group => {
+          (group.questionScores || []).forEach(qScore => {
+            const questionText = resolveQuestionTextWithLookup(lookup, qScore);
+            const answerText = resolveAnswerTextWithLookup(lookup, qScore);
+            const ansScore = qScore.score ?? null;
+            const qIds = [qScore.questionId, qScore.questionContextId, safeGet(qScore, 'question.id'), safeGet(qScore, 'question.contextId')].filter(Boolean);
+            const questionObj = qIds.map(id => lookup.questionObj.get(id)).find(Boolean);
+            const { isFatal, isCritical } = detectCriticalFatalQuestions(qScore, questionObj);
+
+            let rowClass = '';
+            if (isFatal) rowClass = 'fatal-question';
+            else if (isCritical) rowClass = 'critical-warning';
+
+            let allComments = '';
+            if (qScore.comments) { allComments += `<div class="comment-bubble"><strong>Evaluator Comments:</strong> ${qScore.comments}</div>`; }
+            if (qScore.aiAnswer && qScore.aiAnswer.explanation) { allComments += `<div class="comment-bubble"><strong>AI Analysis:</strong> ${qScore.aiAnswer.explanation}</div>`; }
+
+            qRows += `<tr class="${rowClass}">
+              <td>${questionText}</td>
+              <td>${answerText}</td>
+              <td>${ansScore === null ? '-' : fmt(ansScore, 1)}</td>
+              <td>${isFatal ? '<span class="badge badge-fatal">Fatal</span>' : isCritical ? '<span class="badge badge-critical">Critical</span>' : '<span class="badge badge-ok">OK</span>'}</td>
+              <td>${allComments}</td>
+            </tr>`;
+          });
+        });
+
+        const questionsTable = qRows 
+          ? `<div class="table-container">
+               <table class="question-details-table">
+                 <thead><tr><th>Question</th><th>Answer</th><th>Score</th><th>Flags</th><th>Comments</th></tr></thead>
+                 <tbody>${qRows}</tbody>
+               </table>
+             </div>`
+          : `<div class="muted">No question data available.</div>`;
+
+        // Add critical/fatal indicators to score
+        let scoreDisplay = score === null ? '-' : pct(score, 1);
+        if (hasFatal) {
+          scoreDisplay += ' <span class="badge badge-fatal">Fatal</span>';
+        } else if (hasCritical) {
+          scoreDisplay += ' <span class="badge badge-critical">Critical</span>';
+        }
+
+        return `
+          <tr class="expandable-row" onclick="toggleRow(${index})">
+            <td>${when}</td>
+            <td>${agent}</td>
+            <td>${formName}</td>
+            <td>${scoreDisplay}</td>
+            <td><div class="contact-info">${contactInfo}</div></td>
+            <td><span class="expand-icon">▶</span> Click to expand</td>
+          </tr>
+          <tr id="details-row-${index}" class="expandable-content">
+            <td colspan="6">
+              ${questionsTable}
+            </td>
+          </tr>
+        `;
+      }));
+
+      const footer = filteredData.length === 0 
+        ? '<tr><td colspan="6" class="muted">No evaluations match the selected filters.</td></tr>'
+        : `<tr><td colspan="6" class="muted">Showing ${filteredData.length} of ${evaluationData.length} evaluations</td></tr>`;
+
+      c.innerHTML = header + rows.join('') + footer + '</tbody></table>';
+      
+      // Initialize all rows as collapsed
+      for (let i = 0; i < filteredData.length; i++) {
+        const row = document.getElementById(`details-row-${i}`);
+        if (row) {
+          row.style.display = 'none';
+        }
       }
     }
-    
-    return {
-      agent,
-      formName,
-      date,
-      when,
-      contactInfo,
-      score,
-      hasCritical,
-      hasFatal,
-      evalObj: e,
-      lookup
-    };
-  }));
 
-  // Apply filters
-  let filteredData = evaluationData;
-  
-  // Agent filter
-  if (state.detailsAgentFilter !== 'all') {
-    filteredData = filteredData.filter(d => d.agent === state.detailsAgentFilter);
-  }
-  
-  // Score filter
-  if (state.detailsScoreFilter !== 'all') {
-    switch(state.detailsScoreFilter) {
-      case 'pass':
-        filteredData = filteredData.filter(d => d.score >= 85);
-        break;
-      case 'amber':
-        filteredData = filteredData.filter(d => d.score >= 80 && d.score < 85);
-        break;
-      case 'fail':
-        filteredData = filteredData.filter(d => d.score < 80);
-        break;
-      case 'critical':
-        filteredData = filteredData.filter(d => d.hasCritical);
-        break;
-      case 'fatal':
-        filteredData = filteredData.filter(d => d.hasFatal);
-        break;
-    }
-  }
-
-  // Sort the data based on current sort settings
-  filteredData.sort((a, b) => {
-    let aVal, bVal;
-    
-    switch(state.detailsSortField) {
-      case 'date':
-        aVal = a.date.getTime();
-        bVal = b.date.getTime();
-        break;
-      case 'agent':
-        aVal = a.agent.toLowerCase();
-        bVal = b.agent.toLowerCase();
-        break;
-      case 'form':
-        aVal = a.formName.toLowerCase();
-        bVal = b.formName.toLowerCase();
-        break;
-      case 'score':
-        aVal = a.score || 0;
-        bVal = b.score || 0;
-        break;
-      default:
-        aVal = a.date.getTime();
-        bVal = b.date.getTime();
-    }
-    
-    if (state.detailsSortDirection === 'desc') {
-      return bVal - aVal || (bVal < aVal ? 1 : -1);
-    } else {
-      return aVal - bVal || (aVal < bVal ? -1 : 1);
-    }
-  });
-
-  // Update agent filter dropdown
-  const uniqueAgents = [...new Set(evaluationData.map(d => d.agent))].sort();
-  const agentFilter = document.getElementById('detailsAgentFilter');
-  agentFilter.innerHTML = '<option value="all">All Agents</option>' + 
-    uniqueAgents.map(agent => `<option value="${agent}" ${state.detailsAgentFilter === agent ? 'selected' : ''}>${agent}</option>`).join('');
-
-  // Create sortable header
-  const sortArrow = (field) => {
-    if (state.detailsSortField === field) {
-      return state.detailsSortDirection === 'asc' ? ' ▲' : ' ▼';
-    }
-    return '';
-  };
-
-  const header = `
-    <table class="frozen-table details-table sortable">
-      <thead>
-        <tr>
-          <th class="sort-header" onclick="sortDetails('date')">Time${sortArrow('date')}</th>
-          <th class="sort-header" onclick="sortDetails('agent')">Agent${sortArrow('agent')}</th>
-          <th class="sort-header" onclick="sortDetails('form')">Form${sortArrow('form')}</th>
-          <th class="sort-header" onclick="sortDetails('score')">Score${sortArrow('score')}</th>
-          <th>Contact Info</th>
-          <th>Details</th>
-        </tr>
-      </thead>
-      <tbody>
-  `;
-
-  // Create rows
-  const rows = await Promise.all(filteredData.map(async (data, index) => {
-    const { agent, formName, when, contactInfo, score, evalObj, lookup, hasCritical, hasFatal } = data;
-    
-    let qRows = '';
-    const questionGroups = safeGet(evalObj, 'answers.questionGroupScores') || [];
-    
-    questionGroups.forEach(group => {
-      (group.questionScores || []).forEach(qScore => {
-        const questionText = resolveQuestionTextWithLookup(lookup, qScore);
-        const answerText = resolveAnswerTextWithLookup(lookup, qScore);
-        const ansScore = qScore.score ?? null;
-        const qIds = [qScore.questionId, qScore.questionContextId, safeGet(qScore, 'question.id'), safeGet(qScore, 'question.contextId')].filter(Boolean);
-        const questionObj = qIds.map(id => lookup.questionObj.get(id)).find(Boolean);
-        const { isFatal, isCritical } = detectCriticalFatalQuestions(qScore, questionObj);
-
-        let rowClass = '';
-        if (isFatal) rowClass = 'fatal-question';
-        else if (isCritical) rowClass = 'critical-warning';
-
-        let allComments = '';
-        if (qScore.comments) { allComments += `<div class="comment-bubble"><strong>Evaluator Comments:</strong> ${qScore.comments}</div>`; }
-        if (qScore.aiAnswer && qScore.aiAnswer.explanation) { allComments += `<div class="comment-bubble"><strong>AI Analysis:</strong> ${qScore.aiAnswer.explanation}</div>`; }
-
-        qRows += `<tr class="${rowClass}">
-          <td>${questionText}</td>
-          <td>${answerText}</td>
-          <td>${ansScore === null ? '-' : fmt(ansScore, 1)}</td>
-          <td>${isFatal ? '<span class="badge badge-fatal">Fatal</span>' : isCritical ? '<span class="badge badge-critical">Critical</span>' : '<span class="badge badge-ok">OK</span>'}</td>
-          <td>${allComments}</td>
-        </tr>`;
-      });
-    });
-
-    const questionsTable = qRows 
-      ? `<div class="table-container">
-           <table class="question-details-table">
-             <thead><tr><th>Question</th><th>Answer</th><th>Score</th><th>Flags</th><th>Comments</th></tr></thead>
-             <tbody>${qRows}</tbody>
-           </table>
-         </div>`
-      : `<div class="muted">No question data available.</div>`;
-
-    // Add critical/fatal indicators to score
-    let scoreDisplay = score === null ? '-' : pct(score, 1);
-    if (hasFatal) {
-      scoreDisplay += ' <span class="badge badge-fatal">Fatal</span>';
-    } else if (hasCritical) {
-      scoreDisplay += ' <span class="badge badge-critical">Critical</span>';
-    }
-
-    return `
-      <tr class="expandable-row" onclick="toggleRow(${index})">
-        <td>${when}</td>
-        <td>${agent}</td>
-        <td>${formName}</td>
-        <td>${scoreDisplay}</td>
-        <td><div class="contact-info">${contactInfo}</div></td>
-        <td><span class="expand-icon">▶</span> Click to expand</td>
-      </tr>
-      <tr id="details-row-${index}" class="expandable-content">
-        <td colspan="6">
-          ${questionsTable}
-        </td>
-      </tr>
-    `;
-  }));
-
-  const footer = filteredData.length === 0 
-    ? '<tr><td colspan="6" class="muted">No evaluations match the selected filters.</td></tr>'
-    : `<tr><td colspan="6" class="muted">Showing ${filteredData.length} of ${evaluationData.length} evaluations</td></tr>`;
-
-  c.innerHTML = header + rows.join('') + footer + '</tbody></table>';
-  
-  // Initialize all rows as collapsed
-  for (let i = 0; i < filteredData.length; i++) {
-    const row = document.getElementById(`details-row-${i}`);
-    if (row) {
-      row.style.display = 'none';
-    }
-  }
     // ===== CRITICAL RENDERER =====
     async function renderCritical(){
       const tbl=document.getElementById('criticalTable');

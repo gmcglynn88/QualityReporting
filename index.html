@@ -4,7 +4,6 @@
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
   <style>
-    /* ALL YOUR CSS STYLES REMAIN UNCHANGED */
     :root{ --primary-color:#63AB8F; --secondary-color:#4A8C7D; --border-color:#DEE2E6;
       --light-bg:#F8F9FA; --card-bg:#FFFFFF; --text-color:#2C3E50; --text-light:#6C757D; --pill:#e9f6f0;
       --ok:#22c55e; --warn:#f59e0b; --bad:#ef4444; }
@@ -31,7 +30,6 @@
     tr:hover{background-color:rgba(99,171,143,.05)}
     .table-container{overflow-x:auto;border:1px solid var(--border-color);border-radius:6px;padding:1px;margin-top:10px}
 
-    /* Frozen column styling for analytics table */
     .frozen-table-container { position: relative; overflow: auto; border: 1px solid var(--border-color); border-radius: 6px; margin-top: 10px; max-height: 600px; -webkit-overflow-scrolling: touch; }
     .frozen-table { border-collapse: separate; border-spacing: 0; width: max-content; min-width: 100%; }
     .frozen-table th, .frozen-table td { padding: 10px 12px; text-align: left; border-bottom: 1px solid var(--border-color); vertical-align: top; white-space: nowrap; background: var(--card-bg); position: relative; }
@@ -41,7 +39,7 @@
     .frozen-table tr:hover td { background-color: rgba(99,171,143,.05); }
     .frozen-table tr:hover td:first-child { background: rgba(99,171,143,.1); }
 
-    /* Tab styling - Updated to match your reference app but keep original structure */
+    /* Tab styling */
     .main-tab-container {
       display: flex;
       gap: 12px;
@@ -78,7 +76,6 @@
       display: block;
     }
 
-    /* Original tab styling for the nested tabs (unchanged) */
     .tab{display:inline-block;padding:12px 20px;margin-right:10px;background:#eee;cursor:pointer;border-radius:6px;font-weight:500}
     .tab.active{background:var(--primary-color);color:white}
     .tab-content{display:none}
@@ -166,9 +163,35 @@
 
     .stacked-bar-container { position: relative; height: 400px; margin: 20px 0; }
     
-    /* New styles for enhancements */
-    .time-period-selector { margin: 16px 0; }
-    .time-period-selector label { display: inline-block; margin-right: 10px; }
+    /* Simplified date range selector */
+    .date-range-simple {
+      display: flex;
+      gap: 10px;
+      align-items: center;
+      flex-wrap: wrap;
+    }
+    
+    .date-range-simple button {
+      padding: 8px 16px;
+      background: #fff;
+      border: 1px solid var(--border-color);
+      border-radius: 6px;
+      color: var(--text-color);
+      font-weight: 500;
+    }
+    
+    .date-range-simple button.active {
+      background: var(--primary-color);
+      color: white;
+      border-color: var(--primary-color);
+    }
+    
+    .date-range-simple input[type="date"] {
+      padding: 8px 12px;
+      border: 1px solid var(--border-color);
+      border-radius: 6px;
+    }
+    
     .agent-failure-table { margin-top: 20px; }
     .agent-failure-table th { background-color: var(--warn); }
     .agent-failure-table tr.fatal-agent th { background-color: var(--bad); }
@@ -180,7 +203,7 @@
     .sort-arrow { margin-left: 5px; }
     .contact-info { font-size: 12px; color: var(--text-light); margin-top: 2px; }
     
-    /* New styles for trends tab */
+    /* Trends tab */
     .trend-controls { display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 16px; margin-bottom: 20px; }
     .trend-chart-container { height: 500px; margin: 20px 0; }
     .trend-table-container { margin-top: 30px; }
@@ -192,12 +215,12 @@
     .trend-stat.warning .value { color: var(--warn); }
     .trend-stat.bad .value { color: var(--bad); }
     
-    /* Filter controls for details tab */
+    /* Filter controls */
     .details-filters { display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 16px; margin-bottom: 20px; }
     .details-filters .filter-group { display: flex; flex-direction: column; }
     .details-filters label { margin-bottom: 8px; }
     
-    /* Expandable rows styling */
+    /* Expandable rows */
     .expandable-row { cursor: pointer; }
     .expandable-content { display: none; padding: 20px; background: var(--light-bg); border-top: 1px solid var(--border-color); }
     .expandable-content.expanded { display: table-row; }
@@ -206,395 +229,16 @@
     .expand-icon { margin-right: 8px; transition: transform 0.3s; }
     .expanded .expand-icon { transform: rotate(90deg); }
     
-    /* Analytics specific styles */
+    /* Charts */
     .analytics-chart-container { height: 400px; margin: 20px 0; }
     
-    /* How to Use tab specific styles */
+    /* How to Use tab styles */
     .guide-step { margin: 20px 0; padding-left: 20px; border-left: 3px solid var(--primary-color); }
     .guide-step h3 { margin-top: 0; color: var(--secondary-color); }
     .guide-step p { margin: 8px 0; }
     .guide-note { background: var(--pill); border: 1px solid var(--border-color); border-radius: 8px; padding: 12px; margin: 12px 0; }
     
-    /* Month Comparison Styles */
-    .month-comparison { 
-      background: var(--light-bg);
-      border: 1px solid var(--border-color);
-      border-radius: 8px;
-      padding: 16px;
-      margin: 20px 0;
-    }
-    .month-comparison h3 { 
-      margin: 0 0 16px 0;
-      color: var(--secondary-color);
-      font-size: 18px;
-    }
-    .comparison-grid {
-      display: grid;
-      grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
-      gap: 12px;
-    }
-    .comparison-item {
-      background: white;
-      border: 1px solid var(--border-color);
-      border-radius: 6px;
-      padding: 12px;
-      text-align: center;
-    }
-    .comparison-item .label {
-      font-size: 12px;
-      color: var(--text-light);
-      margin-bottom: 4px;
-    }
-    .comparison-item .value {
-      font-size: 20px;
-      font-weight: bold;
-      margin: 4px 0;
-    }
-    .comparison-item .change {
-      font-size: 12px;
-      font-weight: 500;
-    }
-    .comparison-item .change.positive {
-      color: var(--ok);
-    }
-    .comparison-item .change.negative {
-      color: var(--bad);
-    }
-    .comparison-item .change.neutral {
-      color: var(--text-light);
-    }
-    .comparison-note {
-      font-size: 11px;
-      color: var(--text-light);
-      margin-top: 8px;
-      text-align: center;
-    }
-
-    /* NEW STYLES: Date Range Selector Styles (from the first code) */
-    .date-range-container {
-      width: 100%;
-    }
-    
-    .date-range-input {
-      width: 100%;
-      padding: 10px 12px;
-      background: white;
-      border: 1px solid var(--border-color);
-      border-radius: 6px;
-      font-size: 14px;
-      color: var(--text-color);
-      cursor: pointer;
-      display: flex;
-      justify-content: space-between;
-      align-items: center;
-      transition: all 0.2s ease;
-      min-height: 42px;
-      box-sizing: border-box;
-    }
-    
-    .date-range-input:hover {
-      border-color: var(--primary-color);
-      background-color: var(--pill);
-    }
-    
-    .calendar-icon {
-      color: var(--text-light);
-      font-size: 16px;
-      flex-shrink: 0;
-    }
-    
-    #date-range-value {
-      white-space: nowrap;
-      overflow: hidden;
-      text-overflow: ellipsis;
-      flex-grow: 1;
-      margin-right: 8px;
-    }
-    
-    .calendar-overlay {
-      position: fixed;
-      top: 0;
-      left: 0;
-      right: 0;
-      bottom: 0;
-      background: rgba(0, 0, 0, 0.5);
-      display: none;
-      justify-content: center;
-      align-items: center;
-      z-index: 1000;
-      padding: 20px;
-    }
-    
-    .calendar-overlay.active {
-      display: flex;
-    }
-    
-    .calendar-popup {
-      width: 100%;
-      max-width: 340px;
-      background: white;
-      border-radius: 12px;
-      box-shadow: 0 20px 40px rgba(0, 0, 0, 0.2);
-      overflow: hidden;
-      animation: fadeIn 0.2s ease;
-    }
-    
-    @keyframes fadeIn {
-      from { opacity: 0; transform: scale(0.95); }
-      to { opacity: 1; transform: scale(1); }
-    }
-    
-    .presets-sidebar {
-      padding: 20px;
-      background: var(--light-bg);
-      border-bottom: 1px solid var(--border-color);
-    }
-    
-    .presets-title {
-      font-size: 12px;
-      font-weight: 600;
-      color: var(--text-light);
-      margin-bottom: 15px;
-      text-transform: uppercase;
-      letter-spacing: 0.5px;
-    }
-    
-    .preset-grid {
-      display: grid;
-      grid-template-columns: repeat(2, 1fr);
-      gap: 10px;
-    }
-    
-    .preset-btn {
-      padding: 10px 12px;
-      background: white;
-      border: 1px solid var(--border-color);
-      border-radius: 8px;
-      font-size: 14px;
-      color: var(--text-color);
-      cursor: pointer;
-      transition: all 0.2s ease;
-      text-align: left;
-    }
-    
-    .preset-btn:hover {
-      background: var(--pill);
-      border-color: var(--primary-color);
-    }
-    
-    .preset-btn.active {
-      background: var(--primary-color);
-      color: white;
-      border-color: var(--primary-color);
-      font-weight: 600;
-    }
-    
-    .calendar-container {
-      padding: 20px;
-    }
-    
-    .calendar-header {
-      display: flex;
-      justify-content: space-between;
-      align-items: center;
-      margin-bottom: 20px;
-    }
-    
-    .current-month {
-      font-size: 16px;
-      font-weight: 600;
-      color: var(--text-color);
-    }
-    
-    .month-navigation {
-      display: flex;
-      gap: 8px;
-      align-items: center;
-    }
-    
-    .nav-btn {
-      width: 36px;
-      height: 36px;
-      border-radius: 8px;
-      border: 1px solid var(--border-color);
-      background: white;
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      cursor: pointer;
-      color: var(--text-color);
-      font-weight: 600;
-      transition: all 0.2s ease;
-    }
-    
-    .nav-btn:hover {
-      background: var(--pill);
-      border-color: var(--primary-color);
-    }
-    
-    .today-btn {
-      padding: 8px 12px;
-      background: var(--pill);
-      border: 1px solid var(--border-color);
-      border-radius: 8px;
-      font-weight: 600;
-      color: var(--text-color);
-      cursor: pointer;
-      transition: all 0.2s ease;
-      font-size: 14px;
-    }
-    
-    .today-btn:hover {
-      background: #e0f0ea;
-    }
-    
-    .weekdays-header {
-      display: grid;
-      grid-template-columns: repeat(7, 1fr);
-      margin-bottom: 12px;
-      text-align: center;
-    }
-    
-    .weekday {
-      font-weight: 600;
-      color: var(--text-light);
-      font-size: 12px;
-      padding: 6px 0;
-      text-transform: uppercase;
-    }
-    
-    .calendar-days {
-      display: grid;
-      grid-template-columns: repeat(7, 1fr);
-      gap: 6px;
-    }
-    
-    .calendar-day {
-      height: 36px;
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      border-radius: 8px;
-      font-size: 14px;
-      cursor: pointer;
-      transition: all 0.2s ease;
-      color: var(--text-color);
-      font-weight: 500;
-    }
-    
-    .calendar-day:hover {
-      background: var(--pill);
-    }
-    
-    .calendar-day.other-month {
-      color: #cbd5e1;
-    }
-    
-    .calendar-day.today {
-      border: 2px solid var(--primary-color);
-      color: var(--primary-color);
-    }
-    
-    .calendar-day.in-range {
-      background: #e0f0ea;
-      color: var(--secondary-color);
-    }
-    
-    .calendar-day.range-start {
-      background: linear-gradient(135deg, var(--primary-color), var(--secondary-color));
-      color: white;
-      font-weight: 600;
-      border-top-right-radius: 0;
-      border-bottom-right-radius: 0;
-    }
-    
-    .calendar-day.range-end {
-      background: linear-gradient(135deg, var(--primary-color), var(--secondary-color));
-      color: white;
-      font-weight: 600;
-      border-top-left-radius: 0;
-      border-bottom-left-radius: 0;
-    }
-    
-    .range-summary {
-      padding: 16px 20px;
-      background: var(--light-bg);
-      border-top: 1px solid var(--border-color);
-      display: flex;
-      justify-content: space-between;
-      align-items: center;
-    }
-    
-    .range-info {
-      font-size: 14px;
-      color: var(--text-color);
-    }
-    
-    .range-dates {
-      color: var(--primary-color);
-      font-weight: 600;
-      margin-left: 8px;
-    }
-    
-    .calendar-actions {
-      display: flex;
-      gap: 10px;
-    }
-    
-    .btn-secondary {
-      padding: 10px 16px;
-      background: white;
-      border: 1px solid var(--border-color);
-      border-radius: 8px;
-      font-weight: 600;
-      color: var(--text-color);
-      cursor: pointer;
-      transition: all 0.2s ease;
-      font-size: 14px;
-    }
-    
-    .btn-secondary:hover {
-      background: var(--pill);
-    }
-    
-    .btn-primary {
-      padding: 10px 20px;
-      background: var(--primary-color);
-      color: white;
-      border: none;
-      border-radius: 8px;
-      font-weight: 600;
-      font-size: 14px;
-      cursor: pointer;
-      transition: all 0.2s ease;
-    }
-    
-    .btn-primary:hover {
-      background: var(--secondary-color);
-    }
-    
-    .btn-primary:disabled {
-      background: var(--text-light);
-      cursor: not-allowed;
-    }
-    
-    /* Chart placeholder styling */
-    .chart-placeholder {
-      position: absolute;
-      top: 0;
-      left: 0;
-      width: 100%;
-      height: 100%;
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      background: rgba(248, 249, 250, 0.9);
-      z-index: 5;
-      text-align: center;
-      padding: 20px;
-    }
-    
-    /* Progress bar for loading */
+    /* Progress bar */
     .progress-bar{width:100%;height:8px;background:var(--border-color);border-radius:4px;overflow:hidden;margin:10px 0}
     .progress-fill{height:100%;background:var(--primary-color);transition:width .3s}
     
@@ -611,13 +255,13 @@
   <div id="appContent" style="display:none;">
     <div id="messageContainer"></div>
 
-    <!-- Main Tab Navigation - Quality Reporting vs How to Use -->
+    <!-- Main Tab Navigation -->
     <div class="main-tab-container">
       <button class="main-tab-button active" data-tab="tab-quality">Quality Reporting</button>
       <button class="main-tab-button" data-tab="tab-guide">How to Use</button>
     </div>
 
-    <!-- Quality Reporting Tab (Original App) -->
+    <!-- Quality Reporting Tab -->
     <div id="tab-quality" class="main-tab-content active">
       <div class="card">
         <h2 class="section-title">Configuration</h2>
@@ -636,14 +280,18 @@
           </div>
           <div>
             <label>Date Range</label>
-            <div class="date-range-container">
-              <div class="date-range-input" id="date-range-input">
-                <span id="date-range-value">Select date range</span>
-                <span class="calendar-icon">📅</span>
+            <div class="date-range-simple">
+              <div style="display: flex; gap: 8px; margin-bottom: 8px;">
+                <button id="dayBtn" class="active">Day</button>
+                <button id="weekBtn">Week</button>
+                <button id="monthBtn">Month</button>
+                <button id="customBtn">Custom</button>
+              </div>
+              <div style="display: flex; gap: 8px; width: 100%;">
+                <input type="date" id="fromDate" style="flex: 1;">
+                <input type="date" id="toDate" style="flex: 1;">
               </div>
             </div>
-            <input type="hidden" id="fromDate">
-            <input type="hidden" id="toDate">
           </div>
           <div>
             <label>&nbsp;</label>
@@ -669,7 +317,6 @@
 
       <div class="card">
         <div style="margin-bottom:10px;">
-          <!-- ORIGINAL TABS - UNCHANGED -->
           <div id="tabs">
             <div id="overviewTabButton" class="tab active">Overview</div>
             <div id="analyticsTabButton" class="tab">Analytics</div>
@@ -680,7 +327,7 @@
         </div>
 
         <div id="overviewTab" class="tab-content active">
-          <h2 class="section-title">Monthly Overview</h2>
+          <h2 class="section-title">Overview</h2>
           <div id="overviewKPIs" class="kpis"></div>
           <div class="table-container">
             <table id="agentSummaryTable"></table>
@@ -689,30 +336,6 @@
 
         <div id="analyticsTab" class="tab-content">
           <h2 class="section-title">Analytics</h2>
-
-          <!-- Month Comparison Section - NEW -->
-          <div id="monthComparison" class="month-comparison" style="display:none;">
-            <h3>Month-to-Month Comparison</h3>
-            <div class="comparison-grid" id="comparisonGrid">
-              <!-- Will be populated by JavaScript -->
-            </div>
-            <div class="comparison-note">Comparing two most recent months with data</div>
-          </div>
-
-          <div class="controls" style="margin-top:8px">
-            <div>
-              <label for="anaFrom">From (Month)</label>
-              <input id="anaFrom" type="month">
-            </div>
-            <div>
-              <label for="anaTo">To (Month)</label>
-              <input id="anaTo" type="month">
-            </div>
-            <div>
-              <label for="analyticsTeamDropdown">Filter by Work Team</label>
-              <div id="analyticsTeamDropdown" class="checkbox-dropdown"></div>
-            </div>
-          </div>
 
           <div class="controls" style="margin-top:8px">
             <div>
@@ -724,17 +347,20 @@
               <input id="amberBand" type="number" min="0" max="20" value="5">
             </div>
             <div>
+              <label for="analyticsTeamDropdown">Filter by Work Team</label>
+              <div id="analyticsTeamDropdown" class="checkbox-dropdown"></div>
+            </div>
+            <div>
               <label>&nbsp;</label>
               <button id="loadAnalyticsBtn" class="full-width-btn">
                 <span class="loading-spinner" style="display:none"></span>
-                <span class="btn-text">Load Range</span>
+                <span class="btn-text">Update Analytics</span>
               </button>
             </div>
           </div>
 
           <div id="analyticsKPIs" class="kpis"></div>
 
-          <!-- Updated Analytics Visualizations -->
           <div class="card" style="padding:16px;margin-top:10px">
             <h3 class="section-title" style="margin:0 0 8px">Performance Distribution by Media Type</h3>
             <div class="analytics-chart-container">
@@ -762,7 +388,6 @@
             </div>
           </div>
 
-          <!-- Fixed frozen table container for media table -->
           <div class="frozen-table-container">
             <table id="mediaTable" class="frozen-table sortable"></table>
           </div>
@@ -786,7 +411,7 @@
             <div id="agentInsights" style="margin-top:8px"></div>
           </div>
 
-          <h3 class="section-title" style="margin-top:18px">Daily Trend by Agent (Selected Period)</h3>
+          <h3 class="section-title" style="margin-top:18px">Daily Trend by Agent</h3>
           <div id="trendTable" class="frozen-table-container"></div>
 
           <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(260px,1fr));gap:16px;margin-top:16px">
@@ -804,20 +429,17 @@
           
           <div class="controls" style="margin-top:8px">
             <div>
-              <label for="trendFrom">From (Month)</label>
-              <input id="trendFrom" type="month">
-            </div>
-            <div>
-              <label for="trendTo">To (Month)</label>
-              <input id="trendTo" type="month">
+              <label for="trendPeriodSelect">View By</label>
+              <select id="trendPeriodSelect" class="full-width-btn">
+                <option value="day">Daily</option>
+                <option value="week">Weekly</option>
+                <option value="month">Monthly</option>
+              </select>
             </div>
             <div>
               <label for="trendTeamDropdown">Filter by Work Team</label>
               <div id="trendTeamDropdown" class="checkbox-dropdown"></div>
             </div>
-          </div>
-
-          <div class="controls" style="margin-top:8px">
             <div>
               <label for="trendPassTarget">Pass target (%)</label>
               <input id="trendPassTarget" type="number" min="0" max="100" value="85">
@@ -825,13 +447,6 @@
             <div>
               <label for="trendAmberBand">Amber band (±%)</label>
               <input id="trendAmberBand" type="number" min="0" max="20" value="5">
-            </div>
-            <div>
-              <label for="trendPeriodSelect">Time Period View</label>
-              <select id="trendPeriodSelect" class="full-width-btn">
-                <option value="month">Month over Month</option>
-                <option value="week">Week over Week</option>
-              </select>
             </div>
             <div>
               <label>&nbsp;</label>
@@ -844,10 +459,9 @@
 
           <div id="trendsKPIs" class="kpis"></div>
 
-          <!-- Month over Month / Week over Week View -->
           <div id="trendsView" style="display:none;">
             <div class="card" style="padding:16px;margin-top:10px;">
-              <h3 class="section-title" style="margin:0 0 8px" id="trendsTitle">Month over Month Performance</h3>
+              <h3 class="section-title" style="margin:0 0 8px" id="trendsTitle">Performance Trends</h3>
               <div class="trend-chart-container">
                 <canvas id="trendsChart"></canvas>
               </div>
@@ -858,10 +472,8 @@
               </div>
             </div>
 
-            <!-- Trend Statistics -->
             <div class="trend-stats" id="trendStats"></div>
 
-            <!-- Trend Improvement Table -->
             <div class="trend-table-container">
               <h3 class="section-title">Agent Performance Trends</h3>
               <div class="frozen-table-container">
@@ -876,9 +488,8 @@
         </div>
 
         <div id="detailsTab" class="tab-content">
-          <h2 class="section-title">Evaluation Details (with Question Scores)</h2>
+          <h2 class="section-title">Evaluation Details</h2>
           
-          <!-- Filter Controls -->
           <div class="details-filters">
             <div class="filter-group">
               <label for="detailsAgentFilter">Filter by Agent</label>
@@ -903,7 +514,6 @@
             </div>
           </div>
           
-          <!-- Fixed frozen table container for details -->
           <div id="detailsContainer" class="frozen-table-container"></div>
         </div>
 
@@ -911,7 +521,6 @@
           <h2 class="section-title">Critical / Fail Question Counts</h2>
           <div id="criticalSummaryKPIs" class="critical-summary-kpis"></div>
           
-          <!-- New Agent Failure Table -->
           <div class="card" style="margin-top:20px;">
             <h3 class="section-title">Agent Mark Downs by Question</h3>
             <div id="agentFailuresContainer"></div>
@@ -922,7 +531,7 @@
           </div>
         </div>
       </div>
-    </div> <!-- end tab-quality -->
+    </div>
 
     <!-- How to Use Tab -->
     <div id="tab-guide" class="main-tab-content">
@@ -940,7 +549,14 @@
           <p><strong>Agents:</strong> Select individual agents you want to analyze. Use the search box to find specific agents.</p>
           <p><strong>Work Teams:</strong> Select entire teams to include all agents within those teams.</p>
           <p><strong>Evaluation Forms:</strong> Choose specific evaluation forms to filter results.</p>
-          <p><strong>Date Range Selection:</strong> Use the new date range picker to select custom date ranges or use preset ranges (Today, Yesterday, This Week, Last Week).</p>
+          <p><strong>Date Range Selection:</strong> Use the simple date range picker:
+            <ul>
+              <li><strong>Day:</strong> View data for today</li>
+              <li><strong>Week:</strong> View data for the current week</li>
+              <li><strong>Month:</strong> View data for the current month</li>
+              <li><strong>Custom:</strong> Select any date range using the date pickers</li>
+            </ul>
+          </p>
           <p><strong>Load Evaluations:</strong> Click this button after making your selections to load the data.</p>
           <div class="guide-note">
             <strong>Note:</strong> You must select at least one agent, team, or form before loading evaluations.
@@ -955,9 +571,9 @@
 
         <div class="guide-step">
           <h3>4. Analytics Tab</h3>
-          <p><strong>Date Range:</strong> Select a custom date range for deeper analysis.</p>
-          <p><strong>Team Filtering:</strong> Filter analytics by specific work teams.</p>
           <p><strong>Pass Target Settings:</strong> Adjust the pass threshold (default 85%) and amber band (±5%).</p>
+          <p><strong>Team Filtering:</strong> Filter analytics by specific work teams.</p>
+          <p><strong>Update Analytics:</strong> Click to refresh analytics with current settings.</p>
           <p><strong>Visualizations:</strong>
             <ul>
               <li><strong>Media Type Chart:</strong> Shows performance distribution across different media types</li>
@@ -974,7 +590,7 @@
 
         <div class="guide-step">
           <h3>5. Trends Tab</h3>
-          <p><strong>Time Period Analysis:</strong> Compare performance month-over-month or week-over-week.</p>
+          <p><strong>Time Period Analysis:</strong> Compare performance daily, weekly, or monthly.</p>
           <p><strong>Trend Chart:</strong> Visual representation of pass/amber/fail trends over time.</p>
           <p><strong>Trend Statistics:</strong> Key metrics showing improvement or decline over the selected period.</p>
           <p><strong>Agent Improvement Table:</strong> Shows which agents improved or declined over time.</p>
@@ -1023,57 +639,6 @@
           <strong>Please Note:</strong> This tool extracts and analyzes quality evaluation data from Genesys Cloud. All data is read-only and doesn't modify any evaluations in the system.
         </div>
       </div>
-    </div> <!-- end tab-guide -->
-  </div>
-
-  <!-- Calendar Overlay (from the first code) -->
-  <div class="calendar-overlay" id="calendar-overlay">
-    <div class="calendar-popup" id="calendar-popup">
-      <div class="presets-sidebar">
-        <div class="presets-title">Quick Presets</div>
-        <div class="preset-grid">
-          <button class="preset-btn" data-preset="today">Today</button>
-          <button class="preset-btn" data-preset="yesterday">Yesterday</button>
-          <button class="preset-btn" data-preset="thisWeek">This week</button>
-          <button class="preset-btn" data-preset="lastWeek">Last week</button>
-          <button class="preset-btn active" data-preset="custom">Custom Range</button>
-        </div>
-      </div>
-      
-      <div class="calendar-container">
-        <div class="calendar-header">
-          <div class="current-month" id="current-month">Loading...</div>
-          <div class="month-navigation">
-            <button class="nav-btn" id="prev-month">&lt;</button>
-            <button class="today-btn" id="today-btn">Today</button>
-            <button class="nav-btn" id="next-month">&gt;</button>
-          </div>
-        </div>
-        
-        <div class="weekdays-header">
-          <div class="weekday">Sun</div>
-          <div class="weekday">Mon</div>
-          <div class="weekday">Tue</div>
-          <div class="weekday">Wed</div>
-          <div class="weekday">Thu</div>
-          <div class="weekday">Fri</div>
-          <div class="weekday">Sat</div>
-        </div>
-        
-        <div class="calendar-days" id="calendar-days">
-          <!-- Calendar days will be generated by JavaScript -->
-        </div>
-      </div>
-      
-      <div class="range-summary">
-        <div class="range-info">
-          Selected: <span class="range-dates" id="selected-range">Select a date range</span>
-        </div>
-        <div class="calendar-actions">
-          <button class="btn-secondary" id="clear-btn">Clear</button>
-          <button class="btn-primary" id="apply-calendar-btn">Apply</button>
-        </div>
-      </div>
     </div>
   </div>
 
@@ -1107,8 +672,7 @@
     // ===== OAuth Configuration =====
     const clientId = 'fe305808-b368-4547-8af9-325d28d552bb';
     const config = { REGION: 'mypurecloud.ie' };
-    const redirectUri = 'https://gmcglynn88.github.io/QualityReporting/'; // must exactly match your OAuth app
-    // Hard-coded, pre-encoded OAuth URL
+    const redirectUri = 'https://gmcglynn88.github.io/QualityReporting/';
     const oauthUrl = 'https://login.mypurecloud.ie/oauth/authorize?client_id=fe305808-b368-4547-8af9-325d28d552bb&response_type=token&redirect_uri=https%3A%2F%2Fgmcglynn88.github.io%2FQualityReporting%2F&state=qa';
 
     const state = {
@@ -1134,20 +698,13 @@
       formLookupCache: new Map(),
       combinedLookupCache: new Map(),
       
-      // New state for sorting and filtering
       detailsSortField: 'date',
       detailsSortDirection: 'desc',
       detailsAgentFilter: 'all',
       detailsScoreFilter: 'all',
       filteredEvals: [],
       
-      // Date range state
-      dateRangeState: {
-        currentDate: new Date(),
-        startDate: null,
-        endDate: null,
-        isSelectingRange: false
-      }
+      dateRangeMode: 'day'
     };
 
     const dropdowns = { 
@@ -1158,7 +715,6 @@
       trendTeams: null 
     };
 
-    // Chart colours resolved from CSS vars (Chart.js can't read CSS vars directly)
     const cssVar = k => getComputedStyle(document.documentElement).getPropertyValue(k).trim();
     let COLORS = { OK: '#22c55e', WARN: '#f59e0b', BAD: '#ef4444', TEXT: '#2C3E50', BLUE: '#3b82f6', PRIMARY: '#63AB8F', SECONDARY: '#4A8C7D' };
     function resolveColors() {
@@ -1170,9 +726,8 @@
       COLORS.SECONDARY = cssVar('--secondary-color') || COLORS.SECONDARY;
     }
 
-    // Throttle + backoff
     let lastApiCall = 0;
-    const API_DELAY = 120;                  // ms spacing between calls
+    const API_DELAY = 120;
     const MAX_CONCURRENT_AGENT_BATCH = 3;
 
     function sleep(ms){ return new Promise(r=>setTimeout(r,ms)); }
@@ -1188,10 +743,9 @@
       const spinner=button.querySelector('.loading-spinner');
       const text=button.querySelector('.btn-text');
       if(isLoading){ spinner.style.display='inline-block'; text.textContent='Loading...'; button.disabled=true; }
-      else{ spinner.style.display='none'; text.textContent = button.id==='loadTrendsBtn'?'Load Trends':(button.id==='loadAnalyticsBtn'?'Load Range':'Load Evaluations'); button.disabled=false; }
+      else{ spinner.style.display='none'; text.textContent = button.id==='loadTrendsBtn'?'Load Trends':(button.id==='loadAnalyticsBtn'?'Update Analytics':'Load Evaluations'); button.disabled=false; }
     }
     
-    // ===== Progress Bar Functions =====
     function updateProgress(p,cur,total){ 
       const progressFill = document.getElementById('progressFill');
       const progressText = document.getElementById('progressText');
@@ -1212,353 +766,76 @@
       if (progressSection) progressSection.style.display='none'; 
     }
 
-    // ===== Date Range Selector Functions (from the first code) =====
-    function initializeDateRangeSelector() {
-      // Set default dates (last 7 days)
+    // ===== Simplified Date Range Functions =====
+    function initializeDateRange() {
       const today = new Date();
-      const weekAgo = new Date();
-      weekAgo.setDate(today.getDate() - 7);
+      const fromDate = document.getElementById('fromDate');
+      const toDate = document.getElementById('toDate');
       
-      state.dateRangeState.startDate = weekAgo;
-      state.dateRangeState.endDate = today;
+      fromDate.value = today.toISOString().split('T')[0];
+      toDate.value = today.toISOString().split('T')[0];
       
-      updateDateRangeDisplay();
-      updateHiddenDateInputs();
-      updateCalendar();
+      updateDateRange('day');
     }
     
-    function updateHiddenDateInputs() {
-      if (state.dateRangeState.startDate) {
-        document.getElementById('fromDate').value = state.dateRangeState.startDate.toISOString().split('T')[0];
-      }
-      if (state.dateRangeState.endDate) {
-        document.getElementById('toDate').value = state.dateRangeState.endDate.toISOString().split('T')[0];
-      }
-    }
-    
-    function updateDateRangeDisplay() {
-      const valueElement = document.getElementById('date-range-value');
-      if (state.dateRangeState.startDate && state.dateRangeState.endDate) {
-        const startStr = formatDateDisplay(state.dateRangeState.startDate);
-        const endStr = formatDateDisplay(state.dateRangeState.endDate);
-        valueElement.textContent = `${startStr} - ${endStr}`;
-      } else if (state.dateRangeState.startDate) {
-        const startStr = formatDateDisplay(state.dateRangeState.startDate);
-        valueElement.textContent = `${startStr} (Select end date)`;
-      } else {
-        valueElement.textContent = 'Select date range';
-      }
-    }
-    
-    function formatDateDisplay(date) {
-      return date.toLocaleDateString('en-US', { 
-        month: 'short', 
-        day: 'numeric',
-        year: 'numeric'
-      });
-    }
-    
-    function isSameDay(date1, date2) {
-      return date1.getFullYear() === date2.getFullYear() &&
-             date1.getMonth() === date2.getMonth() &&
-             date1.getDate() === date2.getDate();
-    }
-    
-    function isDateInRange(date) {
-      if (!state.dateRangeState.startDate || !state.dateRangeState.endDate) return false;
-      return date >= state.dateRangeState.startDate && date <= state.dateRangeState.endDate;
-    }
-    
-    function getWeekStartDate(date) {
-      const result = new Date(date);
-      const day = result.getDay();
-      const diff = result.getDate() - day;
-      result.setDate(diff);
-      return result;
-    }
-    
-    function getWeekEndDate(date) {
-      const result = new Date(date);
-      const day = result.getDay();
-      const diff = result.getDate() + (6 - day);
-      result.setDate(diff);
-      return result;
-    }
-    
-    function updateCalendar() {
-      const monthNames = ['January', 'February', 'March', 'April', 'May', 'June',
-          'July', 'August', 'September', 'October', 'November', 'December'];
-      const year = state.dateRangeState.currentDate.getFullYear();
-      const month = state.dateRangeState.currentDate.getMonth();
-      document.getElementById('current-month').textContent = `${monthNames[month]} ${year}`;
-      
-      // Clear calendar
-      const calendarDaysElement = document.getElementById('calendar-days');
-      calendarDaysElement.innerHTML = '';
-      
-      // Get first day of month and total days
-      const firstDay = new Date(year, month, 1);
-      const lastDay = new Date(year, month + 1, 0);
-      const daysInMonth = lastDay.getDate();
-      const startingDay = firstDay.getDay(); // 0 = Sunday
-      
+    function updateDateRange(mode) {
+      state.dateRangeMode = mode;
       const today = new Date();
+      const fromDate = document.getElementById('fromDate');
+      const toDate = document.getElementById('toDate');
       
-      // Add days from previous month (now selectable)
-      if (startingDay > 0) {
-        const prevMonthLastDay = new Date(year, month, 0).getDate();
-        for (let i = startingDay - 1; i >= 0; i--) {
-          const prevMonthDay = prevMonthLastDay - i;
-          const dayDate = new Date(year, month - 1, prevMonthDay);
-          const dayElement = createDayElement('calendar-day other-month', prevMonthDay);
+      document.querySelectorAll('.date-range-simple button').forEach(btn => {
+        btn.classList.remove('active');
+      });
+      document.getElementById(mode + 'Btn').classList.add('active');
+      
+      switch(mode) {
+        case 'day':
+          fromDate.value = today.toISOString().split('T')[0];
+          toDate.value = today.toISOString().split('T')[0];
+          break;
+        case 'week':
+          const weekStart = new Date(today);
+          weekStart.setDate(today.getDate() - today.getDay());
+          const weekEnd = new Date(weekStart);
+          weekEnd.setDate(weekStart.getDate() + 6);
           
-          // Check if this day is selected
-          applySelectionClasses(dayElement, dayDate, today);
+          fromDate.value = weekStart.toISOString().split('T')[0];
+          toDate.value = weekEnd.toISOString().split('T')[0];
+          break;
+        case 'month':
+          const monthStart = new Date(today.getFullYear(), today.getMonth(), 1);
+          const monthEnd = new Date(today.getFullYear(), today.getMonth() + 1, 0);
           
-          // Add click event for selecting dates
-          dayElement.addEventListener('click', (e) => {
-            e.stopPropagation();
-            handleDateClick(dayDate);
-          });
-          
-          calendarDaysElement.appendChild(dayElement);
-        }
+          fromDate.value = monthStart.toISOString().split('T')[0];
+          toDate.value = monthEnd.toISOString().split('T')[0];
+          break;
+        case 'custom':
+          break;
       }
       
-      // Add days of the current month
-      for (let day = 1; day <= daysInMonth; day++) {
-        const dayDate = new Date(year, month, day);
-        const dayElement = createDayElement('calendar-day', day);
-        
-        // Check if this day is selected
-        applySelectionClasses(dayElement, dayDate, today);
-        
-        // Add click event for selecting dates
-        dayElement.addEventListener('click', (e) => {
-          e.stopPropagation();
-          handleDateClick(dayDate);
-        });
-        
-        calendarDaysElement.appendChild(dayElement);
-      }
-      
-      // Calculate how many cells we've added so far
-      const totalCellsSoFar = startingDay + daysInMonth;
-      const cellsNeededForFullGrid = 42; // 6 rows * 7 days
-      
-      // Add days from next month to complete the grid (now selectable)
-      if (totalCellsSoFar < cellsNeededForFullGrid) {
-        for (let i = 1; i <= (cellsNeededForFullGrid - totalCellsSoFar); i++) {
-          const dayDate = new Date(year, month + 1, i);
-          const dayElement = createDayElement('calendar-day other-month', i);
-          
-          // Check if this day is selected
-          applySelectionClasses(dayElement, dayDate, today);
-          
-          // Add click event for selecting dates
-          dayElement.addEventListener('click', (e) => {
-            e.stopPropagation();
-            handleDateClick(dayDate);
-          });
-          
-          calendarDaysElement.appendChild(dayElement);
-        }
-      }
-      
-      // Update apply button state
-      document.getElementById('apply-calendar-btn').disabled = !(state.dateRangeState.startDate && state.dateRangeState.endDate);
+      state.monthStart = new Date(fromDate.value);
+      state.monthEnd = new Date(toDate.value);
+      state.monthEnd.setHours(23, 59, 59, 999);
     }
     
-    function createDayElement(className, day) {
-      const dayElement = document.createElement('div');
-      dayElement.className = className;
-      if (day) dayElement.textContent = day;
-      return dayElement;
-    }
-    
-    function applySelectionClasses(dayElement, dayDate, today) {
-      const isToday = isSameDay(dayDate, today);
-      const isStartDate = state.dateRangeState.startDate && isSameDay(dayDate, state.dateRangeState.startDate);
-      const isEndDate = state.dateRangeState.endDate && isSameDay(dayDate, state.dateRangeState.endDate);
-      const isInRange = isDateInRange(dayDate);
+    function setupDateRangeEvents() {
+      document.getElementById('dayBtn').addEventListener('click', () => updateDateRange('day'));
+      document.getElementById('weekBtn').addEventListener('click', () => updateDateRange('week'));
+      document.getElementById('monthBtn').addEventListener('click', () => updateDateRange('month'));
+      document.getElementById('customBtn').addEventListener('click', () => updateDateRange('custom'));
       
-      if (isToday) dayElement.classList.add('today');
-      if (isInRange) dayElement.classList.add('in-range');
-      if (isStartDate) dayElement.classList.add('range-start');
-      if (isEndDate) dayElement.classList.add('range-end');
-    }
-    
-    function handleDateClick(date) {
-      if (!state.dateRangeState.startDate || (state.dateRangeState.startDate && state.dateRangeState.endDate)) {
-        // Start new selection
-        state.dateRangeState.startDate = new Date(date);
-        state.dateRangeState.endDate = null;
-        state.dateRangeState.isSelectingRange = true;
-        
-        // Update current month view to show the selected month
-        const clickedMonth = date.getMonth();
-        const clickedYear = date.getFullYear();
-        
-        // Only update currentDate if the clicked date is from a different month
-        if (clickedMonth !== state.dateRangeState.currentDate.getMonth() || clickedYear !== state.dateRangeState.currentDate.getFullYear()) {
-          state.dateRangeState.currentDate = new Date(clickedYear, clickedMonth, 1);
-        }
-        
-        // Update preset buttons
-        document.querySelectorAll('.preset-btn').forEach(btn => btn.classList.remove('active'));
-        document.querySelector('[data-preset="custom"]').classList.add('active');
-      } else if (state.dateRangeState.isSelectingRange) {
-        // Complete the range selection
-        if (date < state.dateRangeState.startDate) {
-          state.dateRangeState.endDate = new Date(state.dateRangeState.startDate);
-          state.dateRangeState.startDate = new Date(date);
-        } else {
-          state.dateRangeState.endDate = new Date(date);
-        }
-        state.dateRangeState.isSelectingRange = false;
-        
-        // Update current month view to show the start date month
-        const clickedMonth = state.dateRangeState.startDate.getMonth();
-        const clickedYear = state.dateRangeState.startDate.getFullYear();
-        
-        // Only update currentDate if the start date is from a different month
-        if (clickedMonth !== state.dateRangeState.currentDate.getMonth() || clickedYear !== state.dateRangeState.currentDate.getFullYear()) {
-          state.dateRangeState.currentDate = new Date(clickedYear, clickedMonth, 1);
-        }
-      }
-      
-      updateDateRangeDisplay();
-      updateSelectedRangeDisplay();
-      updateCalendar();
-    }
-    
-    function updateSelectedRangeDisplay() {
-      if (state.dateRangeState.startDate && state.dateRangeState.endDate) {
-        const startStr = formatDateDisplay(state.dateRangeState.startDate);
-        const endStr = formatDateDisplay(state.dateRangeState.endDate);
-        document.getElementById('selected-range').textContent = `${startStr} - ${endStr}`;
-      } else if (state.dateRangeState.startDate) {
-        const startStr = formatDateDisplay(state.dateRangeState.startDate);
-        document.getElementById('selected-range').textContent = `${startStr} (Select end date)`;
-      } else {
-        document.getElementById('selected-range').textContent = 'Select a date range';
-      }
-    }
-    
-    function openCalendar() {
-      document.getElementById('calendar-overlay').classList.add('active');
-      document.body.style.overflow = 'hidden';
-    }
-    
-    function closeCalendar() {
-      document.getElementById('calendar-overlay').classList.remove('active');
-      document.body.style.overflow = 'auto';
-    }
-    
-    function setupCalendarEvents() {
-      // Open calendar
-      document.getElementById('date-range-input').addEventListener('click', openCalendar);
-      
-      // Close calendar when clicking on overlay
-      document.getElementById('calendar-overlay').addEventListener('click', function(e) {
-        if (e.target === document.getElementById('calendar-overlay')) closeCalendar();
-      });
-      
-      // Month navigation
-      document.getElementById('prev-month').addEventListener('click', (e) => {
-        e.stopPropagation();
-        state.dateRangeState.currentDate.setMonth(state.dateRangeState.currentDate.getMonth() - 1);
-        updateCalendar();
-      });
-      
-      document.getElementById('next-month').addEventListener('click', (e) => {
-        e.stopPropagation();
-        state.dateRangeState.currentDate.setMonth(state.dateRangeState.currentDate.getMonth() + 1);
-        updateCalendar();
-      });
-      
-      document.getElementById('today-btn').addEventListener('click', (e) => {
-        e.stopPropagation();
-        state.dateRangeState.currentDate = new Date();
-        updateCalendar();
-      });
-      
-      // Clear selection
-      document.getElementById('clear-btn').addEventListener('click', (e) => {
-        e.stopPropagation();
-        state.dateRangeState.startDate = null;
-        state.dateRangeState.endDate = null;
-        updateDateRangeDisplay();
-        updateSelectedRangeDisplay();
-        updateCalendar();
-        document.querySelectorAll('.preset-btn').forEach(btn => btn.classList.remove('active'));
-        document.querySelector('[data-preset="custom"]').classList.add('active');
-      });
-      
-      // Apply calendar selection
-      document.getElementById('apply-calendar-btn').addEventListener('click', (e) => {
-        e.stopPropagation();
-        if (state.dateRangeState.startDate && state.dateRangeState.endDate) {
-          updateDateRangeDisplay();
-          updateHiddenDateInputs();
-          closeCalendar();
-          updateMonthRange(); // Update the month range based on date range
-        } else {
-          alert('Please select a date range first.');
+      document.getElementById('fromDate').addEventListener('change', () => {
+        if (state.dateRangeMode === 'custom') {
+          state.monthStart = new Date(document.getElementById('fromDate').value);
         }
       });
       
-      // Preset button functionality
-      document.querySelectorAll('.preset-btn').forEach(button => {
-        button.addEventListener('click', function(e) {
-          e.stopPropagation();
-          document.querySelectorAll('.preset-btn').forEach(btn => btn.classList.remove('active'));
-          this.classList.add('active');
-          
-          const preset = this.dataset.preset;
-          const today = new Date();
-          
-          switch(preset) {
-            case 'today':
-              state.dateRangeState.startDate = new Date(today);
-              state.dateRangeState.endDate = new Date(today);
-              break;
-            case 'yesterday':
-              const yesterday = new Date(today);
-              yesterday.setDate(yesterday.getDate() - 1);
-              state.dateRangeState.startDate = yesterday;
-              state.dateRangeState.endDate = yesterday;
-              break;
-            case 'thisWeek':
-              state.dateRangeState.startDate = getWeekStartDate(today);
-              state.dateRangeState.endDate = getWeekEndDate(today);
-              break;
-            case 'lastWeek':
-              const lastWeek = new Date(today);
-              lastWeek.setDate(lastWeek.getDate() - 7);
-              state.dateRangeState.startDate = getWeekStartDate(lastWeek);
-              state.dateRangeState.endDate = getWeekEndDate(lastWeek);
-              break;
-            case 'custom':
-              break;
-          }
-          
-          if (state.dateRangeState.startDate) {
-            state.dateRangeState.currentDate = new Date(state.dateRangeState.startDate);
-          }
-          
-          updateDateRangeDisplay();
-          updateSelectedRangeDisplay();
-          updateCalendar();
-          updateHiddenDateInputs();
-          updateMonthRange(); // Update the month range based on date range
-        });
-      });
-      
-      // Close on Escape key
-      document.addEventListener('keydown', function(e) {
-        if (e.key === 'Escape' && document.getElementById('calendar-overlay').classList.contains('active')) {
-          closeCalendar();
+      document.getElementById('toDate').addEventListener('change', () => {
+        if (state.dateRangeMode === 'custom') {
+          const endDate = new Date(document.getElementById('toDate').value);
+          endDate.setHours(23, 59, 59, 999);
+          state.monthEnd = endDate;
         }
       });
     }
@@ -1628,12 +905,10 @@
       document.getElementById('loadBtn').disabled=!((hasUsers || hasTeams || hasForms));
     }
 
-    // ===== Main Tab Switching Function =====
     function setupMainTabSwitching() {
       document.addEventListener("click", function(e) {
         if (!e.target.classList.contains("main-tab-button")) return;
 
-        // Handle main tabs (Quality Reporting vs How to Use)
         document.querySelectorAll(".main-tab-button").forEach(btn =>
           btn.classList.remove("active")
         );
@@ -1648,7 +923,7 @@
       });
     }
 
-    // ===== Boot (handles errors + expiry, avoids redirect loops) =====
+    // ===== Boot =====
     document.addEventListener('DOMContentLoaded', function () {
       resolveColors();
       setupMainTabSwitching();
@@ -1657,7 +932,6 @@
       const rawHash = (window.location.hash || '').replace(/^#/, '');
       const params = new URLSearchParams(rawHash);
 
-      // 1) OAuth error (prevents infinite redirect)
       const oauthError = params.get('error');
       if (oauthError) {
         const desc = decodeURIComponent(params.get('error_description') || '');
@@ -1671,12 +945,11 @@
         return;
       }
 
-      // 2) Token in hash
       const tokenFromHash = params.get('access_token');
       if (tokenFromHash) {
         console.log('Token found in hash');
         const expiresIn = parseInt(params.get('expires_in') || '0', 10);
-        const expAt = expiresIn ? Date.now() + (expiresIn - 60) * 1000 : 0; // pad by 60s
+        const expAt = expiresIn ? Date.now() + (expiresIn - 60) * 1000 : 0;
         sessionStorage.setItem('purecloud_token', tokenFromHash);
         if (expAt) sessionStorage.setItem('purecloud_token_exp', String(expAt));
         history.replaceState(null, document.title, window.location.pathname + window.location.search);
@@ -1684,7 +957,6 @@
         return;
       }
 
-      // 3) Token from session (if not expired)
       const tokenFromSession = sessionStorage.getItem('purecloud_token');
       const exp = parseInt(sessionStorage.getItem('purecloud_token_exp') || '0', 10);
       if (tokenFromSession && (!exp || Date.now() < exp)) {
@@ -1693,13 +965,11 @@
         return;
       }
 
-      // 4) No token yet - redirect to OAuth
       console.log('No token found, redirecting to OAuth');
       document.getElementById('auth-message').textContent = 'Redirecting to Genesys Cloud for authentication...';
       setTimeout(function(){ window.location.href = oauthUrl; }, 200);
     });
 
-    // ===== Agent Insights Renderer (Moved before startApp) =====
     function renderAgentInsights(){
       const data = window._insightData || [];
       const mode = document.getElementById('insightsSort').value || 'avgDesc';
@@ -1737,11 +1007,9 @@
       dropdowns.analyticsTeams=createCheckboxDropdown('analyticsTeamDropdown',{placeholder:'Filter teams (optional)',searchPlaceholder:'Search teams...'});
       dropdowns.trendTeams=createCheckboxDropdown('trendTeamDropdown',{placeholder:'Filter teams (optional)',searchPlaceholder:'Search teams...'});
 
-      // ORIGINAL tab event listeners - UNCHANGED
       document.getElementById('overviewTabButton').onclick=()=>setTab('overview');
       document.getElementById('analyticsTabButton').onclick=()=>{
         setTab('analytics');
-        // FIX 1: Added setTimeout to ensure DOM is ready before rendering charts
         setTimeout(() => renderAnalytics(), 100);
       };
       document.getElementById('trendsTabButton').onclick=()=>setTab('trends');
@@ -1754,22 +1022,10 @@
       document.getElementById('insightsSort').onchange=renderAgentInsights;
       document.getElementById('trendPeriodSelect').onchange=renderTrends;
       
-      // New event listeners for details filters
       document.getElementById('applyFiltersBtn').onclick=applyDetailsFilters;
 
-      // Initialize date range selector
-      initializeDateRangeSelector();
-      setupCalendarEvents();
-
-      // Set default month values based on date range
-      const m=new Date();
-      const cur=`${m.getFullYear()}-${String(m.getMonth()+1).padStart(2,'0')}`;
-      document.getElementById('anaFrom').value = cur;
-      document.getElementById('anaTo').value = cur;
-      document.getElementById('trendFrom').value = cur;
-      document.getElementById('trendTo').value = cur;
-
-      updateMonthRange();
+      initializeDateRange();
+      setupDateRangeEvents();
 
       Promise.all([fetchAllUsers(), fetchAllTeams(), fetchAllForms()])
         .then(()=> {
@@ -1789,7 +1045,6 @@
         document.getElementById(`${n}TabButton`).classList.toggle('active', n===name);
       });
       if(name==='analytics') {
-        // FIX 2: Added delay when switching to analytics tab
         setTimeout(() => renderAnalytics(), 100);
       }
       if(name==='details') renderDetails();
@@ -1797,24 +1052,7 @@
       if(name==='trends') renderTrends();
     }
 
-    function updateMonthRange(){
-      // Use the date range from the date picker instead of month input
-      const from = document.getElementById('fromDate').value;
-      const to = document.getElementById('toDate').value || from;
-      
-      if(!from) return;
-      
-      const fromDate = new Date(from);
-      const toDate = to ? new Date(to) : new Date(from);
-      
-      // Set to end of day for toDate
-      toDate.setHours(23, 59, 59, 999);
-      
-      state.monthStart = fromDate;
-      state.monthEnd = toDate;
-    }
-
-    // ===== HTTP helper with spacing + retry/backoff =====
+    // ===== HTTP helper =====
     async function rawFetch(url,options={}){
       const now=Date.now(); const delta=now-lastApiCall;
       if(delta<API_DELAY) await sleep(API_DELAY-delta);
@@ -1832,7 +1070,6 @@
         }
         if([400,401,403,404,405].includes(res.status)){
           if(res.status === 401 || res.status === 403) {
-            // Token expired or invalid
             sessionStorage.removeItem('purecloud_token');
             sessionStorage.removeItem('purecloud_token_exp');
             document.getElementById('appContent').style.display='none';
@@ -1886,7 +1123,6 @@
       return `Week ${weekNum}, ${date.getFullYear()}`;
     }
 
-    // Analytics helper functions
     function getPassSettings(){
       const pass=parseFloat(document.getElementById('passTarget').value||'85');
       const band=parseFloat(document.getElementById('amberBand').value||'5');
@@ -1915,7 +1151,6 @@
       return 'Other';
     }
 
-    // Improved critical/fatal detection
     function getMaxScoreForQuestion(questionObj) {
       const opts = [...(questionObj?.answerOptions || []), ...(questionObj?.options || [])];
       if (opts.length > 0) { return Math.max(...opts.map(opt => Number(opt.value) || 0)); }
@@ -1936,15 +1171,12 @@
       return { isFatal, isCritical: explicitCritFail || markdownByScore };
     }
 
-    // Enhanced contact info extraction - prioritizes ANI from API
     function extractContactInfo(e) {
       const conversation = e.conversation || {};
       let contactInfo = '';
       
-      // Try to get phone number (ANI) - this is what we want for +44 numbers
       const ani = conversation.ani || conversation.fromAddress || conversation.callerAddress;
       if (ani) {
-        // Format as +44 number if it starts with 44 or 0
         let formattedAni = ani;
         if (ani.startsWith('44')) {
           formattedAni = '+' + ani;
@@ -1954,14 +1186,12 @@
         contactInfo = `Phone: ${formattedAni}`;
       }
       
-      // Try to get email address
       const email = conversation.emailAddress || conversation.fromEmail || conversation.customerEmail;
       if (email) {
         if (contactInfo) contactInfo += ' | ';
         contactInfo += `Email: ${email}`;
       }
       
-      // Try to get other contact info
       if (!contactInfo) {
         const address = conversation.address || conversation.customerAddress;
         if (address) {
@@ -2043,7 +1273,6 @@
       return Array.from(set);
     }
 
-    // Helper for analytics team filtering
     async function agentsForTeams(teamIds){
       await ensureTeamMembersLoaded(teamIds);
       const ids=new Set();
@@ -2051,7 +1280,6 @@
       return Array.from(ids);
     }
 
-    // ===== Date Range Chunking Functions (from the first code) =====
     function chunks(start,end,days){
       const out=[]; const s=new Date(start), e=new Date(end); let cur=new Date(s);
       while(cur<=e){ 
@@ -2076,7 +1304,7 @@
       return 2;
     }
 
-    // ===== Evaluations with GET/POST fallback + retry =====
+    // ===== Evaluations =====
     async function loadEvaluations(){
       const agentIds = await computeSelectedAgentIds();
       const formIds = dropdowns.forms.getSelectedValues();
@@ -2086,7 +1314,6 @@
         return;
       }
       
-      // Get dates from hidden inputs (populated by date range selector)
       const from = document.getElementById('fromDate').value;
       const to = document.getElementById('toDate').value || from;
       
@@ -2109,7 +1336,6 @@
       try{
         const agentList = agentIds.length ? agentIds : state.users.map(u=>u.id);
         
-        // Use chunking for large date ranges
         const days = optimalDays(from, to);
         const dateChunks = chunks(from, to, days);
         
@@ -2131,20 +1357,16 @@
             msg('Warning: failed chunk ' + (i+1) + ', continuing…', true); 
           }
           
-          // Small delay between chunks to avoid rate limiting
           if(i<dateChunks.length-1) await new Promise(r=>setTimeout(r,400));
         }
 
         updateProgress(100, dateChunks.length, dateChunks.length);
         
-        // CRITICAL FIX: Load ALL form details for ALL forms found in evaluations
         await loadAllFormDetailsFromEvaluations(state.evals);
         
         msg(`Loaded ${state.evals.length} evaluations.`,'success');
         renderAll();
         
-        // FIX 3: Removed auto-load analytics and trends data
-        // Charts will load when user switches to those tabs
       }catch(e){ console.error(e); msg('Failed to load evaluations: '+e.message,'error'); }
       finally{ 
         setLoading(btn,false); 
@@ -2153,14 +1375,16 @@
     }
 
     async function loadAnalyticsRange(){
-      const from=document.getElementById('anaFrom').value;
-      const to=document.getElementById('anaTo').value;
-      if(!from || !to){ msg('Select both From and To months for Analytics.','error'); return; }
-      const [fy,fm]=from.split('-').map(Number);
-      const [ty,tm]=to.split('-').map(Number);
-      const start=new Date(Date.UTC(fy, fm-1, 1, 0,0,0));
-      const end  =new Date(Date.UTC(ty, tm,   0, 23,59,59));
-      if(start>end){ msg('The From month must be before the To month.','error'); return; }
+      const from = document.getElementById('fromDate').value;
+      const to = document.getElementById('toDate').value || from;
+      if(!from || !to){ msg('Select date range for Analytics.','error'); return; }
+      
+      const start = new Date(from);
+      start.setHours(0, 0, 0, 0);
+      const end = new Date(to);
+      end.setHours(23, 59, 59, 999);
+      
+      if(start>end){ msg('The From date must be before the To date.','error'); return; }
 
       const formIds = dropdowns.forms.getSelectedValues();
       const agentIds = await computeSelectedAgentIds();
@@ -2174,12 +1398,10 @@
         const data=await fetchDetailedEvaluations(agentList,formIds,start,end);
         state.analyticsEvals=data; state.analyticsRange={start,end};
         
-        // CRITICAL FIX: Load ALL form details for ALL forms found in analytics evaluations
         await loadAllFormDetailsFromEvaluations(data);
         
         msg(`Analytics range loaded: ${data.length} evaluations.`, 'success');
         
-        // FIX 4: Force render after loading analytics data
         if (document.getElementById('analyticsTab').classList.contains('active')) {
           setTimeout(() => renderAnalytics(), 150);
         }
@@ -2188,14 +1410,16 @@
     }
 
     async function loadTrendsData(){
-      const from=document.getElementById('trendFrom').value;
-      const to=document.getElementById('trendTo').value;
-      if(!from || !to){ msg('Select both From and To months for Trends.','error'); return; }
-      const [fy,fm]=from.split('-').map(Number);
-      const [ty,tm]=to.split('-').map(Number);
-      const start=new Date(Date.UTC(fy, fm-1, 1, 0,0,0));
-      const end  =new Date(Date.UTC(ty, tm,   0, 23,59,59));
-      if(start>end){ msg('The From month must be before the To month.','error'); return; }
+      const from = document.getElementById('fromDate').value;
+      const to = document.getElementById('toDate').value || from;
+      if(!from || !to){ msg('Select date range for Trends.','error'); return; }
+      
+      const start = new Date(from);
+      start.setHours(0, 0, 0, 0);
+      const end = new Date(to);
+      end.setHours(23, 59, 59, 999);
+      
+      if(start>end){ msg('The From date must be before the To date.','error'); return; }
 
       const formIds = dropdowns.forms.getSelectedValues();
       const agentIds = await computeSelectedAgentIds();
@@ -2209,7 +1433,6 @@
         const data=await fetchDetailedEvaluations(agentList,formIds,start,end);
         state.trendsEvals=data; state.trendsRange={start,end};
         
-        // CRITICAL FIX: Load ALL form details for ALL forms found in trends evaluations
         await loadAllFormDetailsFromEvaluations(data);
         
         msg(`Trends data loaded: ${data.length} evaluations.`, 'success');
@@ -2218,13 +1441,11 @@
       finally{ setLoading(btn,false); }
     }
 
-    // NEW FUNCTION: Load ALL form details from evaluations
     async function loadAllFormDetailsFromEvaluations(evaluations) {
       if (!evaluations || evaluations.length === 0) return;
       
       console.log('Loading form details for all evaluations...');
       
-      // Collect ALL unique form IDs from evaluations
       const formPromises = new Set();
       
       evaluations.forEach(e => {
@@ -2232,17 +1453,14 @@
         const formId = safeGet(e, 'form.id') || e.formId;
         const formVersionId = safeGet(e, 'form.versionId') || e.formVersionId || safeGet(e, 'form.version');
         
-        // Add published form if exists
         if (pubId) {
           formPromises.add(getFormDetails(pubId, '__published__'));
         }
         
-        // Add form with version if exists
         if (formId && formVersionId) {
           formPromises.add(getFormDetails(formId, formVersionId));
         }
         
-        // Always add form without version as fallback
         if (formId) {
           formPromises.add(getFormDetails(formId, null));
         }
@@ -2250,7 +1468,6 @@
       
       console.log(`Loading ${formPromises.size} form details...`);
       
-      // Load all form details
       await Promise.allSettled(Array.from(formPromises));
       console.log('All form details loaded.');
     }
@@ -2270,7 +1487,6 @@
       const start=startDate.toISOString(); const end=endDate.toISOString();
       const base = `https://api.${config.REGION}/api/v2/quality/evaluations/query`;
 
-      // Helper: GET path
       async function getViaGET(singleFormId){
         const params = new URLSearchParams({
           agentUserId: agentId,
@@ -2293,7 +1509,6 @@
         return all;
       }
 
-      // Helper: POST path
       async function getViaPOST(){
         const url = base;
         const body = {
@@ -2339,7 +1554,6 @@
     async function getFormDetails(formId, versionId){
       const key = formKey(formId, versionId);
       
-      // Return cached if available
       if (state.formDetailsCache.has(key)) {
         return state.formDetailsCache.get(key);
       }
@@ -2358,7 +1572,6 @@
         try {
           data = await fetchJsonWithRetry(url, { method: 'GET' });
         } catch (err) {
-          // If specific version fails, try to get the latest version
           if (versionId && versionId !== '__published__') {
             console.log(`Version ${versionId} not found for form ${formId}, trying latest version`);
             data = await fetchJsonWithRetry(
@@ -2370,7 +1583,6 @@
           }
         }
         
-        // Store in cache
         state.formDetailsCache.set(key, data);
         state.formLookupCache.set(key, buildFormLookup(data || {}));
         
@@ -2382,7 +1594,6 @@
       }
     }
 
-    // IMPROVED form lookup
     function buildFormLookup(form){
       const questionText = new Map();
       const answerText = new Map();
@@ -2405,14 +1616,12 @@
         
         const qText = extractQuestionText(q);
         
-        // Map ALL possible IDs
         const ids = [];
         if (q.id) ids.push(q.id);
         if (q.contextId) ids.push(q.contextId);
         if (q.questionId) ids.push(q.questionId);
         if (q.questionContextId) ids.push(q.questionContextId);
         
-        // Map IDs to question text
         ids.forEach(id => {
           if (id && qText) {
             questionText.set(id, qText);
@@ -2420,7 +1629,6 @@
           }
         });
         
-        // Handle answer options
         (q.answerOptions || []).forEach(a => {
           const aText = extractAnswerText(a);
           const answerIds = [];
@@ -2437,24 +1645,19 @@
           });
         });
         
-        // Handle nested questions
         (q.multipleSelectOptionQuestions || []).forEach(addQuestion);
         (q.nestedQuestions || []).forEach(addQuestion);
       }
 
       function walkQuestionGroups(groups) {
         (groups || []).forEach(g => {
-          // Process questions in group
           (g.questions || []).forEach(addQuestion);
-          // Recursively walk nested groups
           walkQuestionGroups(g.questionGroups || []);
         });
       }
       
-      // Process top-level questions
       (form.questions || []).forEach(addQuestion);
       
-      // Process question groups
       walkQuestionGroups(form.questionGroups || []);
       
       return { questionText, answerText, questionObj };
@@ -2465,38 +1668,31 @@
       const formId = safeGet(e, 'form.id') || e.formId;
       const formVersionId = safeGet(e, 'form.versionId') || e.formVersionId || safeGet(e, 'form.version');
       
-      // Create cache key
       const comboKey = `${pubId || 'no-pub'}|${formId || 'no-form'}|${formVersionId || 'no-ver'}`;
       
       if (state.combinedLookupCache.has(comboKey)) {
         return state.combinedLookupCache.get(comboKey);
       }
       
-      // Load BOTH published form AND specific form
       const loadPromises = [];
       
-      // Always try published form first
       if (pubId) {
         loadPromises.push(getFormDetails(pubId, '__published__'));
       }
       
-      // Try specific form version
       if (formId && formVersionId) {
         loadPromises.push(getFormDetails(formId, formVersionId));
       }
       
-      // Always try form without version
       if (formId) {
         loadPromises.push(getFormDetails(formId, null));
       }
       
-      // Wait for all form details to load
       const results = await Promise.allSettled(loadPromises);
       const details = results
         .filter(r => r.status === 'fulfilled' && r.value)
         .map(r => r.value);
       
-      // Build combined lookup
       const merged = { 
         questionText: new Map(), 
         answerText: new Map(), 
@@ -2510,7 +1706,6 @@
         lk.questionObj.forEach((v, k) => merged.questionObj.set(k, v));
       });
       
-      // Get form name
       const formName = safeGet(e, 'evaluationForm.name') || 
                       safeGet(e, 'form.name') || 
                       (details[0]?.name) || 
@@ -2528,11 +1723,7 @@
       return combined;
     }
 
-    // ===== IMPROVED Question Text Resolution =====
-    function approx(a,b){ return Math.abs(Number(a)-Number(b))<1e-6; }
-    
     function resolveQuestionTextWithLookup(lookup, qScore) {
-      // Strategy 1: Try to get from qScore.question directly
       if (qScore.question) {
         const directText = qScore.question.text || qScore.question.label || qScore.question.title;
         if (directText) {
@@ -2540,7 +1731,6 @@
         }
       }
       
-      // Strategy 2: Try lookup with all possible IDs
       const idsToTry = [
         qScore.questionId,
         qScore.questionContextId,
@@ -2558,11 +1748,9 @@
         }
       }
       
-      // Strategy 3: Try to find by scanning all question objects for partial matches
       if (idsToTry.length > 0) {
         const allQuestionIds = Array.from(lookup.questionText.keys());
         for (const questionId of allQuestionIds) {
-          // Check for partial matches (sometimes IDs are truncated)
           for (const searchId of idsToTry) {
             if (questionId.includes(searchId) || searchId.includes(questionId)) {
               const text = lookup.questionText.get(questionId);
@@ -2572,13 +1760,11 @@
         }
       }
       
-      // Strategy 4: Try the qScore itself
       const qScoreText = qScore.text || qScore.label || qScore.title;
       if (qScoreText) {
         return qScoreText;
       }
       
-      // Strategy 5: Try to extract from answer options if score matches
       const allQuestionObjs = Array.from(lookup.questionObj.values());
       for (const questionObj of allQuestionObjs) {
         if (questionObj.answerOptions && qScore.score !== undefined) {
@@ -2592,9 +1778,7 @@
         }
       }
       
-      // Last resort: Show ID or generic text
       if (idsToTry[0]) {
-        // Check if ID might actually be the question text (some systems store text as ID)
         const firstId = idsToTry[0];
         if (firstId.length < 100 && !firstId.includes('-') && !firstId.match(/^[a-f0-9]{8}-/i)) {
           return firstId;
@@ -2605,11 +1789,11 @@
       return 'Question';
     }
 
+    function approx(a,b){ return Math.abs(Number(a)-Number(b))<1e-6; }
+
     function resolveAnswerTextWithLookup(lookup, qScore) {
-      // Try to get answer text from lookup
       const ids = new Set();
       
-      // Collect ALL possible answer IDs
       (qScore.selectedAnswerIds || []).forEach(x => ids.add(x));
       (qScore.selectedAnswerOptionIds || []).forEach(x => ids.add(x));
       if (qScore.selectedAnswerId) ids.add(qScore.selectedAnswerId);
@@ -2631,7 +1815,6 @@
       
       if (texts.length) return texts.join(', ');
       
-      // If no answer text found, try to match score to answer options
       const qIds = [ qScore.questionId, qScore.questionContextId, safeGet(qScore, 'question.id'), safeGet(qScore, 'question.contextId') ].filter(Boolean);
       const q = qIds.map(id => lookup.questionObj.get(id)).find(Boolean);
       
@@ -2651,7 +1834,6 @@
         }
       }
       
-      // Fallbacks
       if (qScore.freeTextAnswer) return String(qScore.freeTextAnswer);
       if (qScore.numericAnswer !== undefined && qScore.numericAnswer !== null) return String(qScore.numericAnswer);
       if (safeGet(qScore, 'answer.text')) return qScore.answer.text;
@@ -2660,143 +1842,9 @@
       return 'No answer';
     }
 
-    // ===== NEW: Month Comparison Function =====
-    async function renderMonthComparison() {
-      const comparisonContainer = document.getElementById('monthComparison');
-      const comparisonGrid = document.getElementById('comparisonGrid');
-      
-      if (!state.analyticsEvals || state.analyticsEvals.length === 0) {
-        comparisonContainer.style.display = 'none';
-        return;
-      }
-      
-      // Group evaluations by month
-      const evalsByMonth = new Map();
-      
-      state.analyticsEvals.forEach(e => {
-        const date = new Date(e.releaseDate || e.assignedDate || e.creationDate || e.evaluationDate || e.date || Date.now());
-        const monthKey = `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}`;
-        const monthLabel = new Date(date.getFullYear(), date.getMonth(), 1).toLocaleDateString('en-GB', { month: 'short', year: 'numeric' });
-        
-        if (!evalsByMonth.has(monthKey)) {
-          evalsByMonth.set(monthKey, {
-            label: monthLabel,
-            evals: [],
-            totalScore: 0,
-            scoredCount: 0,
-            criticalMarks: 0,
-            fatalMarks: 0,
-            passCount: 0,
-            totalCount: 0
-          });
-        }
-        
-        const monthData = evalsByMonth.get(monthKey);
-        monthData.evals.push(e);
-        monthData.totalCount++;
-        
-        const score = getEvalPercent(e);
-        if (score != null && isFinite(score)) {
-          monthData.totalScore += score;
-          monthData.scoredCount++;
-          
-          const {pass} = getPassSettings();
-          if (score >= pass) {
-            monthData.passCount++;
-          }
-        }
-        
-        // Count critical/fatal marks
-        const qGroups = safeGet(e, 'answers.questionGroupScores') || [];
-        qGroups.forEach(g => {
-          (g.questionScores || []).forEach(q => {
-            const qIds = [q.questionId, q.questionContextId, safeGet(q, 'question.id'), safeGet(q, 'question.contextId')].filter(Boolean);
-            const questionObj = qIds.map(id => state.combinedLookupCache.get(`${safeGet(e, 'evaluationForm.id') || 'no-pub'}|${safeGet(e, 'form.id') || 'no-form'}|${safeGet(e, 'form.versionId') || 'no-ver'}`)?.questionObj.get(id)).find(Boolean);
-            const { isFatal, isCritical } = detectCriticalFatalQuestions(q, questionObj);
-            if (isFatal) monthData.fatalMarks++;
-            if (isCritical) monthData.criticalMarks++;
-          });
-        });
-      });
-      
-      // Get two most recent months
-      const sortedMonths = Array.from(evalsByMonth.keys()).sort().reverse();
-      if (sortedMonths.length < 2) {
-        comparisonContainer.style.display = 'none';
-        return;
-      }
-      
-      const recentMonthKey = sortedMonths[0];
-      const previousMonthKey = sortedMonths[1];
-      
-      const recentMonth = evalsByMonth.get(recentMonthKey);
-      const previousMonth = evalsByMonth.get(previousMonthKey);
-      
-      // Calculate metrics
-      const recentAvg = recentMonth.scoredCount > 0 ? recentMonth.totalScore / recentMonth.scoredCount : 0;
-      const previousAvg = previousMonth.scoredCount > 0 ? previousMonth.totalScore / previousMonth.scoredCount : 0;
-      const avgChange = recentAvg - previousAvg;
-      
-      const recentPassRate = recentMonth.totalCount > 0 ? (recentMonth.passCount / recentMonth.totalCount) * 100 : 0;
-      const previousPassRate = previousMonth.totalCount > 0 ? (previousMonth.passCount / previousMonth.totalCount) * 100 : 0;
-      const passRateChange = recentPassRate - previousPassRate;
-      
-      const evalsChange = ((recentMonth.totalCount - previousMonth.totalCount) / previousMonth.totalCount) * 100;
-      
-      const criticalChange = ((recentMonth.criticalMarks - previousMonth.criticalMarks) / (previousMonth.criticalMarks || 1)) * 100;
-      const fatalChange = ((recentMonth.fatalMarks - previousMonth.fatalMarks) / (previousMonth.fatalMarks || 1)) * 100;
-      
-      // Render comparison
-      comparisonGrid.innerHTML = `
-        <div class="comparison-item">
-          <div class="label">Average Score</div>
-          <div class="value">${pct(recentAvg, 1)}</div>
-          <div class="change ${avgChange > 0 ? 'positive' : avgChange < 0 ? 'negative' : 'neutral'}">
-            ${avgChange > 0 ? '↑' : avgChange < 0 ? '↓' : '→'} ${pct(Math.abs(avgChange), 1)}
-          </div>
-          <div class="comparison-note">${previousMonth.label}: ${pct(previousAvg, 1)}</div>
-        </div>
-        <div class="comparison-item">
-          <div class="label">Pass Rate</div>
-          <div class="value">${pct(recentPassRate, 1)}</div>
-          <div class="change ${passRateChange > 0 ? 'positive' : passRateChange < 0 ? 'negative' : 'neutral'}">
-            ${passRateChange > 0 ? '↑' : passRateChange < 0 ? '↓' : '→'} ${pct(Math.abs(passRateChange), 1)}
-          </div>
-          <div class="comparison-note">${previousMonth.label}: ${pct(previousPassRate, 1)}</div>
-        </div>
-        <div class="comparison-item">
-          <div class="label">Evaluations</div>
-          <div class="value">${recentMonth.totalCount}</div>
-          <div class="change ${evalsChange > 0 ? 'positive' : evalsChange < 0 ? 'negative' : 'neutral'}">
-            ${evalsChange > 0 ? '↑' : evalsChange < 0 ? '↓' : '→'} ${fmt(Math.abs(evalsChange), 1)}%
-          </div>
-          <div class="comparison-note">${previousMonth.label}: ${previousMonth.totalCount}</div>
-        </div>
-        <div class="comparison-item">
-          <div class="label">Critical Marks</div>
-          <div class="value">${recentMonth.criticalMarks}</div>
-          <div class="change ${criticalChange < 0 ? 'positive' : criticalChange > 0 ? 'negative' : 'neutral'}">
-            ${criticalChange < 0 ? '↓' : criticalChange > 0 ? '↑' : '→'} ${fmt(Math.abs(criticalChange), 1)}%
-          </div>
-          <div class="comparison-note">${previousMonth.label}: ${previousMonth.criticalMarks}</div>
-        </div>
-        <div class="comparison-item">
-          <div class="label">Fatal Marks</div>
-          <div class="value">${recentMonth.fatalMarks}</div>
-          <div class="change ${fatalChange < 0 ? 'positive' : fatalChange > 0 ? 'negative' : 'neutral'}">
-            ${fatalChange < 0 ? '↓' : fatalChange > 0 ? '↑' : '→'} ${fmt(Math.abs(fatalChange), 1)}%
-          </div>
-          <div class="comparison-note">${previousMonth.label}: ${previousMonth.fatalMarks}</div>
-        </div>
-      `;
-      
-      comparisonContainer.style.display = 'block';
-    }
-
     // ===== Renderers =====
     function renderAll(){ 
       renderOverview(); 
-      // FIX 5: Don't automatically render analytics/trends on initial load
       renderDetails(); 
       renderCritical(); 
     }
@@ -2827,10 +1875,10 @@
       const overallAvg=(rows.length && total)?(rows.reduce((s,r)=>s+(r.avg||0),0)/rows.length):null;
 
       document.getElementById('overviewKPIs').innerHTML=`
-        <div class="kpi"><div class="label">Date Range</div><div class="value">${document.getElementById('date-range-value').textContent}</div></div>
+        <div class="kpi"><div class="label">Date Range</div><div class="value">${document.getElementById('fromDate').value} to ${document.getElementById('toDate').value}</div></div>
         <div class="kpi"><div class="label">Evaluations</div><div class="value">${evals.length}</div></div>
         <div class="kpi"><div class="label">Agents</div><div class="value">${rows.length}</div></div>
-        <div class="kpi"><div class="label">Average Score (Agent Avg)</div><div class="value">${overallAvg==null?'-':pct(overallAvg,1)}</div></div>`;
+        <div class="kpi"><div class="label">Average Score</div><div class="value">${overallAvg==null?'-':pct(overallAvg,1)}</div></div>`;
       const tbl=document.getElementById('agentSummaryTable');
       tbl.innerHTML = rows.length
         ? `<thead><tr><th>Agent</th><th>Evaluations</th><th>Average Score</th></tr></thead>
@@ -2858,13 +1906,12 @@
       return out; 
     }
 
-    // ===== UPDATED ANALYTICS RENDERER WITH PROPER CHART.JS VISUALS =====
+    // ===== ANALYTICS RENDERER =====
     async function renderAnalytics(){
       const raw = getAnalyticsSet();
       
-      // Check if charts should be rendered
       if(!raw || !raw.length){
-        document.getElementById('analyticsKPIs').innerHTML='<div class="muted" style="padding:20px;text-align:center">No analytics data loaded. Use "Load Range" button to load data.</div>';
+        document.getElementById('analyticsKPIs').innerHTML='<div class="muted" style="padding:20px;text-align:center">No analytics data loaded. Use "Update Analytics" button to load data.</div>';
         document.getElementById('mediaTable').innerHTML='<tr><td class="muted">No data loaded yet.</td></tr>';
         document.getElementById('repeatFailsTable').innerHTML='';
         document.getElementById('agentInsights').innerHTML='';
@@ -2872,17 +1919,14 @@
         document.getElementById('topAgentsTable').innerHTML='';
         document.getElementById('bottomAgentsTable').innerHTML='';
         
-        // Clear any existing charts properly WITHOUT removing the canvas elements
         ['mediaTypeChart', 'agentTrendChart', 'scoreDistributionChart', 'trendsChart'].forEach(id => {
           const canvas = document.getElementById(id);
           if (canvas) {
-            // FIX 6: Check if canvas exists before trying to get context
             const ctx = canvas.getContext('2d');
             if (ctx) {
               ctx.clearRect(0, 0, canvas.width, canvas.height);
             }
             
-            // Destroy existing Chart.js instances
             if (id === 'mediaTypeChart' && window.mediaTypeChartInstance) {
               try {
                 window.mediaTypeChartInstance.destroy();
@@ -2918,37 +1962,8 @@
           }
         });
         
-        // Display "no data" message on the charts WITHOUT replacing canvas elements
-        const mediaChartContainer = document.querySelector('.analytics-chart-container');
-        if (mediaChartContainer) {
-          // Create a placeholder div that will sit on top of the canvas
-          let placeholder = mediaChartContainer.querySelector('.chart-placeholder');
-          if (!placeholder) {
-            placeholder = document.createElement('div');
-            placeholder.className = 'chart-placeholder';
-            placeholder.style.cssText = 'position:absolute; top:0; left:0; width:100%; height:100%; display:flex; align-items:center; justify-content:center; background:rgba(248,249,250,0.9); z-index:5;';
-            mediaChartContainer.appendChild(placeholder);
-          }
-          placeholder.innerHTML = `
-            <div style="text-align:center;padding:20px;">
-              <div style="font-size:14px;margin-bottom:8px;">📊</div>
-              <div style="font-size:12px;">No data available</div>
-              <div style="font-size:11px;margin-top:4px;">Load analytics data first</div>
-            </div>
-          `;
-          placeholder.style.display = 'flex';
-        }
-        
-        // Hide month comparison
-        document.getElementById('monthComparison').style.display = 'none';
-        
         return;
       }
-
-      // Remove placeholder messages if they exist
-      document.querySelectorAll('.chart-placeholder').forEach(placeholder => {
-        placeholder.style.display = 'none';
-      });
 
       const teamFilter = dropdowns.analyticsTeams.getSelectedValues();
       let allowedAgents = null;
@@ -2960,7 +1975,6 @@
       const start = state.analyticsRange?.start || state.monthStart;
       const end   = state.analyticsRange?.end   || state.monthEnd;
       
-      // Calculate KPIs
       let withFatal=0, withCritical=0, totalCriticalMarks=0, totalFatalMarks=0;
       let sumScores=0, scored=0;
       for (const e of evals) {
@@ -2995,31 +2009,28 @@
 
       const {pass, band} = getPassSettings();
       
-      // Data for charts
       const mediaTypeData = { Voice: { pass: 0, amber: 0, fail: 0 }, 
                              Email: { pass: 0, amber: 0, fail: 0 }, 
                              Message: { pass: 0, amber: 0, fail: 0 }, 
                              Social: { pass: 0, amber: 0, fail: 0 }, 
                              Other: { pass: 0, amber: 0, fail: 0 } };
       
-      const agentTrendData = new Map(); // agent -> {dates: [], scores: []}
-      const scoreDistribution = Array(10).fill(0); // 0-10, 11-20, ..., 91-100
+      const agentTrendData = new Map();
+      const scoreDistribution = Array(10).fill(0);
       
-      const byAgent=new Map(); // agent -> media -> {count,sum,scored}
+      const byAgent=new Map();
       evals.forEach(e=>{
         const aid=safeGet(e,'agent.id')||e.agentUserId||'(unknown)';
         const name=resolveUserName(aid);
         const mt=guessMediaType(e);
         const p=getEvalPercent(e);
         
-        // Media type chart data
         if (p != null && isFinite(p)) {
           if (p >= pass) mediaTypeData[mt].pass++;
           else if (p >= pass - band) mediaTypeData[mt].amber++;
           else mediaTypeData[mt].fail++;
         }
         
-        // Agent trend data
         if (!agentTrendData.has(name)) {
           agentTrendData.set(name, { dates: [], scores: [] });
         }
@@ -3027,14 +2038,12 @@
         agentTrendData.get(name).dates.push(date);
         agentTrendData.get(name).scores.push(p || 0);
         
-        // Score distribution
         if (p != null && isFinite(p)) {
           const bucket = Math.floor(p / 10);
           const idx = bucket === 10 ? 9 : bucket;
           scoreDistribution[idx]++;
         }
         
-        // Existing media table data
         if(!byAgent.has(aid)) byAgent.set(aid,{name,map:new Map()});
         const m=byAgent.get(aid).map;
         if(!m.has(mt)) m.set(mt,{count:0,sum:0,scored:0});
@@ -3043,10 +2052,9 @@
         if(p!=null&&isFinite(p)){ o.sum+=Number(p); o.scored++; }
       });
 
-      // 1. Media Type Chart (Stacked Bar)
+      // Media Type Chart
       try {
         const mediaTypeCanvas = document.getElementById('mediaTypeChart');
-        // FIX 7: Check if canvas exists and get context safely
         if (!mediaTypeCanvas) {
           console.warn('mediaTypeChart canvas not found');
         } else {
@@ -3054,7 +2062,6 @@
           if (!mediaTypeCtx) {
             console.warn('Could not get 2d context for mediaTypeChart');
           } else {
-            // Destroy existing chart instance
             if (window.mediaTypeChartInstance) {
               try {
                 window.mediaTypeChartInstance.destroy();
@@ -3130,7 +2137,7 @@
         console.error('Error creating mediaTypeChart:', chartError);
       }
 
-      // 2. Agent Trend Chart (Line chart for top 5 agents)
+      // Agent Trend Chart
       try {
         const agentTrendCanvas = document.getElementById('agentTrendChart');
         if (!agentTrendCanvas) {
@@ -3140,7 +2147,6 @@
           if (!agentTrendCtx) {
             console.warn('Could not get 2d context for agentTrendChart');
           } else {
-            // Destroy existing chart instance
             if (window.agentTrendChartInstance) {
               try {
                 window.agentTrendChartInstance.destroy();
@@ -3150,18 +2156,15 @@
               window.agentTrendChartInstance = null;
             }
             
-            // Get top 5 agents by number of evaluations
             const topAgents = Array.from(agentTrendData.entries())
               .sort((a, b) => b[1].scores.length - a[1].scores.length)
               .slice(0, 5);
             
-            // Prepare data for line chart
             const allDates = Array.from(new Set(topAgents.flatMap(([name, data]) => 
               data.dates.map(d => d.toISOString().split('T')[0])
             ))).sort();
             
             const datasets = topAgents.map(([name, data], idx) => {
-              // Create map of date to average score for that day
               const dateScoreMap = new Map();
               data.dates.forEach((date, i) => {
                 const dateStr = date.toISOString().split('T')[0];
@@ -3172,7 +2175,6 @@
                 dateScoreMap.get(dateStr).push(score);
               });
               
-              // Calculate average for each date
               const scoresByDate = allDates.map(date => {
                 const scores = dateScoreMap.get(date);
                 return scores && scores.length > 0 
@@ -3180,7 +2182,6 @@
                   : null;
               });
               
-              // Generate distinct color
               const hue = (idx * 360 / topAgents.length) % 360;
               const color = `hsl(${hue}, 70%, 50%)`;
               
@@ -3246,7 +2247,7 @@
         console.error('Error creating agentTrendChart:', chartError);
       }
 
-      // 3. Score Distribution Chart (Histogram)
+      // Score Distribution Chart
       try {
         const scoreDistCanvas = document.getElementById('scoreDistributionChart');
         if (!scoreDistCanvas) {
@@ -3256,7 +2257,6 @@
           if (!scoreDistCtx) {
             console.warn('Could not get 2d context for scoreDistributionChart');
           } else {
-            // Destroy existing chart instance
             if (window.scoreDistributionChartInstance) {
               try {
                 window.scoreDistributionChartInstance.destroy();
@@ -3268,7 +2268,6 @@
             
             const scoreLabels = ['0-10%', '11-20%', '21-30%', '31-40%', '41-50%', '51-60%', '61-70%', '71-80%', '81-90%', '91-100%'];
             
-            // Color bars based on score ranges
             const backgroundColors = scoreLabels.map((label, idx) => {
               const minScore = idx * 10;
               if (minScore >= pass) return COLORS.OK;
@@ -3326,7 +2325,6 @@
         console.error('Error creating scoreDistributionChart:', chartError);
       }
 
-      // Build media table (agent × media) - KEEPING EXISTING TABLE
       const mediaTypesTable=['Voice','Email','Message','Social','Other'];
       const mediaHead='<thead><tr><th>Agent</th>'+mediaTypesTable.map(mt=>`<th>${mt} (avg)</th>`).join('')+'<th>Overall</th><th>Evaluations</th></tr></thead>';
       let mediaRows='';
@@ -3359,12 +2357,10 @@
       
       document.getElementById('mediaTable').innerHTML=mediaHead+'<tbody>'+mediaRows+'</tbody>';
 
-      // Store insight data for sorting
       window._insightData = insightData;
       renderAgentInsights();
 
-      // Repeat failures table
-      const repeatFails = new Map(); // question text -> {formName, agents: Map, count}
+      const repeatFails = new Map();
       for (const e of evals) {
         const lookup = await getCombinedLookupForEval(e);
         const agentName = resolveUserName(safeGet(e, 'agent.id') || e.agentUserId);
@@ -3410,13 +2406,11 @@
         ? `<thead><tr><th>Form</th><th>Question</th><th>Total Marks</th><th>Agents</th><th>Agent Breakdown</th></tr></thead><tbody>${repeatFailRows}</tbody>`
         : '<tr><td class="muted">No repeat failures found.</td></tr>';
 
-      // Daily trend table
       const days = buildDays(start, end);
       const dayKeys = days.map(d => dayKeyUTC(d));
       const dayLabels = days.map(d => toUKDate(d));
       
-      // Agent trend data for table
-      const agentTrendTable = new Map(); // agent -> day -> {count, sum}
+      const agentTrendTable = new Map();
       evals.forEach(e => {
         const aid = safeGet(e, 'agent.id') || e.agentUserId;
         const name = resolveUserName(aid);
@@ -3438,7 +2432,6 @@
         }
       });
       
-      // Build table
       let trendTable = `<table class="frozen-table">
         <thead>
           <tr>
@@ -3474,7 +2467,6 @@
       trendTable += '</tbody></table>';
       document.getElementById('trendTable').innerHTML = trendTable;
 
-      // Top/Bottom agents tables
       const sortedAgents = insightData
         .filter(a => a.count > 0)
         .sort((a, b) => (b.avg || 0) - (a.avg || 0));
@@ -3482,7 +2474,6 @@
       const topAgentsTable = sortedAgents.slice(0, 10);
       const bottomAgentsTable = sortedAgents.slice(-10).reverse();
       
-      // Top agents table
       let topHtml = '<thead><tr><th>Rank</th><th>Agent</th><th>Avg Score</th><th>Evaluations</th><th>Failures</th></tr></thead><tbody>';
       topAgentsTable.forEach((agent, i) => {
         const col = colourFor(agent.avg, pass, band);
@@ -3497,7 +2488,6 @@
       topHtml += '</tbody>';
       document.getElementById('topAgentsTable').innerHTML = topHtml;
       
-      // Bottom agents table
       let bottomHtml = '<thead><tr><th>Rank</th><th>Agent</th><th>Avg Score</th><th>Evaluations</th><th>Failures</th></tr></thead><tbody>';
       bottomAgentsTable.forEach((agent, i) => {
         const col = colourFor(agent.avg, pass, band);
@@ -3511,12 +2501,9 @@
       });
       bottomHtml += '</tbody>';
       document.getElementById('bottomAgentsTable').innerHTML = bottomHtml;
-      
-      // NEW: Render month comparison
-      renderMonthComparison();
     }
 
-    // ===== TRENDS RENDERER (Keep existing) =====
+    // ===== TRENDS RENDERER - FIXED SYNTAX =====
     async function renderTrends() {
       const raw = getTrendsSet();
       const trendsView = document.getElementById('trendsView');
@@ -3527,7 +2514,6 @@
         trendsNoData.style.display = 'block';
         document.getElementById('trendsKPIs').innerHTML = '';
         
-        // Clear any existing chart
         if (window.trendsChartInstance) {
           try {
             window.trendsChartInstance.destroy();
@@ -3553,9 +2539,8 @@
       const { pass, band } = getTrendPassSettings();
       const period = document.getElementById('trendPeriodSelect').value;
       
-      // Group evaluations by period
       const periodMap = new Map();
-      const agentPeriodMap = new Map(); // agent -> period -> {count, sum, passes, ambers, fails}
+      const agentPeriodMap = new Map();
       
       evals.forEach(e => {
         const date = new Date(e.releaseDate || e.assignedDate || e.creationDate || e.evaluationDate || e.date || Date.now());
@@ -3564,16 +2549,18 @@
         if (period === 'week') {
           periodKey = `${date.getFullYear()}-W${String(getWeekNumber(date)).padStart(2, '0')}`;
           periodLabel = formatWeek(date);
-        } else {
+        } else if (period === 'month') {
           periodKey = `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}`;
           periodLabel = new Date(date.getFullYear(), date.getMonth(), 1).toLocaleDateString('en-GB', { month: 'short', year: 'numeric' });
+        } else {
+          periodKey = dayKeyUTC(date);
+          periodLabel = toUKDate(date);
         }
         
         const score = getEvalPercent(e);
         const agentId = safeGet(e, 'agent.id') || e.agentUserId;
         const agentName = resolveUserName(agentId);
         
-        // Update period totals
         if (!periodMap.has(periodKey)) {
           periodMap.set(periodKey, {
             label: periodLabel,
@@ -3595,7 +2582,6 @@
           else periodData.fails++;
         }
         
-        // Check for critical/fatal
         const qGroups = safeGet(e, 'answers.questionGroupScores') || [];
         qGroups.forEach(g => {
           (g.questionScores || []).forEach(q => {
@@ -3607,7 +2593,6 @@
           });
         });
         
-        // Update agent-period data
         if (!agentPeriodMap.has(agentName)) {
           agentPeriodMap.set(agentName, new Map());
         }
@@ -3631,11 +2616,9 @@
         }
       });
       
-      // Sort periods chronologically
       const sortedPeriods = Array.from(periodMap.keys()).sort();
       const periodData = sortedPeriods.map(key => periodMap.get(key));
       
-      // Calculate KPIs
       let totalEvals = 0;
       let totalScore = 0;
       let totalPasses = 0;
@@ -3662,11 +2645,13 @@
         <div class="kpi"><div class="label">Periods</div><div class="value">${sortedPeriods.length}</div></div>
       `;
       
-      // Update chart title
-      document.getElementById('trendsTitle').textContent = 
-        period === 'week' ? 'Week over Week Performance' : 'Month over Month Performance';
+      const periodTitles = {
+        'day': 'Daily Performance',
+        'week': 'Weekly Performance',
+        'month': 'Monthly Performance'
+      };
+      document.getElementById('trendsTitle').textContent = periodTitles[period] || 'Performance Trends';
       
-      // Create Chart.js chart
       const canvas = document.getElementById('trendsChart');
       if (!canvas) {
         console.error('trendsChart canvas not found');
@@ -3679,7 +2664,6 @@
         return;
       }
       
-      // Destroy existing chart if it exists
       if (window.trendsChartInstance) {
         try {
           window.trendsChartInstance.destroy();
@@ -3730,7 +2714,7 @@
               stacked: true,
               title: {
                 display: true,
-                text: period === 'week' ? 'Week' : 'Month'
+                text: period === 'day' ? 'Date' : (period === 'week' ? 'Week' : 'Month')
               }
             },
             y: {
@@ -3754,7 +2738,6 @@
         }
       });
       
-      // Calculate trend statistics
       let improvementCount = 0;
       let declineCount = 0;
       let stableCount = 0;
@@ -3809,7 +2792,6 @@
         `;
       }
       
-      // Build agent improvement table
       const agentImprovements = [];
       
       Array.from(agentPeriodMap.entries()).forEach(([agentName, periodMap]) => {
@@ -3845,7 +2827,6 @@
         }
       });
       
-      // Sort by improvement
       agentImprovements.sort((a, b) => b.avgChange - a.avgChange);
       
       let improvementHtml = '<thead><tr><th>Agent</th><th>First Avg</th><th>Last Avg</th><th>Change</th><th>First Pass Rate</th><th>Last Pass Rate</th><th>Pass Rate Change</th><th>Total Evals</th><th>Trend</th></tr></thead><tbody>';
@@ -3890,7 +2871,6 @@
       
       c.innerHTML = '<div class="info-message">Loading evaluation details...</div>';
 
-      // Create evaluation data with all needed information
       const evaluationData = await Promise.all(state.evals.map(async (e) => {
         const agent = resolveUserName(safeGet(e, 'agent.id') || e.agentUserId);
         const lookup = await getCombinedLookupForEval(e);
@@ -3900,11 +2880,10 @@
         const contactInfo = extractContactInfo(e);
         const score = getEvalPercent(e);
         
-        // Check for critical/fatal marks - FIXED: changed qgs to qGroups
         let hasCritical = false;
         let hasFatal = false;
         const qGroups = safeGet(e, 'answers.questionGroupScores') || [];
-        for (const g of qGroups) { // FIXED: qgs changed to qGroups
+        for (const g of qGroups) {
           for (const q of (g.questionScores || [])) {
             const qIds = [q.questionId, q.questionContextId, safeGet(q, 'question.id'), safeGet(q, 'question.contextId')].filter(Boolean);
             const questionObj = qIds.map(id => lookup.questionObj.get(id)).find(Boolean);
@@ -3928,15 +2907,12 @@
         };
       }));
 
-      // Apply filters
       let filteredData = evaluationData;
       
-      // Agent filter
       if (state.detailsAgentFilter !== 'all') {
         filteredData = filteredData.filter(d => d.agent === state.detailsAgentFilter);
       }
       
-      // Score filter
       if (state.detailsScoreFilter !== 'all') {
         switch(state.detailsScoreFilter) {
           case 'pass':
@@ -3957,7 +2933,6 @@
         }
       }
 
-      // Sort the data based on current sort settings
       filteredData.sort((a, b) => {
         let aVal, bVal;
         
@@ -3990,13 +2965,11 @@
         }
       });
 
-      // Update agent filter dropdown
       const uniqueAgents = [...new Set(evaluationData.map(d => d.agent))].sort();
       const agentFilter = document.getElementById('detailsAgentFilter');
       agentFilter.innerHTML = '<option value="all">All Agents</option>' + 
         uniqueAgents.map(agent => `<option value="${agent}" ${state.detailsAgentFilter === agent ? 'selected' : ''}>${agent}</option>`).join('');
 
-      // Create sortable header
       const sortArrow = (field) => {
         if (state.detailsSortField === field) {
           return state.detailsSortDirection === 'asc' ? ' ▲' : ' ▼';
@@ -4019,7 +2992,6 @@
           <tbody>
       `;
 
-      // Create rows
       const rows = await Promise.all(filteredData.map(async (data, index) => {
         const { agent, formName, when, contactInfo, score, evalObj, lookup, hasCritical, hasFatal } = data;
         
@@ -4062,7 +3034,6 @@
              </div>`
           : `<div class="muted">No question data available.</div>`;
 
-        // Add critical/fatal indicators to score
         let scoreDisplay = score === null ? '-' : pct(score, 1);
         if (hasFatal) {
           scoreDisplay += ' <span class="badge badge-fatal">Fatal</span>';
@@ -4093,7 +3064,6 @@
 
       c.innerHTML = header + rows.join('') + footer + '</tbody></table>';
       
-      // Initialize all rows as collapsed
       for (let i = 0; i < filteredData.length; i++) {
         const row = document.getElementById(`details-row-${i}`);
         if (row) {
@@ -4119,8 +3089,7 @@
       const fatalMap=new Map();  
       const critMap=new Map();
       
-      // New data structure for agent failures
-      const agentFailures = new Map(); // agent -> Map(question -> {dates: [], type: 'critical'|'fatal'})
+      const agentFailures = new Map();
       
       function add(map, formName, qText, agentName, date, type){
         const key=formName+'|'+qText;
@@ -4129,7 +3098,6 @@
         o.count++; 
         o.agents.set(agentName,(o.agents.get(agentName)||0)+1);
         
-        // Add to agent failures
         if (!agentFailures.has(agentName)) {
           agentFailures.set(agentName, { 
             failures: new Map(), 
@@ -4151,7 +3119,6 @@
         failure.dates.push(date);
         failure.count++;
         
-        // Track counts separately
         if (type === 'fatal') {
           failure.type = 'fatal';
           agentData.fatalCount++;
@@ -4200,7 +3167,6 @@
         </div>
       `;
 
-      // Render agent failures table
       const agentFailureRows = [];
       const agentFailureArray = Array.from(agentFailures.entries())
         .filter(([agent, agentData]) => agentData.failures.size > 0)
@@ -4214,19 +3180,17 @@
         const failuresMap = agentData.failures;
         const failures = Array.from(failuresMap.entries())
           .sort((a, b) => {
-            // Sort by type (fatal first) then by number of occurrences
             if (a[1].type === 'fatal' && b[1].type !== 'fatal') return -1;
             if (a[1].type !== 'fatal' && b[1].type === 'fatal') return 1;
             return b[1].count - a[1].count;
           });
         
-        // Calculate totals
         const totalFailures = agentData.fatalCount + agentData.criticalCount;
         const hasFatal = agentData.fatalCount > 0;
         
         const failureItems = failures.map(([question, data]) => {
           const dates = [...new Set(data.dates)].sort().reverse();
-          const recentDates = dates.slice(0, 3); // Show only 3 most recent dates
+          const recentDates = dates.slice(0, 3);
           const datesText = recentDates.join(', ') + (dates.length > 3 ? ` (+${dates.length - 3} more)` : '');
           
           return `
@@ -4239,7 +3203,6 @@
           `;
         }).join('');
         
-        // Update the header to show both counts
         const headerText = `${agentName} - ${totalFailures} Total (${agentData.fatalCount} Fatal, ${agentData.criticalCount} Critical)`;
         
         agentFailureRows.push(`

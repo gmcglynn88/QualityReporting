@@ -270,312 +270,11 @@
       text-align: center;
     }
 
-    /* NEW STYLES: Date Range Selector Styles (from the first code) */
-    .date-range-container {
+    /* NEW STYLES: Date selection styling fixes */
+    input[type="month"], input[type="number"] {
       width: 100%;
-    }
-    
-    .date-range-input {
-      width: 100%;
-      padding: 10px 12px;
-      background: white;
-      border: 1px solid var(--border-color);
-      border-radius: 6px;
-      font-size: 14px;
-      color: var(--text-color);
-      cursor: pointer;
-      display: flex;
-      justify-content: space-between;
-      align-items: center;
-      transition: all 0.2s ease;
-      min-height: 42px;
       box-sizing: border-box;
-    }
-    
-    .date-range-input:hover {
-      border-color: var(--primary-color);
-      background-color: var(--pill);
-    }
-    
-    .calendar-icon {
-      color: var(--text-light);
-      font-size: 16px;
-      flex-shrink: 0;
-    }
-    
-    #date-range-value {
-      white-space: nowrap;
-      overflow: hidden;
-      text-overflow: ellipsis;
-      flex-grow: 1;
-      margin-right: 8px;
-    }
-    
-    .calendar-overlay {
-      position: fixed;
-      top: 0;
-      left: 0;
-      right: 0;
-      bottom: 0;
-      background: rgba(0, 0, 0, 0.5);
-      display: none;
-      justify-content: center;
-      align-items: center;
-      z-index: 1000;
-      padding: 20px;
-    }
-    
-    .calendar-overlay.active {
-      display: flex;
-    }
-    
-    .calendar-popup {
-      width: 100%;
-      max-width: 340px;
-      background: white;
-      border-radius: 12px;
-      box-shadow: 0 20px 40px rgba(0, 0, 0, 0.2);
-      overflow: hidden;
-      animation: fadeIn 0.2s ease;
-    }
-    
-    @keyframes fadeIn {
-      from { opacity: 0; transform: scale(0.95); }
-      to { opacity: 1; transform: scale(1); }
-    }
-    
-    .presets-sidebar {
-      padding: 20px;
-      background: var(--light-bg);
-      border-bottom: 1px solid var(--border-color);
-    }
-    
-    .presets-title {
-      font-size: 12px;
-      font-weight: 600;
-      color: var(--text-light);
-      margin-bottom: 15px;
-      text-transform: uppercase;
-      letter-spacing: 0.5px;
-    }
-    
-    .preset-grid {
-      display: grid;
-      grid-template-columns: repeat(2, 1fr);
-      gap: 10px;
-    }
-    
-    .preset-btn {
-      padding: 10px 12px;
-      background: white;
-      border: 1px solid var(--border-color);
-      border-radius: 8px;
-      font-size: 14px;
-      color: var(--text-color);
-      cursor: pointer;
-      transition: all 0.2s ease;
-      text-align: left;
-    }
-    
-    .preset-btn:hover {
-      background: var(--pill);
-      border-color: var(--primary-color);
-    }
-    
-    .preset-btn.active {
-      background: var(--primary-color);
-      color: white;
-      border-color: var(--primary-color);
-      font-weight: 600;
-    }
-    
-    .calendar-container {
-      padding: 20px;
-    }
-    
-    .calendar-header {
-      display: flex;
-      justify-content: space-between;
-      align-items: center;
-      margin-bottom: 20px;
-    }
-    
-    .current-month {
-      font-size: 16px;
-      font-weight: 600;
-      color: var(--text-color);
-    }
-    
-    .month-navigation {
-      display: flex;
-      gap: 8px;
-      align-items: center;
-    }
-    
-    .nav-btn {
-      width: 36px;
-      height: 36px;
-      border-radius: 8px;
-      border: 1px solid var(--border-color);
-      background: white;
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      cursor: pointer;
-      color: var(--text-color);
-      font-weight: 600;
-      transition: all 0.2s ease;
-    }
-    
-    .nav-btn:hover {
-      background: var(--pill);
-      border-color: var(--primary-color);
-    }
-    
-    .today-btn {
-      padding: 8px 12px;
-      background: var(--pill);
-      border: 1px solid var(--border-color);
-      border-radius: 8px;
-      font-weight: 600;
-      color: var(--text-color);
-      cursor: pointer;
-      transition: all 0.2s ease;
-      font-size: 14px;
-    }
-    
-    .today-btn:hover {
-      background: #e0f0ea;
-    }
-    
-    .weekdays-header {
-      display: grid;
-      grid-template-columns: repeat(7, 1fr);
-      margin-bottom: 12px;
-      text-align: center;
-    }
-    
-    .weekday {
-      font-weight: 600;
-      color: var(--text-light);
-      font-size: 12px;
-      padding: 6px 0;
-      text-transform: uppercase;
-    }
-    
-    .calendar-days {
-      display: grid;
-      grid-template-columns: repeat(7, 1fr);
-      gap: 6px;
-    }
-    
-    .calendar-day {
-      height: 36px;
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      border-radius: 8px;
-      font-size: 14px;
-      cursor: pointer;
-      transition: all 0.2s ease;
-      color: var(--text-color);
-      font-weight: 500;
-    }
-    
-    .calendar-day:hover {
-      background: var(--pill);
-    }
-    
-    .calendar-day.other-month {
-      color: #cbd5e1;
-    }
-    
-    .calendar-day.today {
-      border: 2px solid var(--primary-color);
-      color: var(--primary-color);
-    }
-    
-    .calendar-day.in-range {
-      background: #e0f0ea;
-      color: var(--secondary-color);
-    }
-    
-    .calendar-day.range-start {
-      background: linear-gradient(135deg, var(--primary-color), var(--secondary-color));
-      color: white;
-      font-weight: 600;
-      border-top-right-radius: 0;
-      border-bottom-right-radius: 0;
-    }
-    
-    .calendar-day.range-end {
-      background: linear-gradient(135deg, var(--primary-color), var(--secondary-color));
-      color: white;
-      font-weight: 600;
-      border-top-left-radius: 0;
-      border-bottom-left-radius: 0;
-    }
-    
-    .range-summary {
-      padding: 16px 20px;
-      background: var(--light-bg);
-      border-top: 1px solid var(--border-color);
-      display: flex;
-      justify-content: space-between;
-      align-items: center;
-    }
-    
-    .range-info {
-      font-size: 14px;
-      color: var(--text-color);
-    }
-    
-    .range-dates {
-      color: var(--primary-color);
-      font-weight: 600;
-      margin-left: 8px;
-    }
-    
-    .calendar-actions {
-      display: flex;
-      gap: 10px;
-    }
-    
-    .btn-secondary {
-      padding: 10px 16px;
-      background: white;
-      border: 1px solid var(--border-color);
-      border-radius: 8px;
-      font-weight: 600;
-      color: var(--text-color);
-      cursor: pointer;
-      transition: all 0.2s ease;
-      font-size: 14px;
-    }
-    
-    .btn-secondary:hover {
-      background: var(--pill);
-    }
-    
-    .btn-primary {
-      padding: 10px 20px;
-      background: var(--primary-color);
-      color: white;
-      border: none;
-      border-radius: 8px;
-      font-weight: 600;
-      font-size: 14px;
-      cursor: pointer;
-      transition: all 0.2s ease;
-    }
-    
-    .btn-primary:hover {
-      background: var(--secondary-color);
-    }
-    
-    .btn-primary:disabled {
-      background: var(--text-light);
-      cursor: not-allowed;
+      font-family: 'Aptos', 'Segoe UI', system-ui, -apple-system, Arial, sans-serif;
     }
     
     /* Chart placeholder styling */
@@ -593,13 +292,6 @@
       text-align: center;
       padding: 20px;
     }
-    
-    /* Progress bar for loading */
-    .progress-bar{width:100%;height:8px;background:var(--border-color);border-radius:4px;overflow:hidden;margin:10px 0}
-    .progress-fill{height:100%;background:var(--primary-color);transition:width .3s}
-    
-    /* Loading section */
-    #progressSection { display: none; }
   </style>
   <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
 </head>
@@ -635,15 +327,8 @@
             <div id="formDropdown" class="checkbox-dropdown"></div>
           </div>
           <div>
-            <label>Date Range</label>
-            <div class="date-range-container">
-              <div class="date-range-input" id="date-range-input">
-                <span id="date-range-value">Select date range</span>
-                <span class="calendar-icon">📅</span>
-              </div>
-            </div>
-            <input type="hidden" id="fromDate">
-            <input type="hidden" id="toDate">
+            <label for="monthInput">Month</label>
+            <input id="monthInput" type="month">
           </div>
           <div>
             <label>&nbsp;</label>
@@ -651,18 +336,6 @@
               <span class="loading-spinner" style="display:none"></span>
               <span class="btn-text">Load Evaluations</span>
             </button>
-          </div>
-        </div>
-      </div>
-
-      <!-- Progress Section -->
-      <div id="progressSection" style="display:none;">
-        <div class="card">
-          <h3 style="margin:0 0 8px;">Fetching Evaluations</h3>
-          <div class="muted" id="chunkInfo">Processing date range...</div>
-          <div class="progress-bar"><div class="progress-fill" id="progressFill" style="width:0%"></div></div>
-          <div style="display:flex;justify-content:space-between;font-size:14px" class="muted">
-            <span id="progressText">0%</span><span id="chunkText">Processing...</span>
           </div>
         </div>
       </div>
@@ -940,7 +613,7 @@
           <p><strong>Agents:</strong> Select individual agents you want to analyze. Use the search box to find specific agents.</p>
           <p><strong>Work Teams:</strong> Select entire teams to include all agents within those teams.</p>
           <p><strong>Evaluation Forms:</strong> Choose specific evaluation forms to filter results.</p>
-          <p><strong>Date Range Selection:</strong> Use the new date range picker to select custom date ranges or use preset ranges (Today, Yesterday, This Week, Last Week).</p>
+          <p><strong>Month Selection:</strong> Pick the month you want to analyze evaluations from.</p>
           <p><strong>Load Evaluations:</strong> Click this button after making your selections to load the data.</p>
           <div class="guide-note">
             <strong>Note:</strong> You must select at least one agent, team, or form before loading evaluations.
@@ -1026,57 +699,6 @@
     </div> <!-- end tab-guide -->
   </div>
 
-  <!-- Calendar Overlay (from the first code) -->
-  <div class="calendar-overlay" id="calendar-overlay">
-    <div class="calendar-popup" id="calendar-popup">
-      <div class="presets-sidebar">
-        <div class="presets-title">Quick Presets</div>
-        <div class="preset-grid">
-          <button class="preset-btn" data-preset="today">Today</button>
-          <button class="preset-btn" data-preset="yesterday">Yesterday</button>
-          <button class="preset-btn" data-preset="thisWeek">This week</button>
-          <button class="preset-btn" data-preset="lastWeek">Last week</button>
-          <button class="preset-btn active" data-preset="custom">Custom Range</button>
-        </div>
-      </div>
-      
-      <div class="calendar-container">
-        <div class="calendar-header">
-          <div class="current-month" id="current-month">Loading...</div>
-          <div class="month-navigation">
-            <button class="nav-btn" id="prev-month">&lt;</button>
-            <button class="today-btn" id="today-btn">Today</button>
-            <button class="nav-btn" id="next-month">&gt;</button>
-          </div>
-        </div>
-        
-        <div class="weekdays-header">
-          <div class="weekday">Sun</div>
-          <div class="weekday">Mon</div>
-          <div class="weekday">Tue</div>
-          <div class="weekday">Wed</div>
-          <div class="weekday">Thu</div>
-          <div class="weekday">Fri</div>
-          <div class="weekday">Sat</div>
-        </div>
-        
-        <div class="calendar-days" id="calendar-days">
-          <!-- Calendar days will be generated by JavaScript -->
-        </div>
-      </div>
-      
-      <div class="range-summary">
-        <div class="range-info">
-          Selected: <span class="range-dates" id="selected-range">Select a date range</span>
-        </div>
-        <div class="calendar-actions">
-          <button class="btn-secondary" id="clear-btn">Clear</button>
-          <button class="btn-primary" id="apply-calendar-btn">Apply</button>
-        </div>
-      </div>
-    </div>
-  </div>
-
   <script>
     // ===== Global Functions for HTML onclick attributes =====
     window.toggleRow = function(index) {
@@ -1139,15 +761,7 @@
       detailsSortDirection: 'desc',
       detailsAgentFilter: 'all',
       detailsScoreFilter: 'all',
-      filteredEvals: [],
-      
-      // Date range state
-      dateRangeState: {
-        currentDate: new Date(),
-        startDate: null,
-        endDate: null,
-        isSelectingRange: false
-      }
+      filteredEvals: []
     };
 
     const dropdowns = { 
@@ -1189,378 +803,6 @@
       const text=button.querySelector('.btn-text');
       if(isLoading){ spinner.style.display='inline-block'; text.textContent='Loading...'; button.disabled=true; }
       else{ spinner.style.display='none'; text.textContent = button.id==='loadTrendsBtn'?'Load Trends':(button.id==='loadAnalyticsBtn'?'Load Range':'Load Evaluations'); button.disabled=false; }
-    }
-    
-    // ===== Progress Bar Functions =====
-    function updateProgress(p,cur,total){ 
-      const progressFill = document.getElementById('progressFill');
-      const progressText = document.getElementById('progressText');
-      const chunkText = document.getElementById('chunkText');
-      
-      if (progressFill) progressFill.style.width = `${p}%`; 
-      if (progressText) progressText.textContent = `${Math.round(p)}%`; 
-      if (chunkText) chunkText.textContent = `Processing...`; 
-    }
-    
-    function showProgress(){ 
-      const progressSection = document.getElementById('progressSection');
-      if (progressSection) progressSection.style.display='block'; 
-    }
-    
-    function hideProgress(){ 
-      const progressSection = document.getElementById('progressSection');
-      if (progressSection) progressSection.style.display='none'; 
-    }
-
-    // ===== Date Range Selector Functions (from the first code) =====
-    function initializeDateRangeSelector() {
-      // Set default dates (last 7 days)
-      const today = new Date();
-      const weekAgo = new Date();
-      weekAgo.setDate(today.getDate() - 7);
-      
-      state.dateRangeState.startDate = weekAgo;
-      state.dateRangeState.endDate = today;
-      
-      updateDateRangeDisplay();
-      updateHiddenDateInputs();
-      updateCalendar();
-    }
-    
-    function updateHiddenDateInputs() {
-      if (state.dateRangeState.startDate) {
-        document.getElementById('fromDate').value = state.dateRangeState.startDate.toISOString().split('T')[0];
-      }
-      if (state.dateRangeState.endDate) {
-        document.getElementById('toDate').value = state.dateRangeState.endDate.toISOString().split('T')[0];
-      }
-    }
-    
-    function updateDateRangeDisplay() {
-      const valueElement = document.getElementById('date-range-value');
-      if (state.dateRangeState.startDate && state.dateRangeState.endDate) {
-        const startStr = formatDateDisplay(state.dateRangeState.startDate);
-        const endStr = formatDateDisplay(state.dateRangeState.endDate);
-        valueElement.textContent = `${startStr} - ${endStr}`;
-      } else if (state.dateRangeState.startDate) {
-        const startStr = formatDateDisplay(state.dateRangeState.startDate);
-        valueElement.textContent = `${startStr} (Select end date)`;
-      } else {
-        valueElement.textContent = 'Select date range';
-      }
-    }
-    
-    function formatDateDisplay(date) {
-      return date.toLocaleDateString('en-US', { 
-        month: 'short', 
-        day: 'numeric',
-        year: 'numeric'
-      });
-    }
-    
-    function isSameDay(date1, date2) {
-      return date1.getFullYear() === date2.getFullYear() &&
-             date1.getMonth() === date2.getMonth() &&
-             date1.getDate() === date2.getDate();
-    }
-    
-    function isDateInRange(date) {
-      if (!state.dateRangeState.startDate || !state.dateRangeState.endDate) return false;
-      return date >= state.dateRangeState.startDate && date <= state.dateRangeState.endDate;
-    }
-    
-    function getWeekStartDate(date) {
-      const result = new Date(date);
-      const day = result.getDay();
-      const diff = result.getDate() - day;
-      result.setDate(diff);
-      return result;
-    }
-    
-    function getWeekEndDate(date) {
-      const result = new Date(date);
-      const day = result.getDay();
-      const diff = result.getDate() + (6 - day);
-      result.setDate(diff);
-      return result;
-    }
-    
-    function updateCalendar() {
-      const monthNames = ['January', 'February', 'March', 'April', 'May', 'June',
-          'July', 'August', 'September', 'October', 'November', 'December'];
-      const year = state.dateRangeState.currentDate.getFullYear();
-      const month = state.dateRangeState.currentDate.getMonth();
-      document.getElementById('current-month').textContent = `${monthNames[month]} ${year}`;
-      
-      // Clear calendar
-      const calendarDaysElement = document.getElementById('calendar-days');
-      calendarDaysElement.innerHTML = '';
-      
-      // Get first day of month and total days
-      const firstDay = new Date(year, month, 1);
-      const lastDay = new Date(year, month + 1, 0);
-      const daysInMonth = lastDay.getDate();
-      const startingDay = firstDay.getDay(); // 0 = Sunday
-      
-      const today = new Date();
-      
-      // Add days from previous month (now selectable)
-      if (startingDay > 0) {
-        const prevMonthLastDay = new Date(year, month, 0).getDate();
-        for (let i = startingDay - 1; i >= 0; i--) {
-          const prevMonthDay = prevMonthLastDay - i;
-          const dayDate = new Date(year, month - 1, prevMonthDay);
-          const dayElement = createDayElement('calendar-day other-month', prevMonthDay);
-          
-          // Check if this day is selected
-          applySelectionClasses(dayElement, dayDate, today);
-          
-          // Add click event for selecting dates
-          dayElement.addEventListener('click', (e) => {
-            e.stopPropagation();
-            handleDateClick(dayDate);
-          });
-          
-          calendarDaysElement.appendChild(dayElement);
-        }
-      }
-      
-      // Add days of the current month
-      for (let day = 1; day <= daysInMonth; day++) {
-        const dayDate = new Date(year, month, day);
-        const dayElement = createDayElement('calendar-day', day);
-        
-        // Check if this day is selected
-        applySelectionClasses(dayElement, dayDate, today);
-        
-        // Add click event for selecting dates
-        dayElement.addEventListener('click', (e) => {
-          e.stopPropagation();
-          handleDateClick(dayDate);
-        });
-        
-        calendarDaysElement.appendChild(dayElement);
-      }
-      
-      // Calculate how many cells we've added so far
-      const totalCellsSoFar = startingDay + daysInMonth;
-      const cellsNeededForFullGrid = 42; // 6 rows * 7 days
-      
-      // Add days from next month to complete the grid (now selectable)
-      if (totalCellsSoFar < cellsNeededForFullGrid) {
-        for (let i = 1; i <= (cellsNeededForFullGrid - totalCellsSoFar); i++) {
-          const dayDate = new Date(year, month + 1, i);
-          const dayElement = createDayElement('calendar-day other-month', i);
-          
-          // Check if this day is selected
-          applySelectionClasses(dayElement, dayDate, today);
-          
-          // Add click event for selecting dates
-          dayElement.addEventListener('click', (e) => {
-            e.stopPropagation();
-            handleDateClick(dayDate);
-          });
-          
-          calendarDaysElement.appendChild(dayElement);
-        }
-      }
-      
-      // Update apply button state
-      document.getElementById('apply-calendar-btn').disabled = !(state.dateRangeState.startDate && state.dateRangeState.endDate);
-    }
-    
-    function createDayElement(className, day) {
-      const dayElement = document.createElement('div');
-      dayElement.className = className;
-      if (day) dayElement.textContent = day;
-      return dayElement;
-    }
-    
-    function applySelectionClasses(dayElement, dayDate, today) {
-      const isToday = isSameDay(dayDate, today);
-      const isStartDate = state.dateRangeState.startDate && isSameDay(dayDate, state.dateRangeState.startDate);
-      const isEndDate = state.dateRangeState.endDate && isSameDay(dayDate, state.dateRangeState.endDate);
-      const isInRange = isDateInRange(dayDate);
-      
-      if (isToday) dayElement.classList.add('today');
-      if (isInRange) dayElement.classList.add('in-range');
-      if (isStartDate) dayElement.classList.add('range-start');
-      if (isEndDate) dayElement.classList.add('range-end');
-    }
-    
-    function handleDateClick(date) {
-      if (!state.dateRangeState.startDate || (state.dateRangeState.startDate && state.dateRangeState.endDate)) {
-        // Start new selection
-        state.dateRangeState.startDate = new Date(date);
-        state.dateRangeState.endDate = null;
-        state.dateRangeState.isSelectingRange = true;
-        
-        // Update current month view to show the selected month
-        const clickedMonth = date.getMonth();
-        const clickedYear = date.getFullYear();
-        
-        // Only update currentDate if the clicked date is from a different month
-        if (clickedMonth !== state.dateRangeState.currentDate.getMonth() || clickedYear !== state.dateRangeState.currentDate.getFullYear()) {
-          state.dateRangeState.currentDate = new Date(clickedYear, clickedMonth, 1);
-        }
-        
-        // Update preset buttons
-        document.querySelectorAll('.preset-btn').forEach(btn => btn.classList.remove('active'));
-        document.querySelector('[data-preset="custom"]').classList.add('active');
-      } else if (state.dateRangeState.isSelectingRange) {
-        // Complete the range selection
-        if (date < state.dateRangeState.startDate) {
-          state.dateRangeState.endDate = new Date(state.dateRangeState.startDate);
-          state.dateRangeState.startDate = new Date(date);
-        } else {
-          state.dateRangeState.endDate = new Date(date);
-        }
-        state.dateRangeState.isSelectingRange = false;
-        
-        // Update current month view to show the start date month
-        const clickedMonth = state.dateRangeState.startDate.getMonth();
-        const clickedYear = state.dateRangeState.startDate.getFullYear();
-        
-        // Only update currentDate if the start date is from a different month
-        if (clickedMonth !== state.dateRangeState.currentDate.getMonth() || clickedYear !== state.dateRangeState.currentDate.getFullYear()) {
-          state.dateRangeState.currentDate = new Date(clickedYear, clickedMonth, 1);
-        }
-      }
-      
-      updateDateRangeDisplay();
-      updateSelectedRangeDisplay();
-      updateCalendar();
-    }
-    
-    function updateSelectedRangeDisplay() {
-      if (state.dateRangeState.startDate && state.dateRangeState.endDate) {
-        const startStr = formatDateDisplay(state.dateRangeState.startDate);
-        const endStr = formatDateDisplay(state.dateRangeState.endDate);
-        document.getElementById('selected-range').textContent = `${startStr} - ${endStr}`;
-      } else if (state.dateRangeState.startDate) {
-        const startStr = formatDateDisplay(state.dateRangeState.startDate);
-        document.getElementById('selected-range').textContent = `${startStr} (Select end date)`;
-      } else {
-        document.getElementById('selected-range').textContent = 'Select a date range';
-      }
-    }
-    
-    function openCalendar() {
-      document.getElementById('calendar-overlay').classList.add('active');
-      document.body.style.overflow = 'hidden';
-    }
-    
-    function closeCalendar() {
-      document.getElementById('calendar-overlay').classList.remove('active');
-      document.body.style.overflow = 'auto';
-    }
-    
-    function setupCalendarEvents() {
-      // Open calendar
-      document.getElementById('date-range-input').addEventListener('click', openCalendar);
-      
-      // Close calendar when clicking on overlay
-      document.getElementById('calendar-overlay').addEventListener('click', function(e) {
-        if (e.target === document.getElementById('calendar-overlay')) closeCalendar();
-      });
-      
-      // Month navigation
-      document.getElementById('prev-month').addEventListener('click', (e) => {
-        e.stopPropagation();
-        state.dateRangeState.currentDate.setMonth(state.dateRangeState.currentDate.getMonth() - 1);
-        updateCalendar();
-      });
-      
-      document.getElementById('next-month').addEventListener('click', (e) => {
-        e.stopPropagation();
-        state.dateRangeState.currentDate.setMonth(state.dateRangeState.currentDate.getMonth() + 1);
-        updateCalendar();
-      });
-      
-      document.getElementById('today-btn').addEventListener('click', (e) => {
-        e.stopPropagation();
-        state.dateRangeState.currentDate = new Date();
-        updateCalendar();
-      });
-      
-      // Clear selection
-      document.getElementById('clear-btn').addEventListener('click', (e) => {
-        e.stopPropagation();
-        state.dateRangeState.startDate = null;
-        state.dateRangeState.endDate = null;
-        updateDateRangeDisplay();
-        updateSelectedRangeDisplay();
-        updateCalendar();
-        document.querySelectorAll('.preset-btn').forEach(btn => btn.classList.remove('active'));
-        document.querySelector('[data-preset="custom"]').classList.add('active');
-      });
-      
-      // Apply calendar selection
-      document.getElementById('apply-calendar-btn').addEventListener('click', (e) => {
-        e.stopPropagation();
-        if (state.dateRangeState.startDate && state.dateRangeState.endDate) {
-          updateDateRangeDisplay();
-          updateHiddenDateInputs();
-          closeCalendar();
-          updateMonthRange(); // Update the month range based on date range
-        } else {
-          alert('Please select a date range first.');
-        }
-      });
-      
-      // Preset button functionality
-      document.querySelectorAll('.preset-btn').forEach(button => {
-        button.addEventListener('click', function(e) {
-          e.stopPropagation();
-          document.querySelectorAll('.preset-btn').forEach(btn => btn.classList.remove('active'));
-          this.classList.add('active');
-          
-          const preset = this.dataset.preset;
-          const today = new Date();
-          
-          switch(preset) {
-            case 'today':
-              state.dateRangeState.startDate = new Date(today);
-              state.dateRangeState.endDate = new Date(today);
-              break;
-            case 'yesterday':
-              const yesterday = new Date(today);
-              yesterday.setDate(yesterday.getDate() - 1);
-              state.dateRangeState.startDate = yesterday;
-              state.dateRangeState.endDate = yesterday;
-              break;
-            case 'thisWeek':
-              state.dateRangeState.startDate = getWeekStartDate(today);
-              state.dateRangeState.endDate = getWeekEndDate(today);
-              break;
-            case 'lastWeek':
-              const lastWeek = new Date(today);
-              lastWeek.setDate(lastWeek.getDate() - 7);
-              state.dateRangeState.startDate = getWeekStartDate(lastWeek);
-              state.dateRangeState.endDate = getWeekEndDate(lastWeek);
-              break;
-            case 'custom':
-              break;
-          }
-          
-          if (state.dateRangeState.startDate) {
-            state.dateRangeState.currentDate = new Date(state.dateRangeState.startDate);
-          }
-          
-          updateDateRangeDisplay();
-          updateSelectedRangeDisplay();
-          updateCalendar();
-          updateHiddenDateInputs();
-          updateMonthRange(); // Update the month range based on date range
-        });
-      });
-      
-      // Close on Escape key
-      document.addEventListener('keydown', function(e) {
-        if (e.key === 'Escape' && document.getElementById('calendar-overlay').classList.contains('active')) {
-          closeCalendar();
-        }
-      });
     }
 
     // ===== Checkbox dropdown =====
@@ -1622,10 +864,11 @@
     }
 
     function updateLoadButtonState(){
+      const hasMonth=document.getElementById('monthInput').value;
       const hasUsers=dropdowns.users && dropdowns.users.getSelectedValues().length>0;
       const hasTeams=dropdowns.teams && dropdowns.teams.getSelectedValues().length>0;
       const hasForms=dropdowns.forms && dropdowns.forms.getSelectedValues().length>0;
-      document.getElementById('loadBtn').disabled=!((hasUsers || hasTeams || hasForms));
+      document.getElementById('loadBtn').disabled=!(hasMonth && (hasUsers || hasTeams || hasForms));
     }
 
     // ===== Main Tab Switching Function =====
@@ -1757,19 +1000,16 @@
       // New event listeners for details filters
       document.getElementById('applyFiltersBtn').onclick=applyDetailsFilters;
 
-      // Initialize date range selector
-      initializeDateRangeSelector();
-      setupCalendarEvents();
-
-      // Set default month values based on date range
       const m=new Date();
       const cur=`${m.getFullYear()}-${String(m.getMonth()+1).padStart(2,'0')}`;
+      document.getElementById('monthInput').value = cur;
       document.getElementById('anaFrom').value = cur;
       document.getElementById('anaTo').value = cur;
       document.getElementById('trendFrom').value = cur;
       document.getElementById('trendTo').value = cur;
 
       updateMonthRange();
+      document.getElementById('monthInput').addEventListener('change',()=>{ updateMonthRange(); updateLoadButtonState(); });
 
       Promise.all([fetchAllUsers(), fetchAllTeams(), fetchAllForms()])
         .then(()=> {
@@ -1798,20 +1038,11 @@
     }
 
     function updateMonthRange(){
-      // Use the date range from the date picker instead of month input
-      const from = document.getElementById('fromDate').value;
-      const to = document.getElementById('toDate').value || from;
-      
-      if(!from) return;
-      
-      const fromDate = new Date(from);
-      const toDate = to ? new Date(to) : new Date(from);
-      
-      // Set to end of day for toDate
-      toDate.setHours(23, 59, 59, 999);
-      
-      state.monthStart = fromDate;
-      state.monthEnd = toDate;
+      const val=document.getElementById('monthInput').value;
+      if(!val) return;
+      const [y,m]=val.split('-').map(Number);
+      state.monthStart=new Date(Date.UTC(y, m-1, 1, 0,0,0));
+      state.monthEnd  =new Date(Date.UTC(y, m,   0, 23,59,59));
     }
 
     // ===== HTTP helper with spacing + retry/backoff =====
@@ -2051,31 +1282,6 @@
       return Array.from(ids);
     }
 
-    // ===== Date Range Chunking Functions (from the first code) =====
-    function chunks(start,end,days){
-      const out=[]; const s=new Date(start), e=new Date(end); let cur=new Date(s);
-      while(cur<=e){ 
-        let ce=new Date(cur); 
-        ce.setDate(ce.getDate()+days-1); 
-        if(ce>e) ce=new Date(e);
-        out.push({
-          start:cur.toISOString().slice(0,10), 
-          end:ce.toISOString().slice(0,10)
-        }); 
-        cur.setDate(cur.getDate()+days);
-      } 
-      return out;
-    }
-    
-    function optimalDays(start,end){
-      const s=new Date(start), e=new Date(end), total=Math.ceil((e-s)/(1000*60*60*24))+1;
-      if(total<=7) return 7; 
-      if(total<=30) return 7; 
-      if(total<=90) return 5; 
-      if(total<=180) return 3; 
-      return 2;
-    }
-
     // ===== Evaluations with GET/POST fallback + retry =====
     async function loadEvaluations(){
       const agentIds = await computeSelectedAgentIds();
@@ -2085,57 +1291,15 @@
         msg('Please select at least one agent, team, or form.','error');
         return;
       }
-      
-      // Get dates from hidden inputs (populated by date range selector)
-      const from = document.getElementById('fromDate').value;
-      const to = document.getElementById('toDate').value || from;
-      
-      if(!from){ 
-        msg('Please select a date range first', true); 
-        return; 
-      }
-      
-      const today = new Date().toISOString().split('T')[0];
-      if(from > today || to > today) { 
-        msg('Date range cannot be in the future', true); 
-        return; 
+      if(!state.monthStart || !state.monthEnd){
+        msg('Please select a month.','error');
+        return;
       }
 
-      const btn=document.getElementById('loadBtn'); setLoading(btn,true); 
-      showProgress();
-      updateProgress(0, 0, 1);
-      msg('Loading evaluations…','info');
-      
+      const btn=document.getElementById('loadBtn'); setLoading(btn,true); msg('Loading evaluations…','info');
       try{
         const agentList = agentIds.length ? agentIds : state.users.map(u=>u.id);
-        
-        // Use chunking for large date ranges
-        const days = optimalDays(from, to);
-        const dateChunks = chunks(from, to, days);
-        
-        document.getElementById('chunkInfo').innerHTML = 
-          `Processing range: <strong>${from} to ${to}</strong><br>Split into <strong>${dateChunks.length} chunks</strong> of ${days} days.`;
-
-        state.evals = [];
-        
-        for(let i=0; i<dateChunks.length; i++){
-          const ch = dateChunks[i]; 
-          updateProgress((i/dateChunks.length)*100, i+1, dateChunks.length);
-          msg(`Fetching chunk ${i+1}/${dateChunks.length}: ${ch.start} → ${ch.end}`, 'info');
-          
-          try{
-            const chunkEvals = await fetchDetailedEvaluations(agentList, formIds, new Date(ch.start), new Date(ch.end + 'T23:59:59'));
-            state.evals = state.evals.concat(chunkEvals);
-          }catch(e){ 
-            console.error('Error in chunk:', e); 
-            msg('Warning: failed chunk ' + (i+1) + ', continuing…', true); 
-          }
-          
-          // Small delay between chunks to avoid rate limiting
-          if(i<dateChunks.length-1) await new Promise(r=>setTimeout(r,400));
-        }
-
-        updateProgress(100, dateChunks.length, dateChunks.length);
+        state.evals = await fetchDetailedEvaluations(agentList, formIds, state.monthStart, state.monthEnd);
         
         // CRITICAL FIX: Load ALL form details for ALL forms found in evaluations
         await loadAllFormDetailsFromEvaluations(state.evals);
@@ -2146,10 +1310,7 @@
         // FIX 3: Removed auto-load analytics and trends data
         // Charts will load when user switches to those tabs
       }catch(e){ console.error(e); msg('Failed to load evaluations: '+e.message,'error'); }
-      finally{ 
-        setLoading(btn,false); 
-        hideProgress();
-      }
+      finally{ setLoading(btn,false); }
     }
 
     async function loadAnalyticsRange(){
@@ -2827,7 +1988,7 @@
       const overallAvg=(rows.length && total)?(rows.reduce((s,r)=>s+(r.avg||0),0)/rows.length):null;
 
       document.getElementById('overviewKPIs').innerHTML=`
-        <div class="kpi"><div class="label">Date Range</div><div class="value">${document.getElementById('date-range-value').textContent}</div></div>
+        <div class="kpi"><div class="label">Month</div><div class="value">${document.getElementById('monthInput').value}</div></div>
         <div class="kpi"><div class="label">Evaluations</div><div class="value">${evals.length}</div></div>
         <div class="kpi"><div class="label">Agents</div><div class="value">${rows.length}</div></div>
         <div class="kpi"><div class="label">Average Score (Agent Avg)</div><div class="value">${overallAvg==null?'-':pct(overallAvg,1)}</div></div>`;
@@ -3455,7 +2616,7 @@
         .forEach(([name, dayMap]) => {
           trendTable += `<tr><td>${name}</td>`;
           
-          dayKeys.forEach(day) => {
+          dayKeys.forEach(day => {
             const data = dayMap.get(day);
             if (data && data.count > 0) {
               const avg = data.sum / data.count;
@@ -4287,7 +3448,7 @@
                     : '<span class="badge badge-critical">Critical</span>'}</td>
               <td>${r.count}</td>
               <td>${agentsHtml}</td>
-            </tr>`;
+            </tr>`);
           });
       }
       rowsFrom(fatalMap,'fatal'); 

@@ -4,6 +4,7 @@
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
   <style>
+    /* ALL YOUR CSS STYLES REMAIN UNCHANGED */
     :root{ --primary-color:#63AB8F; --secondary-color:#4A8C7D; --border-color:#DEE2E6;
       --light-bg:#F8F9FA; --card-bg:#FFFFFF; --text-color:#2C3E50; --text-light:#6C757D; --pill:#e9f6f0;
       --ok:#22c55e; --warn:#f59e0b; --bad:#ef4444; }
@@ -1993,11 +1994,6 @@
     async function renderAnalytics(){
       const raw = getAnalyticsSet();
       
-      // Get chart canvas elements
-      const mediaTypeCanvas = document.getElementById('mediaTypeChart');
-      const agentTrendCanvas = document.getElementById('agentTrendChart');
-      const scoreDistCanvas = document.getElementById('scoreDistributionChart');
-      
       // Check if charts should be rendered
       if(!raw || !raw.length){
         document.getElementById('analyticsKPIs').innerHTML='<div class="muted" style="padding:20px;text-align:center">No analytics data loaded. Use "Load Range" button to load data.</div>';
@@ -2008,8 +2004,8 @@
         document.getElementById('topAgentsTable').innerHTML='';
         document.getElementById('bottomAgentsTable').innerHTML='';
         
-        // Clear any existing charts properly
-        ['mediaTypeChart', 'agentTrendChart', 'scoreDistributionChart'].forEach(id => {
+        // Clear any existing charts properly WITHOUT removing the canvas elements
+        ['mediaTypeChart', 'agentTrendChart', 'scoreDistributionChart', 'trendsChart'].forEach(id => {
           const canvas = document.getElementById(id);
           if (canvas) {
             const ctx = canvas.getContext('2d');
@@ -2028,23 +2024,44 @@
               window.scoreDistributionChartInstance.destroy();
               window.scoreDistributionChartInstance = null;
             }
-            
-            // Create a placeholder message
-            const container = canvas.parentElement;
-            if (container) {
-              container.innerHTML = `
-                <div class="muted" style="text-align:center;padding:40px;background:#f8f9fa;border-radius:6px;">
-                  <div style="font-size:14px;margin-bottom:8px;">📊</div>
-                  <div style="font-size:12px;">No data available</div>
-                  <div style="font-size:11px;margin-top:4px;">Load analytics data first</div>
-                </div>
-              `;
+            if (id === 'trendsChart' && window.trendsChartInstance) {
+              window.trendsChartInstance.destroy();
+              window.trendsChartInstance = null;
             }
           }
         });
         
+        // Display "no data" message on the charts WITHOUT replacing canvas elements
+        const mediaChartContainer = document.querySelector('.analytics-chart-container');
+        if (mediaChartContainer) {
+          // Create a placeholder div that will sit on top of the canvas
+          let placeholder = mediaChartContainer.querySelector('.chart-placeholder');
+          if (!placeholder) {
+            placeholder = document.createElement('div');
+            placeholder.className = 'chart-placeholder';
+            placeholder.style.cssText = 'position:absolute; top:0; left:0; width:100%; height:100%; display:flex; align-items:center; justify-content:center; background:rgba(248,249,250,0.9); z-index:5;';
+            mediaChartContainer.appendChild(placeholder);
+          }
+          placeholder.innerHTML = `
+            <div style="text-align:center;padding:20px;">
+              <div style="font-size:14px;margin-bottom:8px;">📊</div>
+              <div style="font-size:12px;">No data available</div>
+              <div style="font-size:11px;margin-top:4px;">Load analytics data first</div>
+            </div>
+          `;
+          placeholder.style.display = 'flex';
+        }
+        
+        // Hide month comparison
+        document.getElementById('monthComparison').style.display = 'none';
+        
         return;
       }
+
+      // Remove placeholder messages if they exist
+      document.querySelectorAll('.chart-placeholder').forEach(placeholder => {
+        placeholder.style.display = 'none';
+      });
 
       const teamFilter = dropdowns.analyticsTeams.getSelectedValues();
       let allowedAgents = null;
@@ -2141,15 +2158,14 @@
 
       // 1. Media Type Chart (Stacked Bar)
       try {
-        const mediaTypeCtx = document.getElementById('mediaTypeChart').getContext('2d');
-        if (window.mediaTypeChartInstance) {
-          window.mediaTypeChartInstance.destroy();
+        const mediaTypeCanvas = document.getElementById('mediaTypeChart');
+        if (!mediaTypeCanvas) {
+          throw new Error('Canvas element not found');
         }
         
-        // Make sure container has canvas again
-        const mediaChartContainer = document.querySelector('.analytics-chart-container');
-        if (mediaChartContainer && !mediaChartContainer.querySelector('canvas')) {
-          mediaChartContainer.innerHTML = '<canvas id="mediaTypeChart"></canvas>';
+        const mediaTypeCtx = mediaTypeCanvas.getContext('2d');
+        if (window.mediaTypeChartInstance) {
+          window.mediaTypeChartInstance.destroy();
         }
         
         const mediaTypes = ['Voice', 'Email', 'Message', 'Social', 'Other'];
@@ -2214,16 +2230,16 @@
         });
       } catch (chartError) {
         console.error('Error creating mediaTypeChart:', chartError);
-        // Show error message
-        const container = document.querySelector('.analytics-chart-container');
-        if (container) {
-          container.innerHTML = `<div class="error-message" style="margin:20px">Chart error: ${chartError.message}</div>`;
-        }
       }
 
       // 2. Agent Trend Chart (Line chart for top 5 agents)
       try {
-        const agentTrendCtx = document.getElementById('agentTrendChart').getContext('2d');
+        const agentTrendCanvas = document.getElementById('agentTrendChart');
+        if (!agentTrendCanvas) {
+          throw new Error('Canvas element not found');
+        }
+        
+        const agentTrendCtx = agentTrendCanvas.getContext('2d');
         if (window.agentTrendChartInstance) {
           window.agentTrendChartInstance.destroy();
         }
@@ -2320,15 +2336,16 @@
         });
       } catch (chartError) {
         console.error('Error creating agentTrendChart:', chartError);
-        const container = document.querySelectorAll('.card')[9]; // Find the right container
-        if (container && container.querySelector('.card > div')) {
-          container.querySelector('.card > div').innerHTML = `<div class="error-message" style="margin:20px">Chart error: ${chartError.message}</div>`;
-        }
       }
 
       // 3. Score Distribution Chart (Histogram)
       try {
-        const scoreDistCtx = document.getElementById('scoreDistributionChart').getContext('2d');
+        const scoreDistCanvas = document.getElementById('scoreDistributionChart');
+        if (!scoreDistCanvas) {
+          throw new Error('Canvas element not found');
+        }
+        
+        const scoreDistCtx = scoreDistCanvas.getContext('2d');
         if (window.scoreDistributionChartInstance) {
           window.scoreDistributionChartInstance.destroy();
         }
@@ -2389,10 +2406,6 @@
         });
       } catch (chartError) {
         console.error('Error creating scoreDistributionChart:', chartError);
-        const container = document.querySelectorAll('.card')[10]; // Find the right container
-        if (container && container.querySelector('.card > div')) {
-          container.querySelector('.card > div').innerHTML = `<div class="error-message" style="margin:20px">Chart error: ${chartError.message}</div>`;
-        }
       }
 
       // Build media table (agent × media) - KEEPING EXISTING TABLE
@@ -2725,7 +2738,13 @@
         period === 'week' ? 'Week over Week Performance' : 'Month over Month Performance';
       
       // Create Chart.js chart
-      const ctx = document.getElementById('trendsChart').getContext('2d');
+      const canvas = document.getElementById('trendsChart');
+      if (!canvas) {
+        console.error('trendsChart canvas not found');
+        return;
+      }
+      
+      const ctx = canvas.getContext('2d');
       
       // Destroy existing chart if it exists
       if (window.trendsChartInstance) {

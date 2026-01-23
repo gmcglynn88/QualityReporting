@@ -213,6 +213,61 @@
     .guide-step h3 { margin-top: 0; color: var(--secondary-color); }
     .guide-step p { margin: 8px 0; }
     .guide-note { background: var(--pill); border: 1px solid var(--border-color); border-radius: 8px; padding: 12px; margin: 12px 0; }
+    
+    /* Month Comparison Styles */
+    .month-comparison { 
+      background: var(--light-bg);
+      border: 1px solid var(--border-color);
+      border-radius: 8px;
+      padding: 16px;
+      margin: 20px 0;
+    }
+    .month-comparison h3 { 
+      margin: 0 0 16px 0;
+      color: var(--secondary-color);
+      font-size: 18px;
+    }
+    .comparison-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+      gap: 12px;
+    }
+    .comparison-item {
+      background: white;
+      border: 1px solid var(--border-color);
+      border-radius: 6px;
+      padding: 12px;
+      text-align: center;
+    }
+    .comparison-item .label {
+      font-size: 12px;
+      color: var(--text-light);
+      margin-bottom: 4px;
+    }
+    .comparison-item .value {
+      font-size: 20px;
+      font-weight: bold;
+      margin: 4px 0;
+    }
+    .comparison-item .change {
+      font-size: 12px;
+      font-weight: 500;
+    }
+    .comparison-item .change.positive {
+      color: var(--ok);
+    }
+    .comparison-item .change.negative {
+      color: var(--bad);
+    }
+    .comparison-item .change.neutral {
+      color: var(--text-light);
+    }
+    .comparison-note {
+      font-size: 11px;
+      color: var(--text-light);
+      margin-top: 8px;
+      text-align: center;
+    }
   </style>
   <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
 </head>
@@ -284,6 +339,15 @@
         <div id="analyticsTab" class="tab-content">
           <h2 class="section-title">Analytics</h2>
 
+          <!-- Month Comparison Section - NEW -->
+          <div id="monthComparison" class="month-comparison" style="display:none;">
+            <h3>Month-to-Month Comparison</h3>
+            <div class="comparison-grid" id="comparisonGrid">
+              <!-- Will be populated by JavaScript -->
+            </div>
+            <div class="comparison-note">Comparing two most recent months with data</div>
+          </div>
+
           <div class="controls" style="margin-top:8px">
             <div>
               <label for="anaFrom">From (Month)</label>
@@ -347,8 +411,9 @@
             </div>
           </div>
 
-          <div class="table-container">
-            <table id="mediaTable" class="sortable"></table>
+          <!-- Fixed frozen table container for media table -->
+          <div class="frozen-table-container">
+            <table id="mediaTable" class="frozen-table sortable"></table>
           </div>
           <div class="table-container">
             <table id="repeatFailsTable" class="sortable"></table>
@@ -448,8 +513,8 @@
             <!-- Trend Improvement Table -->
             <div class="trend-table-container">
               <h3 class="section-title">Agent Performance Trends</h3>
-              <div class="table-container">
-                <table id="trendImprovementTable" class="sortable"></table>
+              <div class="frozen-table-container">
+                <table id="trendImprovementTable" class="frozen-table sortable"></table>
               </div>
             </div>
           </div>
@@ -487,7 +552,8 @@
             </div>
           </div>
           
-          <div id="detailsContainer"></div>
+          <!-- Fixed frozen table container for details -->
+          <div id="detailsContainer" class="frozen-table-container"></div>
         </div>
 
         <div id="criticalTab" class="tab-content">
@@ -909,13 +975,27 @@
       // New event listeners for details filters
       document.getElementById('applyFiltersBtn').onclick=applyDetailsFilters;
 
+      // Set default dates: current month for main, previous month for analytics/trends
       const m=new Date();
-      const cur=`${m.getFullYear()}-${String(m.getMonth()+1).padStart(2,'0')}`;
-      document.getElementById('monthInput').value = cur;
-      document.getElementById('anaFrom').value = cur;
-      document.getElementById('anaTo').value = cur;
-      document.getElementById('trendFrom').value = cur;
-      document.getElementById('trendTo').value = cur;
+      const curMonth=`${m.getFullYear()}-${String(m.getMonth()+1).padStart(2,'0')}`;
+      
+      // Calculate previous month
+      let prevYear = m.getFullYear();
+      let prevMonth = m.getMonth(); // Month is 0-indexed
+      if (prevMonth === 0) {
+        prevYear--;
+        prevMonth = 11;
+      } else {
+        prevMonth--;
+      }
+      const prevMonthStr=`${prevYear}-${String(prevMonth+1).padStart(2,'0')}`;
+      
+      // Set defaults
+      document.getElementById('monthInput').value = curMonth;
+      document.getElementById('anaFrom').value = prevMonthStr;
+      document.getElementById('anaTo').value = curMonth;
+      document.getElementById('trendFrom').value = prevMonthStr;
+      document.getElementById('trendTo').value = curMonth;
 
       updateMonthRange();
       document.getElementById('monthInput').addEventListener('change',()=>{ updateMonthRange(); updateLoadButtonState(); });
@@ -1212,6 +1292,10 @@
         
         msg(`Loaded ${state.evals.length} evaluations.`,'success');
         renderAll();
+        
+        // NEW: Auto-load analytics and trends data
+        await loadAnalyticsRange();
+        await loadTrendsData();
       }catch(e){ console.error(e); msg('Failed to load evaluations: '+e.message,'error'); }
       finally{ setLoading(btn,false); }
     }
@@ -1240,12 +1324,6 @@
         
         // CRITICAL FIX: Load ALL form details for ALL forms found in analytics evaluations
         await loadAllFormDetailsFromEvaluations(data);
-        
-        // NEW: Copy the date range to trends tab
-        document.getElementById('trendFrom').value = from;
-        document.getElementById('trendTo').value = to;
-        document.getElementById('trendPassTarget').value = document.getElementById('passTarget').value;
-        document.getElementById('trendAmberBand').value = document.getElementById('amberBand').value;
         
         msg(`Analytics range loaded: ${data.length} evaluations.`, 'success');
         renderAnalytics();
@@ -1726,12 +1804,146 @@
       return 'No answer';
     }
 
+    // ===== NEW: Month Comparison Function =====
+    async function renderMonthComparison() {
+      const comparisonContainer = document.getElementById('monthComparison');
+      const comparisonGrid = document.getElementById('comparisonGrid');
+      
+      if (!state.analyticsEvals || state.analyticsEvals.length === 0) {
+        comparisonContainer.style.display = 'none';
+        return;
+      }
+      
+      // Group evaluations by month
+      const evalsByMonth = new Map();
+      
+      state.analyticsEvals.forEach(e => {
+        const date = new Date(e.releaseDate || e.assignedDate || e.creationDate || e.evaluationDate || e.date || Date.now());
+        const monthKey = `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}`;
+        const monthLabel = new Date(date.getFullYear(), date.getMonth(), 1).toLocaleDateString('en-GB', { month: 'short', year: 'numeric' });
+        
+        if (!evalsByMonth.has(monthKey)) {
+          evalsByMonth.set(monthKey, {
+            label: monthLabel,
+            evals: [],
+            totalScore: 0,
+            scoredCount: 0,
+            criticalMarks: 0,
+            fatalMarks: 0,
+            passCount: 0,
+            totalCount: 0
+          });
+        }
+        
+        const monthData = evalsByMonth.get(monthKey);
+        monthData.evals.push(e);
+        monthData.totalCount++;
+        
+        const score = getEvalPercent(e);
+        if (score != null && isFinite(score)) {
+          monthData.totalScore += score;
+          monthData.scoredCount++;
+          
+          const {pass} = getPassSettings();
+          if (score >= pass) {
+            monthData.passCount++;
+          }
+        }
+        
+        // Count critical/fatal marks
+        const qGroups = safeGet(e, 'answers.questionGroupScores') || [];
+        qGroups.forEach(g => {
+          (g.questionScores || []).forEach(q => {
+            const qIds = [q.questionId, q.questionContextId, safeGet(q, 'question.id'), safeGet(q, 'question.contextId')].filter(Boolean);
+            const questionObj = qIds.map(id => state.combinedLookupCache.get(`${safeGet(e, 'evaluationForm.id') || 'no-pub'}|${safeGet(e, 'form.id') || 'no-form'}|${safeGet(e, 'form.versionId') || 'no-ver'}`)?.questionObj.get(id)).find(Boolean);
+            const { isFatal, isCritical } = detectCriticalFatalQuestions(q, questionObj);
+            if (isFatal) monthData.fatalMarks++;
+            if (isCritical) monthData.criticalMarks++;
+          });
+        });
+      });
+      
+      // Get two most recent months
+      const sortedMonths = Array.from(evalsByMonth.keys()).sort().reverse();
+      if (sortedMonths.length < 2) {
+        comparisonContainer.style.display = 'none';
+        return;
+      }
+      
+      const recentMonthKey = sortedMonths[0];
+      const previousMonthKey = sortedMonths[1];
+      
+      const recentMonth = evalsByMonth.get(recentMonthKey);
+      const previousMonth = evalsByMonth.get(previousMonthKey);
+      
+      // Calculate metrics
+      const recentAvg = recentMonth.scoredCount > 0 ? recentMonth.totalScore / recentMonth.scoredCount : 0;
+      const previousAvg = previousMonth.scoredCount > 0 ? previousMonth.totalScore / previousMonth.scoredCount : 0;
+      const avgChange = recentAvg - previousAvg;
+      
+      const recentPassRate = recentMonth.totalCount > 0 ? (recentMonth.passCount / recentMonth.totalCount) * 100 : 0;
+      const previousPassRate = previousMonth.totalCount > 0 ? (previousMonth.passCount / previousMonth.totalCount) * 100 : 0;
+      const passRateChange = recentPassRate - previousPassRate;
+      
+      const evalsChange = ((recentMonth.totalCount - previousMonth.totalCount) / previousMonth.totalCount) * 100;
+      
+      const criticalChange = ((recentMonth.criticalMarks - previousMonth.criticalMarks) / (previousMonth.criticalMarks || 1)) * 100;
+      const fatalChange = ((recentMonth.fatalMarks - previousMonth.fatalMarks) / (previousMonth.fatalMarks || 1)) * 100;
+      
+      // Render comparison
+      comparisonGrid.innerHTML = `
+        <div class="comparison-item">
+          <div class="label">Average Score</div>
+          <div class="value">${pct(recentAvg, 1)}</div>
+          <div class="change ${avgChange > 0 ? 'positive' : avgChange < 0 ? 'negative' : 'neutral'}">
+            ${avgChange > 0 ? '↑' : avgChange < 0 ? '↓' : '→'} ${pct(Math.abs(avgChange), 1)}
+          </div>
+          <div class="comparison-note">${previousMonth.label}: ${pct(previousAvg, 1)}</div>
+        </div>
+        <div class="comparison-item">
+          <div class="label">Pass Rate</div>
+          <div class="value">${pct(recentPassRate, 1)}</div>
+          <div class="change ${passRateChange > 0 ? 'positive' : passRateChange < 0 ? 'negative' : 'neutral'}">
+            ${passRateChange > 0 ? '↑' : passRateChange < 0 ? '↓' : '→'} ${pct(Math.abs(passRateChange), 1)}
+          </div>
+          <div class="comparison-note">${previousMonth.label}: ${pct(previousPassRate, 1)}</div>
+        </div>
+        <div class="comparison-item">
+          <div class="label">Evaluations</div>
+          <div class="value">${recentMonth.totalCount}</div>
+          <div class="change ${evalsChange > 0 ? 'positive' : evalsChange < 0 ? 'negative' : 'neutral'}">
+            ${evalsChange > 0 ? '↑' : evalsChange < 0 ? '↓' : '→'} ${fmt(Math.abs(evalsChange), 1)}%
+          </div>
+          <div class="comparison-note">${previousMonth.label}: ${previousMonth.totalCount}</div>
+        </div>
+        <div class="comparison-item">
+          <div class="label">Critical Marks</div>
+          <div class="value">${recentMonth.criticalMarks}</div>
+          <div class="change ${criticalChange < 0 ? 'positive' : criticalChange > 0 ? 'negative' : 'neutral'}">
+            ${criticalChange < 0 ? '↓' : criticalChange > 0 ? '↑' : '→'} ${fmt(Math.abs(criticalChange), 1)}%
+          </div>
+          <div class="comparison-note">${previousMonth.label}: ${previousMonth.criticalMarks}</div>
+        </div>
+        <div class="comparison-item">
+          <div class="label">Fatal Marks</div>
+          <div class="value">${recentMonth.fatalMarks}</div>
+          <div class="change ${fatalChange < 0 ? 'positive' : fatalChange > 0 ? 'negative' : 'neutral'}">
+            ${fatalChange < 0 ? '↓' : fatalChange > 0 ? '↑' : '→'} ${fmt(Math.abs(fatalChange), 1)}%
+          </div>
+          <div class="comparison-note">${previousMonth.label}: ${previousMonth.fatalMarks}</div>
+        </div>
+      `;
+      
+      comparisonContainer.style.display = 'block';
+    }
+
     // ===== Renderers =====
     function renderAll(){ 
       renderOverview(); 
       renderAnalytics(); 
       renderDetails(); 
       renderCritical(); 
+      renderTrends();
     }
     
     function resolveUserName(id){ 
@@ -2382,6 +2594,9 @@
       });
       bottomHtml += '</tbody>';
       document.getElementById('bottomAgentsTable').innerHTML = bottomHtml;
+      
+      // NEW: Render month comparison
+      renderMonthComparison();
     }
 
     // ===== TRENDS RENDERER (Keep existing) =====
@@ -2742,11 +2957,11 @@
         const contactInfo = extractContactInfo(e);
         const score = getEvalPercent(e);
         
-        // Check for critical/fatal marks
+        // Check for critical/fatal marks - FIXED: changed qgs to qGroups
         let hasCritical = false;
         let hasFatal = false;
         const qGroups = safeGet(e, 'answers.questionGroupScores') || [];
-        for (const g of qgs) {
+        for (const g of qGroups) { // FIXED: qgs changed to qGroups
           for (const q of (g.questionScores || [])) {
             const qIds = [q.questionId, q.questionContextId, safeGet(q, 'question.id'), safeGet(q, 'question.contextId')].filter(Boolean);
             const questionObj = qIds.map(id => lookup.questionObj.get(id)).find(Boolean);
@@ -2847,19 +3062,18 @@
       };
 
       const header = `
-        <div class="table-container">
-          <table class="details-table sortable">
-            <thead>
-              <tr>
-                <th class="sort-header" onclick="sortDetails('date')">Time${sortArrow('date')}</th>
-                <th class="sort-header" onclick="sortDetails('agent')">Agent${sortArrow('agent')}</th>
-                <th class="sort-header" onclick="sortDetails('form')">Form${sortArrow('form')}</th>
-                <th class="sort-header" onclick="sortDetails('score')">Score${sortArrow('score')}</th>
-                <th>Contact Info</th>
-                <th>Details</th>
-              </tr>
-            </thead>
-            <tbody>
+        <table class="frozen-table details-table sortable">
+          <thead>
+            <tr>
+              <th class="sort-header" onclick="sortDetails('date')">Time${sortArrow('date')}</th>
+              <th class="sort-header" onclick="sortDetails('agent')">Agent${sortArrow('agent')}</th>
+              <th class="sort-header" onclick="sortDetails('form')">Form${sortArrow('form')}</th>
+              <th class="sort-header" onclick="sortDetails('score')">Score${sortArrow('score')}</th>
+              <th>Contact Info</th>
+              <th>Details</th>
+            </tr>
+          </thead>
+          <tbody>
       `;
 
       // Create rows
@@ -2934,7 +3148,7 @@
         ? '<tr><td colspan="6" class="muted">No evaluations match the selected filters.</td></tr>'
         : `<tr><td colspan="6" class="muted">Showing ${filteredData.length} of ${evaluationData.length} evaluations</td></tr>`;
 
-      c.innerHTML = header + rows.join('') + footer + '</tbody></table></div>';
+      c.innerHTML = header + rows.join('') + footer + '</tbody></table>';
       
       // Initialize all rows as collapsed
       for (let i = 0; i < filteredData.length; i++) {
@@ -2968,7 +3182,7 @@
       function add(map, formName, qText, agentName, date, type){
         const key=formName+'|'+qText;
         if(!map.has(key)) map.set(key,{formName,qText,count:0,agents:new Map()});
-        const o=map.get(key); o.count++; o.agents.set(agentName,(o.agents.get(agentName)||0)+1);
+        const o=map.get(key); o.count++; o.agents.set(agentName,(o.agents.get(agentName)||0)+1;
         
   // Add to agent failures
   if (!agentFailures.has(agentName)) {

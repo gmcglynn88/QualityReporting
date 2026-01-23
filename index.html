@@ -269,6 +269,29 @@
       margin-top: 8px;
       text-align: center;
     }
+
+    /* NEW STYLES: Date selection styling fixes */
+    input[type="month"], input[type="number"] {
+      width: 100%;
+      box-sizing: border-box;
+      font-family: 'Aptos', 'Segoe UI', system-ui, -apple-system, Arial, sans-serif;
+    }
+    
+    /* Chart placeholder styling */
+    .chart-placeholder {
+      position: absolute;
+      top: 0;
+      left: 0;
+      width: 100%;
+      height: 100%;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      background: rgba(248, 249, 250, 0.9);
+      z-index: 5;
+      text-align: center;
+      padding: 20px;
+    }
   </style>
   <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
 </head>
@@ -961,7 +984,8 @@
       document.getElementById('overviewTabButton').onclick=()=>setTab('overview');
       document.getElementById('analyticsTabButton').onclick=()=>{
         setTab('analytics');
-        renderAnalytics();
+        // FIX 1: Added setTimeout to ensure DOM is ready before rendering charts
+        setTimeout(() => renderAnalytics(), 100);
       };
       document.getElementById('trendsTabButton').onclick=()=>setTab('trends');
       document.getElementById('detailsTabButton').onclick=()=>setTab('details');
@@ -1004,7 +1028,10 @@
         document.getElementById(`${n}Tab`).classList.toggle('active', n===name);
         document.getElementById(`${n}TabButton`).classList.toggle('active', n===name);
       });
-      if(name==='analytics') renderAnalytics();
+      if(name==='analytics') {
+        // FIX 2: Added delay when switching to analytics tab
+        setTimeout(() => renderAnalytics(), 100);
+      }
       if(name==='details') renderDetails();
       if(name==='critical') renderCritical();
       if(name==='trends') renderTrends();
@@ -1280,9 +1307,8 @@
         msg(`Loaded ${state.evals.length} evaluations.`,'success');
         renderAll();
         
-        // NEW: Auto-load analytics and trends data
-        await loadAnalyticsRange();
-        await loadTrendsData();
+        // FIX 3: Removed auto-load analytics and trends data
+        // Charts will load when user switches to those tabs
       }catch(e){ console.error(e); msg('Failed to load evaluations: '+e.message,'error'); }
       finally{ setLoading(btn,false); }
     }
@@ -1313,7 +1339,11 @@
         await loadAllFormDetailsFromEvaluations(data);
         
         msg(`Analytics range loaded: ${data.length} evaluations.`, 'success');
-        renderAnalytics();
+        
+        // FIX 4: Force render after loading analytics data
+        if (document.getElementById('analyticsTab').classList.contains('active')) {
+          setTimeout(() => renderAnalytics(), 150);
+        }
       }catch(e){ console.error(e); msg('Failed to load analytics range: '+e.message,'error'); }
       finally{ setLoading(btn,false); }
     }
@@ -1927,10 +1957,9 @@
     // ===== Renderers =====
     function renderAll(){ 
       renderOverview(); 
-      renderAnalytics(); 
+      // FIX 5: Don't automatically render analytics/trends on initial load
       renderDetails(); 
       renderCritical(); 
-      renderTrends();
     }
     
     function resolveUserName(id){ 
@@ -2008,24 +2037,43 @@
         ['mediaTypeChart', 'agentTrendChart', 'scoreDistributionChart', 'trendsChart'].forEach(id => {
           const canvas = document.getElementById(id);
           if (canvas) {
+            // FIX 6: Check if canvas exists before trying to get context
             const ctx = canvas.getContext('2d');
-            ctx.clearRect(0, 0, canvas.width, canvas.height);
+            if (ctx) {
+              ctx.clearRect(0, 0, canvas.width, canvas.height);
+            }
             
             // Destroy existing Chart.js instances
             if (id === 'mediaTypeChart' && window.mediaTypeChartInstance) {
-              window.mediaTypeChartInstance.destroy();
+              try {
+                window.mediaTypeChartInstance.destroy();
+              } catch (e) {
+                console.warn('Error destroying mediaTypeChart:', e);
+              }
               window.mediaTypeChartInstance = null;
             }
             if (id === 'agentTrendChart' && window.agentTrendChartInstance) {
-              window.agentTrendChartInstance.destroy();
+              try {
+                window.agentTrendChartInstance.destroy();
+              } catch (e) {
+                console.warn('Error destroying agentTrendChart:', e);
+              }
               window.agentTrendChartInstance = null;
             }
             if (id === 'scoreDistributionChart' && window.scoreDistributionChartInstance) {
-              window.scoreDistributionChartInstance.destroy();
+              try {
+                window.scoreDistributionChartInstance.destroy();
+              } catch (e) {
+                console.warn('Error destroying scoreDistributionChart:', e);
+              }
               window.scoreDistributionChartInstance = null;
             }
             if (id === 'trendsChart' && window.trendsChartInstance) {
-              window.trendsChartInstance.destroy();
+              try {
+                window.trendsChartInstance.destroy();
+              } catch (e) {
+                console.warn('Error destroying trendsChart:', e);
+              }
               window.trendsChartInstance = null;
             }
           }
@@ -2159,75 +2207,86 @@
       // 1. Media Type Chart (Stacked Bar)
       try {
         const mediaTypeCanvas = document.getElementById('mediaTypeChart');
+        // FIX 7: Check if canvas exists and get context safely
         if (!mediaTypeCanvas) {
-          throw new Error('Canvas element not found');
-        }
-        
-        const mediaTypeCtx = mediaTypeCanvas.getContext('2d');
-        if (window.mediaTypeChartInstance) {
-          window.mediaTypeChartInstance.destroy();
-        }
-        
-        const mediaTypes = ['Voice', 'Email', 'Message', 'Social', 'Other'];
-        window.mediaTypeChartInstance = new Chart(mediaTypeCtx, {
-          type: 'bar',
-          data: {
-            labels: mediaTypes,
-            datasets: [
-              {
-                label: 'Pass',
-                data: mediaTypes.map(mt => mediaTypeData[mt].pass),
-                backgroundColor: COLORS.OK,
-                borderColor: COLORS.OK,
-                borderWidth: 1
-              },
-              {
-                label: 'Amber',
-                data: mediaTypes.map(mt => mediaTypeData[mt].amber),
-                backgroundColor: COLORS.WARN,
-                borderColor: COLORS.WARN,
-                borderWidth: 1
-              },
-              {
-                label: 'Fail',
-                data: mediaTypes.map(mt => mediaTypeData[mt].fail),
-                backgroundColor: COLORS.BAD,
-                borderColor: COLORS.BAD,
-                borderWidth: 1
+          console.warn('mediaTypeChart canvas not found');
+        } else {
+          const mediaTypeCtx = mediaTypeCanvas.getContext('2d');
+          if (!mediaTypeCtx) {
+            console.warn('Could not get 2d context for mediaTypeChart');
+          } else {
+            // Destroy existing chart instance
+            if (window.mediaTypeChartInstance) {
+              try {
+                window.mediaTypeChartInstance.destroy();
+              } catch (e) {
+                console.warn('Error destroying existing mediaTypeChart:', e);
               }
-            ]
-          },
-          options: {
-            responsive: true,
-            maintainAspectRatio: false,
-            scales: {
-              x: {
-                stacked: true,
-                title: {
-                  display: true,
-                  text: 'Media Type'
-                }
-              },
-              y: {
-                stacked: true,
-                beginAtZero: true,
-                title: {
-                  display: true,
-                  text: 'Number of Evaluations'
-                }
-              }
-            },
-            plugins: {
-              tooltip: {
-                mode: 'index',
-                intersect: false
-              },
-              legend: {
-                position: 'top'
-              }
+              window.mediaTypeChartInstance = null;
             }
+            
+            const mediaTypes = ['Voice', 'Email', 'Message', 'Social', 'Other'];
+            window.mediaTypeChartInstance = new Chart(mediaTypeCtx, {
+              type: 'bar',
+              data: {
+                labels: mediaTypes,
+                datasets: [
+                  {
+                    label: 'Pass',
+                    data: mediaTypes.map(mt => mediaTypeData[mt].pass),
+                    backgroundColor: COLORS.OK,
+                    borderColor: COLORS.OK,
+                    borderWidth: 1
+                  },
+                  {
+                    label: 'Amber',
+                    data: mediaTypes.map(mt => mediaTypeData[mt].amber),
+                    backgroundColor: COLORS.WARN,
+                    borderColor: COLORS.WARN,
+                    borderWidth: 1
+                  },
+                  {
+                    label: 'Fail',
+                    data: mediaTypes.map(mt => mediaTypeData[mt].fail),
+                    backgroundColor: COLORS.BAD,
+                    borderColor: COLORS.BAD,
+                    borderWidth: 1
+                  }
+                ]
+              },
+              options: {
+                responsive: true,
+                maintainAspectRatio: false,
+                scales: {
+                  x: {
+                    stacked: true,
+                    title: {
+                      display: true,
+                      text: 'Media Type'
+                    }
+                  },
+                  y: {
+                    stacked: true,
+                    beginAtZero: true,
+                    title: {
+                      display: true,
+                      text: 'Number of Evaluations'
+                    }
+                  }
+                },
+                plugins: {
+                  tooltip: {
+                    mode: 'index',
+                    intersect: false
+                  },
+                  legend: {
+                    position: 'top'
+                  }
+                }
+              }
+            });
           }
-        });
+        }
       } catch (chartError) {
         console.error('Error creating mediaTypeChart:', chartError);
       }
@@ -2236,104 +2295,114 @@
       try {
         const agentTrendCanvas = document.getElementById('agentTrendChart');
         if (!agentTrendCanvas) {
-          throw new Error('Canvas element not found');
-        }
-        
-        const agentTrendCtx = agentTrendCanvas.getContext('2d');
-        if (window.agentTrendChartInstance) {
-          window.agentTrendChartInstance.destroy();
-        }
-        
-        // Get top 5 agents by number of evaluations
-        const topAgents = Array.from(agentTrendData.entries())
-          .sort((a, b) => b[1].scores.length - a[1].scores.length)
-          .slice(0, 5);
-        
-        // Prepare data for line chart
-        const allDates = Array.from(new Set(topAgents.flatMap(([name, data]) => 
-          data.dates.map(d => d.toISOString().split('T')[0])
-        ))).sort();
-        
-        const datasets = topAgents.map(([name, data], idx) => {
-          // Create map of date to average score for that day
-          const dateScoreMap = new Map();
-          data.dates.forEach((date, i) => {
-            const dateStr = date.toISOString().split('T')[0];
-            const score = data.scores[i];
-            if (!dateScoreMap.has(dateStr)) {
-              dateScoreMap.set(dateStr, []);
+          console.warn('agentTrendChart canvas not found');
+        } else {
+          const agentTrendCtx = agentTrendCanvas.getContext('2d');
+          if (!agentTrendCtx) {
+            console.warn('Could not get 2d context for agentTrendChart');
+          } else {
+            // Destroy existing chart instance
+            if (window.agentTrendChartInstance) {
+              try {
+                window.agentTrendChartInstance.destroy();
+              } catch (e) {
+                console.warn('Error destroying existing agentTrendChart:', e);
+              }
+              window.agentTrendChartInstance = null;
             }
-            dateScoreMap.get(dateStr).push(score);
-          });
-          
-          // Calculate average for each date
-          const scoresByDate = allDates.map(date => {
-            const scores = dateScoreMap.get(date);
-            return scores && scores.length > 0 
-              ? scores.reduce((sum, s) => sum + s, 0) / scores.length 
-              : null;
-          });
-          
-          // Generate distinct color
-          const hue = (idx * 360 / topAgents.length) % 360;
-          const color = `hsl(${hue}, 70%, 50%)`;
-          
-          return {
-            label: name,
-            data: scoresByDate,
-            borderColor: color,
-            backgroundColor: color + '20',
-            borderWidth: 2,
-            fill: false,
-            tension: 0.4
-          };
-        });
-        
-        window.agentTrendChartInstance = new Chart(agentTrendCtx, {
-          type: 'line',
-          data: {
-            labels: allDates.map(d => new Date(d).toLocaleDateString('en-GB', { day: 'numeric', month: 'short' })),
-            datasets: datasets
-          },
-          options: {
-            responsive: true,
-            maintainAspectRatio: false,
-            scales: {
-              x: {
-                title: {
-                  display: true,
-                  text: 'Date'
+            
+            // Get top 5 agents by number of evaluations
+            const topAgents = Array.from(agentTrendData.entries())
+              .sort((a, b) => b[1].scores.length - a[1].scores.length)
+              .slice(0, 5);
+            
+            // Prepare data for line chart
+            const allDates = Array.from(new Set(topAgents.flatMap(([name, data]) => 
+              data.dates.map(d => d.toISOString().split('T')[0])
+            ))).sort();
+            
+            const datasets = topAgents.map(([name, data], idx) => {
+              // Create map of date to average score for that day
+              const dateScoreMap = new Map();
+              data.dates.forEach((date, i) => {
+                const dateStr = date.toISOString().split('T')[0];
+                const score = data.scores[i];
+                if (!dateScoreMap.has(dateStr)) {
+                  dateScoreMap.set(dateStr, []);
                 }
+                dateScoreMap.get(dateStr).push(score);
+              });
+              
+              // Calculate average for each date
+              const scoresByDate = allDates.map(date => {
+                const scores = dateScoreMap.get(date);
+                return scores && scores.length > 0 
+                  ? scores.reduce((sum, s) => sum + s, 0) / scores.length 
+                  : null;
+              });
+              
+              // Generate distinct color
+              const hue = (idx * 360 / topAgents.length) % 360;
+              const color = `hsl(${hue}, 70%, 50%)`;
+              
+              return {
+                label: name,
+                data: scoresByDate,
+                borderColor: color,
+                backgroundColor: color + '20',
+                borderWidth: 2,
+                fill: false,
+                tension: 0.4
+              };
+            });
+            
+            window.agentTrendChartInstance = new Chart(agentTrendCtx, {
+              type: 'line',
+              data: {
+                labels: allDates.map(d => new Date(d).toLocaleDateString('en-GB', { day: 'numeric', month: 'short' })),
+                datasets: datasets
               },
-              y: {
-                beginAtZero: false,
-                min: 0,
-                max: 100,
-                title: {
-                  display: true,
-                  text: 'Score (%)'
+              options: {
+                responsive: true,
+                maintainAspectRatio: false,
+                scales: {
+                  x: {
+                    title: {
+                      display: true,
+                      text: 'Date'
+                    }
+                  },
+                  y: {
+                    beginAtZero: false,
+                    min: 0,
+                    max: 100,
+                    title: {
+                      display: true,
+                      text: 'Score (%)'
+                    },
+                    ticks: {
+                      callback: function(value) {
+                        return value + '%';
+                      }
+                    }
+                  }
                 },
-                ticks: {
-                  callback: function(value) {
-                    return value + '%';
+                plugins: {
+                  tooltip: {
+                    callbacks: {
+                      label: function(context) {
+                        return `${context.dataset.label}: ${context.parsed.y ? pct(context.parsed.y, 1) : 'N/A'}`;
+                      }
+                    }
+                  },
+                  legend: {
+                    position: 'top'
                   }
                 }
               }
-            },
-            plugins: {
-              tooltip: {
-                callbacks: {
-                  label: function(context) {
-                    return `${context.dataset.label}: ${context.parsed.y ? pct(context.parsed.y, 1) : 'N/A'}`;
-                  }
-                }
-              },
-              legend: {
-                position: 'top'
-              }
-            }
+            });
           }
-        });
+        }
       } catch (chartError) {
         console.error('Error creating agentTrendChart:', chartError);
       }
@@ -2342,68 +2411,78 @@
       try {
         const scoreDistCanvas = document.getElementById('scoreDistributionChart');
         if (!scoreDistCanvas) {
-          throw new Error('Canvas element not found');
-        }
-        
-        const scoreDistCtx = scoreDistCanvas.getContext('2d');
-        if (window.scoreDistributionChartInstance) {
-          window.scoreDistributionChartInstance.destroy();
-        }
-        
-        const scoreLabels = ['0-10%', '11-20%', '21-30%', '31-40%', '41-50%', '51-60%', '61-70%', '71-80%', '81-90%', '91-100%'];
-        
-        // Color bars based on score ranges
-        const backgroundColors = scoreLabels.map((label, idx) => {
-          const minScore = idx * 10;
-          if (minScore >= pass) return COLORS.OK;
-          if (minScore >= pass - band) return COLORS.WARN;
-          return COLORS.BAD;
-        });
-        
-        window.scoreDistributionChartInstance = new Chart(scoreDistCtx, {
-          type: 'bar',
-          data: {
-            labels: scoreLabels,
-            datasets: [{
-              label: 'Number of Evaluations',
-              data: scoreDistribution,
-              backgroundColor: backgroundColors,
-              borderColor: backgroundColors.map(c => c.replace('0.8', '1')),
-              borderWidth: 1
-            }]
-          },
-          options: {
-            responsive: true,
-            maintainAspectRatio: false,
-            scales: {
-              x: {
-                title: {
-                  display: true,
-                  text: 'Score Range'
-                }
-              },
-              y: {
-                beginAtZero: true,
-                title: {
-                  display: true,
-                  text: 'Number of Evaluations'
-                }
+          console.warn('scoreDistributionChart canvas not found');
+        } else {
+          const scoreDistCtx = scoreDistCanvas.getContext('2d');
+          if (!scoreDistCtx) {
+            console.warn('Could not get 2d context for scoreDistributionChart');
+          } else {
+            // Destroy existing chart instance
+            if (window.scoreDistributionChartInstance) {
+              try {
+                window.scoreDistributionChartInstance.destroy();
+              } catch (e) {
+                console.warn('Error destroying existing scoreDistributionChart:', e);
               }
-            },
-            plugins: {
-              legend: {
-                display: false
+              window.scoreDistributionChartInstance = null;
+            }
+            
+            const scoreLabels = ['0-10%', '11-20%', '21-30%', '31-40%', '41-50%', '51-60%', '61-70%', '71-80%', '81-90%', '91-100%'];
+            
+            // Color bars based on score ranges
+            const backgroundColors = scoreLabels.map((label, idx) => {
+              const minScore = idx * 10;
+              if (minScore >= pass) return COLORS.OK;
+              if (minScore >= pass - band) return COLORS.WARN;
+              return COLORS.BAD;
+            });
+            
+            window.scoreDistributionChartInstance = new Chart(scoreDistCtx, {
+              type: 'bar',
+              data: {
+                labels: scoreLabels,
+                datasets: [{
+                  label: 'Number of Evaluations',
+                  data: scoreDistribution,
+                  backgroundColor: backgroundColors,
+                  borderColor: backgroundColors.map(c => c.replace('0.8', '1')),
+                  borderWidth: 1
+                }]
               },
-              tooltip: {
-                callbacks: {
-                  label: function(context) {
-                    return `${context.parsed.y} evaluation${context.parsed.y !== 1 ? 's' : ''}`;
+              options: {
+                responsive: true,
+                maintainAspectRatio: false,
+                scales: {
+                  x: {
+                    title: {
+                      display: true,
+                      text: 'Score Range'
+                    }
+                  },
+                  y: {
+                    beginAtZero: true,
+                    title: {
+                      display: true,
+                      text: 'Number of Evaluations'
+                    }
+                  }
+                },
+                plugins: {
+                  legend: {
+                    display: false
+                  },
+                  tooltip: {
+                    callbacks: {
+                      label: function(context) {
+                        return `${context.parsed.y} evaluation${context.parsed.y !== 1 ? 's' : ''}`;
+                      }
+                    }
                   }
                 }
               }
-            }
+            });
           }
-        });
+        }
       } catch (chartError) {
         console.error('Error creating scoreDistributionChart:', chartError);
       }
@@ -2608,6 +2687,17 @@
         trendsView.style.display = 'none';
         trendsNoData.style.display = 'block';
         document.getElementById('trendsKPIs').innerHTML = '';
+        
+        // Clear any existing chart
+        if (window.trendsChartInstance) {
+          try {
+            window.trendsChartInstance.destroy();
+          } catch (e) {
+            console.warn('Error destroying trendsChart:', e);
+          }
+          window.trendsChartInstance = null;
+        }
+        
         return;
       }
       
@@ -2745,10 +2835,19 @@
       }
       
       const ctx = canvas.getContext('2d');
+      if (!ctx) {
+        console.error('Could not get 2d context for trendsChart');
+        return;
+      }
       
       // Destroy existing chart if it exists
       if (window.trendsChartInstance) {
-        window.trendsChartInstance.destroy();
+        try {
+          window.trendsChartInstance.destroy();
+        } catch (e) {
+          console.warn('Error destroying existing trendsChart:', e);
+        }
+        window.trendsChartInstance = null;
       }
       
       const labels = periodData.map(p => p.label);

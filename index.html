@@ -3900,7 +3900,7 @@
         const contactInfo = extractContactInfo(e);
         const score = getEvalPercent(e);
         
-        // Check for critical/fatal marks - FIXED: changed qgs to qGroups
+// Check for critical/fatal marks
 let hasCritical = false;
 let hasFatal = false;
 const qGroups = safeGet(e, 'answers.questionGroupScores') || [];
@@ -3911,19 +3911,21 @@ for (const g of qGroups) {
     const { isFatal, isCritical } = detectCriticalFatalQuestions(q, questionObj);
     if (isFatal) hasFatal = true;
     if (isCritical) hasCritical = true;
-  }     
-        return {
-          agent,
-          formName,
-          date,
-          when,
-          contactInfo,
-          score,
-          hasCritical,
-          hasFatal,
-          evalObj: e,
-          lookup
-        };
+  }
+}
+
+return {
+  agent,
+  formName,
+  date,
+  when,
+  contactInfo,
+  score,
+  hasCritical,
+  hasFatal,
+  evalObj: e,
+  lookup
+};
       }));
 
       // Apply filters

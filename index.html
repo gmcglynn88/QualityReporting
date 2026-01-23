@@ -3901,18 +3901,18 @@
         const score = getEvalPercent(e);
         
         // Check for critical/fatal marks - FIXED: changed qgs to qGroups
-        let hasCritical = false;
-        let hasFatal = false;
-        const qGroups = safeGet(e, 'answers.questionGroupScores') || [];
-        for (const g of qGroups) { // FIXED: qgs changed to qGroups
-          for (const q of (g.questionScores || [])) {
-            const qIds = [q.questionId, q.questionContextId, safeGet(q, 'question.id'), safeGet(q, 'question.contextId')].filter(Boolean);
-            const questionObj = qIds.map(id => lookup.questionObj.get(id)).find(Boolean);
-            const { isFatal, isCritical } = detectCriticalFatalQuestions(q, questionObj);
-            if (isFatal) hasFatal = true;
-            if (isCritical) hasCritical = true;
-          }
-        }
+let hasCritical = false;
+let hasFatal = false;
+const qGroups = safeGet(e, 'answers.questionGroupScores') || [];
+for (const g of qGroups) { // Fixed variable name
+  for (const q of (g.questionScores || [])) {
+    const qIds = [q.questionId, q.questionContextId, safeGet(q, 'question.id'), safeGet(q, 'question.contextId')].filter(Boolean);
+    const questionObj = qIds.map(id => lookup.questionObj.get(id)).find(Boolean);
+    const { isFatal, isCritical } = detectCriticalFatalQuestions(q, questionObj);
+    if (isFatal) hasFatal = true;
+    if (isCritical) hasCritical = true;
+  }
+}
         
         return {
           agent,

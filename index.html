@@ -1515,8 +1515,10 @@
       return all;
     }
 
-    async function fetchEvaluationsForAgentInterval(agentId,formIds,startDate,endDate){
-      const start=startDate.toISOString(); const end=endDate.toISOString();
+    // FIXED: Corrected arrow function syntax
+    async function fetchEvaluationsForAgentInterval(agentId, formIds, startDate, endDate){
+      const start=startDate.toISOString(); 
+      const end=endDate.toISOString();
       const base = `https://api.${config.REGION}/api/v2/quality/evaluations/query`;
 
       async function getViaGET(singleFormId){
@@ -1549,7 +1551,8 @@
           expandAnswerTotalScores: true,
           pageSize: 50
         };
-        if(formIds && formIds.length>0) body.formIds = formIds;
+        // FIXED: Check if formIds exists and has length property before using it
+        if(formIds && formIds.length && formIds.length>0) body.formIds = formIds;
 
         let page=1, all=[];
         while(true){
@@ -1567,13 +1570,23 @@
       }
 
       if(!formIds || formIds.length<=1){
-        try{ return await getViaGET(formIds?.[0]); }
-        catch(err){ if(err.status===405 || err.status===400){ /* fallback */ } else throw err; }
+        try{ 
+          return await getViaGET(formIds ? formIds[0] : undefined); 
+        }
+        catch(err){ 
+          if(err.status===405 || err.status===400){ 
+            // fallback 
+          } else throw err; 
+        }
       }
 
-      try{ return await getViaPOST(); }
+      try{ 
+        return await getViaPOST(); 
+      }
       catch(err){
-        if(err.status===405 || err.status===400){ return await getViaGET(undefined); }
+        if(err.status===405 || err.status===400){ 
+          return await getViaGET(undefined); 
+        }
         throw err;
       }
     }
@@ -2419,7 +2432,7 @@
         .forEach(([name, dayMap]) => {
           trendTable += `<tr><td>${name}</td>`;
           
-          dayKeys.forEach(day) => {
+          dayKeys.forEach(day => {
             const data = dayMap.get(day);
             if (data && data.count > 0) {
               const avg = data.sum / data.count;

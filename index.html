@@ -244,6 +244,11 @@
     
     /* Loading section */
     #progressSection { display: none; }
+    
+    /* Agent pills styling - ADDED */
+    .agent-list { margin-top: 8px; }
+    .agent-list summary { cursor: pointer; font-weight: 500; }
+    .agent-pills { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 8px; padding: 8px; }
   </style>
   <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
 </head>
@@ -704,7 +709,15 @@
       detailsScoreFilter: 'all',
       filteredEvals: [],
       
-      dateRangeMode: 'day'
+      dateRangeMode: 'day',
+      
+      // Chart instances for cleanup
+      chartInstances: {
+        mediaTypeChart: null,
+        agentTrendChart: null,
+        scoreDistributionChart: null,
+        trendsChart: null
+      }
     };
 
     const dropdowns = { 
@@ -764,6 +777,24 @@
     function hideProgress(){ 
       const progressSection = document.getElementById('progressSection');
       if (progressSection) progressSection.style.display='none'; 
+    }
+
+    // ===== Chart Management =====
+    function destroyChart(chartName) {
+      if (state.chartInstances[chartName]) {
+        try {
+          state.chartInstances[chartName].destroy();
+        } catch (e) {
+          console.warn(`Error destroying ${chartName}:`, e);
+        }
+        state.chartInstances[chartName] = null;
+      }
+    }
+    
+    function destroyAllCharts() {
+      Object.keys(state.chartInstances).forEach(chartName => {
+        destroyChart(chartName);
+      });
     }
 
     // ===== Simplified Date Range Functions =====
@@ -1919,48 +1950,8 @@
         document.getElementById('topAgentsTable').innerHTML='';
         document.getElementById('bottomAgentsTable').innerHTML='';
         
-        ['mediaTypeChart', 'agentTrendChart', 'scoreDistributionChart', 'trendsChart'].forEach(id => {
-          const canvas = document.getElementById(id);
-          if (canvas) {
-            const ctx = canvas.getContext('2d');
-            if (ctx) {
-              ctx.clearRect(0, 0, canvas.width, canvas.height);
-            }
-            
-            if (id === 'mediaTypeChart' && window.mediaTypeChartInstance) {
-              try {
-                window.mediaTypeChartInstance.destroy();
-              } catch (e) {
-                console.warn('Error destroying mediaTypeChart:', e);
-              }
-              window.mediaTypeChartInstance = null;
-            }
-            if (id === 'agentTrendChart' && window.agentTrendChartInstance) {
-              try {
-                window.agentTrendChartInstance.destroy();
-              } catch (e) {
-                console.warn('Error destroying agentTrendChart:', e);
-              }
-              window.agentTrendChartInstance = null;
-            }
-            if (id === 'scoreDistributionChart' && window.scoreDistributionChartInstance) {
-              try {
-                window.scoreDistributionChartInstance.destroy();
-              } catch (e) {
-                console.warn('Error destroying scoreDistributionChart:', e);
-              }
-              window.scoreDistributionChartInstance = null;
-            }
-            if (id === 'trendsChart' && window.trendsChartInstance) {
-              try {
-                window.trendsChartInstance.destroy();
-              } catch (e) {
-                console.warn('Error destroying trendsChart:', e);
-              }
-              window.trendsChartInstance = null;
-            }
-          }
-        });
+        // Clean up chart instances
+        destroyAllCharts();
         
         return;
       }
@@ -2062,17 +2053,10 @@
           if (!mediaTypeCtx) {
             console.warn('Could not get 2d context for mediaTypeChart');
           } else {
-            if (window.mediaTypeChartInstance) {
-              try {
-                window.mediaTypeChartInstance.destroy();
-              } catch (e) {
-                console.warn('Error destroying existing mediaTypeChart:', e);
-              }
-              window.mediaTypeChartInstance = null;
-            }
+            destroyChart('mediaTypeChart');
             
             const mediaTypes = ['Voice', 'Email', 'Message', 'Social', 'Other'];
-            window.mediaTypeChartInstance = new Chart(mediaTypeCtx, {
+            state.chartInstances.mediaTypeChart = new Chart(mediaTypeCtx, {
               type: 'bar',
               data: {
                 labels: mediaTypes,
@@ -2147,14 +2131,7 @@
           if (!agentTrendCtx) {
             console.warn('Could not get 2d context for agentTrendChart');
           } else {
-            if (window.agentTrendChartInstance) {
-              try {
-                window.agentTrendChartInstance.destroy();
-              } catch (e) {
-                console.warn('Error destroying existing agentTrendChart:', e);
-              }
-              window.agentTrendChartInstance = null;
-            }
+            destroyChart('agentTrendChart');
             
             const topAgents = Array.from(agentTrendData.entries())
               .sort((a, b) => b[1].scores.length - a[1].scores.length)
@@ -2196,7 +2173,7 @@
               };
             });
             
-            window.agentTrendChartInstance = new Chart(agentTrendCtx, {
+            state.chartInstances.agentTrendChart = new Chart(agentTrendCtx, {
               type: 'line',
               data: {
                 labels: allDates.map(d => new Date(d).toLocaleDateString('en-GB', { day: 'numeric', month: 'short' })),
@@ -2257,14 +2234,7 @@
           if (!scoreDistCtx) {
             console.warn('Could not get 2d context for scoreDistributionChart');
           } else {
-            if (window.scoreDistributionChartInstance) {
-              try {
-                window.scoreDistributionChartInstance.destroy();
-              } catch (e) {
-                console.warn('Error destroying existing scoreDistributionChart:', e);
-              }
-              window.scoreDistributionChartInstance = null;
-            }
+            destroyChart('scoreDistributionChart');
             
             const scoreLabels = ['0-10%', '11-20%', '21-30%', '31-40%', '41-50%', '51-60%', '61-70%', '71-80%', '81-90%', '91-100%'];
             
@@ -2275,7 +2245,7 @@
               return COLORS.BAD;
             });
             
-            window.scoreDistributionChartInstance = new Chart(scoreDistCtx, {
+            state.chartInstances.scoreDistributionChart = new Chart(scoreDistCtx, {
               type: 'bar',
               data: {
                 labels: scoreLabels,
@@ -2503,7 +2473,7 @@
       document.getElementById('bottomAgentsTable').innerHTML = bottomHtml;
     }
 
-    // ===== TRENDS RENDERER - FIXED SYNTAX =====
+    // ===== TRENDS RENDERER =====
     async function renderTrends() {
       const raw = getTrendsSet();
       const trendsView = document.getElementById('trendsView');
@@ -2514,14 +2484,7 @@
         trendsNoData.style.display = 'block';
         document.getElementById('trendsKPIs').innerHTML = '';
         
-        if (window.trendsChartInstance) {
-          try {
-            window.trendsChartInstance.destroy();
-          } catch (e) {
-            console.warn('Error destroying trendsChart:', e);
-          }
-          window.trendsChartInstance = null;
-        }
+        destroyChart('trendsChart');
         
         return;
       }
@@ -2664,21 +2627,14 @@
         return;
       }
       
-      if (window.trendsChartInstance) {
-        try {
-          window.trendsChartInstance.destroy();
-        } catch (e) {
-          console.warn('Error destroying existing trendsChart:', e);
-        }
-        window.trendsChartInstance = null;
-      }
+      destroyChart('trendsChart');
       
       const labels = periodData.map(p => p.label);
       const passData = periodData.map(p => p.passes);
       const amberData = periodData.map(p => p.ambers);
       const failData = periodData.map(p => p.fails);
       
-      window.trendsChartInstance = new Chart(ctx, {
+      state.chartInstances.trendsChart = new Chart(ctx, {
         type: 'bar',
         data: {
           labels: labels,

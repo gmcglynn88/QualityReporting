@@ -30,17 +30,75 @@
     tr:hover{background-color:rgba(99,171,143,.05)}
     .table-container{overflow-x:auto;border:1px solid var(--border-color);border-radius:6px;padding:1px;margin-top:10px}
 
-    /* Frozen column styling for analytics table */
-    .frozen-table-container { position: relative; overflow: auto; border: 1px solid var(--border-color); border-radius: 6px; margin-top: 10px; max-height: 600px; -webkit-overflow-scrolling: touch; }
-    .frozen-table { border-collapse: separate; border-spacing: 0; width: max-content; min-width: 100%; }
-    .frozen-table th, .frozen-table td { padding: 10px 12px; text-align: left; border-bottom: 1px solid var(--border-color); vertical-align: top; white-space: nowrap; background: var(--card-bg); position: relative; }
-    .frozen-table thead th { background-color: var(--primary-color); color: white; font-weight: 600; position: sticky; top: 0; z-index: 10; }
-    .frozen-table th:first-child, .frozen-table td:first-child { position: sticky; left: 0; background: var(--card-bg); background-clip: padding-box; z-index: 12; border-right: 2px solid var(--border-color); min-width: 220px; }
-    .frozen-table thead th:first-child { z-index: 20; background: var(--primary-color); }
-    .frozen-table tr:hover td { background-color: rgba(99,171,143,.05); }
-    .frozen-table tr:hover td:first-child { background: rgba(99,171,143,.1); }
+    /* Fixed column styling for analytics table - IMPROVED for horizontal scroll */
+    .frozen-table-container { 
+      position: relative; 
+      overflow: auto; 
+      border: 1px solid var(--border-color); 
+      border-radius: 6px; 
+      margin-top: 10px; 
+      max-height: 600px; 
+      -webkit-overflow-scrolling: touch;
+      width: 100%;
+    }
+    
+    .frozen-table { 
+      border-collapse: separate; 
+      border-spacing: 0; 
+      width: max-content; 
+      min-width: 100%;
+      background: white;
+    }
+    
+    .frozen-table th, 
+    .frozen-table td { 
+      padding: 10px 12px; 
+      text-align: left; 
+      border-bottom: 1px solid var(--border-color); 
+      vertical-align: top; 
+      white-space: nowrap; 
+      background: white; 
+      position: relative; 
+    }
+    
+    .frozen-table thead th { 
+      background-color: var(--primary-color); 
+      color: white; 
+      font-weight: 600; 
+      position: sticky; 
+      top: 0; 
+      z-index: 10; 
+    }
+    
+    /* First column (Agent) - fixed when scrolling horizontally AND vertically */
+    .frozen-table th:first-child, 
+    .frozen-table td:first-child { 
+      position: sticky; 
+      left: 0; 
+      background: white; 
+      background-clip: padding-box; 
+      z-index: 5; 
+      border-right: 2px solid var(--border-color); 
+      min-width: 220px;
+      box-shadow: 2px 0 5px -2px rgba(0,0,0,0.1);
+    }
+    
+    /* Ensure header of first column has higher z-index and proper background */
+    .frozen-table thead th:first-child { 
+      z-index: 15; 
+      background: var(--primary-color); 
+    }
+    
+    /* Ensure hover effect works correctly with sticky cells */
+    .frozen-table tr:hover td { 
+      background-color: rgba(99,171,143,.05); 
+    }
+    
+    .frozen-table tr:hover td:first-child { 
+      background: rgba(99,171,143,.1); 
+    }
 
-    /* Tab styling - Updated to match your reference app but keep original structure */
+    /* Tab styling */
     .main-tab-container {
       display: flex;
       gap: 12px;
@@ -77,7 +135,6 @@
       display: block;
     }
 
-    /* Original tab styling for the nested tabs (unchanged) */
     .tab{display:inline-block;padding:12px 20px;margin-right:10px;background:#eee;cursor:pointer;border-radius:6px;font-weight:500}
     .tab.active{background:var(--primary-color);color:white}
     .tab-content{display:none}
@@ -165,7 +222,7 @@
 
     .stacked-bar-container { position: relative; height: 400px; margin: 20px 0; }
     
-    /* New styles for enhancements */
+    /* Styles for enhancements */
     .time-period-selector { margin: 16px 0; }
     .time-period-selector label { display: inline-block; margin-right: 10px; }
     .agent-failure-table { margin-top: 20px; }
@@ -179,7 +236,7 @@
     .sort-arrow { margin-left: 5px; }
     .contact-info { font-size: 12px; color: var(--text-light); margin-top: 2px; }
     
-    /* New styles for trends tab */
+    /* Styles for trends tab */
     .trend-controls { display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 16px; margin-bottom: 20px; }
     .trend-chart-container { height: 500px; margin: 20px 0; }
     .trend-table-container { margin-top: 30px; }
@@ -202,7 +259,7 @@
     .expandable-content.expanded { display: table-row; }
     .question-details-table { width: 100%; margin-top: 10px; }
     .question-details-table th { background-color: var(--secondary-color); }
-    .expand-icon { margin-right: 8px; transition: transform 0.3s; }
+    .expand-icon { margin-right: 8px; transition: transform 0.3s; display: inline-block; }
     .expanded .expand-icon { transform: rotate(90deg); }
     
     /* Analytics specific styles */
@@ -224,13 +281,13 @@
   <div id="appContent" style="display:none;">
     <div id="messageContainer"></div>
 
-    <!-- Main Tab Navigation - Quality Reporting vs How to Use -->
+    <!-- Main Tab Navigation -->
     <div class="main-tab-container">
       <button class="main-tab-button active" data-tab="tab-quality">Quality Reporting</button>
       <button class="main-tab-button" data-tab="tab-guide">How to Use</button>
     </div>
 
-    <!-- Quality Reporting Tab (Original App) -->
+    <!-- Quality Reporting Tab -->
     <div id="tab-quality" class="main-tab-content active">
       <div class="card">
         <h2 class="section-title">Configuration</h2>
@@ -263,7 +320,6 @@
 
       <div class="card">
         <div style="margin-bottom:10px;">
-          <!-- ORIGINAL TABS - UNCHANGED -->
           <div id="tabs">
             <div id="overviewTabButton" class="tab active">Overview</div>
             <div id="analyticsTabButton" class="tab">Analytics</div>
@@ -319,7 +375,7 @@
 
           <div id="analyticsKPIs" class="kpis"></div>
 
-          <!-- Updated Analytics Visualizations -->
+          <!-- Analytics Visualizations -->
           <div class="card" style="padding:16px;margin-top:10px">
             <h3 class="section-title" style="margin:0 0 8px">Performance Distribution by Media Type</h3>
             <div class="analytics-chart-container">
@@ -615,14 +671,12 @@
       const row = document.getElementById(`details-row-${index}`);
       const icon = document.querySelector(`#details-row-${index}`).previousElementSibling.querySelector('.expand-icon');
       
-      if (row.style.display === 'none') {
+      if (row.style.display === 'none' || row.style.display === '') {
         row.style.display = 'table-row';
-        icon.textContent = '▼';
-        icon.classList.add('expanded');
+        if (icon) icon.textContent = '▼';
       } else {
         row.style.display = 'none';
-        icon.textContent = '▶';
-        icon.classList.remove('expanded');
+        if (icon) icon.textContent = '▶';
       }
     };
 
@@ -639,8 +693,7 @@
     // ===== OAuth Configuration =====
     const clientId = 'fe305808-b368-4547-8af9-325d28d552bb';
     const config = { REGION: 'mypurecloud.ie' };
-    const redirectUri = 'https://gmcglynn88.github.io/QualityReporting/'; // must exactly match your OAuth app
-    // Hard-coded, pre-encoded OAuth URL
+    const redirectUri = 'https://gmcglynn88.github.io/QualityReporting/';
     const oauthUrl = 'https://login.mypurecloud.ie/oauth/authorize?client_id=fe305808-b368-4547-8af9-325d28d552bb&response_type=token&redirect_uri=https%3A%2F%2Fgmcglynn88.github.io%2FQualityReporting%2F&state=qa';
 
     const state = {
@@ -666,12 +719,15 @@
       formLookupCache: new Map(),
       combinedLookupCache: new Map(),
       
-      // New state for sorting and filtering
+      // State for sorting and filtering
       detailsSortField: 'date',
       detailsSortDirection: 'desc',
       detailsAgentFilter: 'all',
       detailsScoreFilter: 'all',
-      filteredEvals: []
+      filteredEvals: [],
+      
+      // Cache for processed evaluation data
+      evaluationDataCache: null
     };
 
     const dropdowns = { 
@@ -682,7 +738,7 @@
       trendTeams: null 
     };
 
-    // Chart colours resolved from CSS vars (Chart.js can't read CSS vars directly)
+    // Chart colours resolved from CSS vars
     const cssVar = k => getComputedStyle(document.documentElement).getPropertyValue(k).trim();
     let COLORS = { OK: '#22c55e', WARN: '#f59e0b', BAD: '#ef4444', TEXT: '#2C3E50', BLUE: '#3b82f6', PRIMARY: '#63AB8F', SECONDARY: '#4A8C7D' };
     function resolveColors() {
@@ -696,7 +752,7 @@
 
     // Throttle + backoff
     let lastApiCall = 0;
-    const API_DELAY = 120;                  // ms spacing between calls
+    const API_DELAY = 120;
     const MAX_CONCURRENT_AGENT_BATCH = 3;
 
     function sleep(ms){ return new Promise(r=>setTimeout(r,ms)); }
@@ -786,7 +842,6 @@
       document.addEventListener("click", function(e) {
         if (!e.target.classList.contains("main-tab-button")) return;
 
-        // Handle main tabs (Quality Reporting vs How to Use)
         document.querySelectorAll(".main-tab-button").forEach(btn =>
           btn.classList.remove("active")
         );
@@ -801,7 +856,7 @@
       });
     }
 
-    // ===== Boot (handles errors + expiry, avoids redirect loops) =====
+    // ===== Boot =====
     document.addEventListener('DOMContentLoaded', function () {
       resolveColors();
       setupMainTabSwitching();
@@ -810,7 +865,6 @@
       const rawHash = (window.location.hash || '').replace(/^#/, '');
       const params = new URLSearchParams(rawHash);
 
-      // 1) OAuth error (prevents infinite redirect)
       const oauthError = params.get('error');
       if (oauthError) {
         const desc = decodeURIComponent(params.get('error_description') || '');
@@ -824,12 +878,11 @@
         return;
       }
 
-      // 2) Token in hash
       const tokenFromHash = params.get('access_token');
       if (tokenFromHash) {
         console.log('Token found in hash');
         const expiresIn = parseInt(params.get('expires_in') || '0', 10);
-        const expAt = expiresIn ? Date.now() + (expiresIn - 60) * 1000 : 0; // pad by 60s
+        const expAt = expiresIn ? Date.now() + (expiresIn - 60) * 1000 : 0;
         sessionStorage.setItem('purecloud_token', tokenFromHash);
         if (expAt) sessionStorage.setItem('purecloud_token_exp', String(expAt));
         history.replaceState(null, document.title, window.location.pathname + window.location.search);
@@ -837,7 +890,6 @@
         return;
       }
 
-      // 3) Token from session (if not expired)
       const tokenFromSession = sessionStorage.getItem('purecloud_token');
       const exp = parseInt(sessionStorage.getItem('purecloud_token_exp') || '0', 10);
       if (tokenFromSession && (!exp || Date.now() < exp)) {
@@ -846,13 +898,12 @@
         return;
       }
 
-      // 4) No token yet - redirect to OAuth
       console.log('No token found, redirecting to OAuth');
       document.getElementById('auth-message').textContent = 'Redirecting to Genesys Cloud for authentication...';
       setTimeout(function(){ window.location.href = oauthUrl; }, 200);
     });
 
-    // ===== Agent Insights Renderer (Moved before startApp) =====
+    // ===== Agent Insights Renderer =====
     function renderAgentInsights(){
       const data = window._insightData || [];
       const mode = document.getElementById('insightsSort').value || 'avgDesc';
@@ -890,14 +941,16 @@
       dropdowns.analyticsTeams=createCheckboxDropdown('analyticsTeamDropdown',{placeholder:'Filter teams (optional)',searchPlaceholder:'Search teams...'});
       dropdowns.trendTeams=createCheckboxDropdown('trendTeamDropdown',{placeholder:'Filter teams (optional)',searchPlaceholder:'Search teams...'});
 
-      // ORIGINAL tab event listeners - UNCHANGED
       document.getElementById('overviewTabButton').onclick=()=>setTab('overview');
       document.getElementById('analyticsTabButton').onclick=()=>{
         setTab('analytics');
         renderAnalytics();
       };
       document.getElementById('trendsTabButton').onclick=()=>setTab('trends');
-      document.getElementById('detailsTabButton').onclick=()=>setTab('details');
+      document.getElementById('detailsTabButton').onclick=()=>{
+        setTab('details');
+        renderDetails();
+      };
       document.getElementById('criticalTabButton').onclick=()=>setTab('critical');
       document.getElementById('loadBtn').onclick=loadEvaluations;
 
@@ -906,7 +959,6 @@
       document.getElementById('insightsSort').onchange=renderAgentInsights;
       document.getElementById('trendPeriodSelect').onchange=renderTrends;
       
-      // New event listeners for details filters
       document.getElementById('applyFiltersBtn').onclick=applyDetailsFilters;
 
       const m=new Date();
@@ -969,7 +1021,6 @@
         }
         if([400,401,403,404,405].includes(res.status)){
           if(res.status === 401 || res.status === 403) {
-            // Token expired or invalid
             sessionStorage.removeItem('purecloud_token');
             sessionStorage.removeItem('purecloud_token_exp');
             document.getElementById('appContent').style.display='none';
@@ -1052,7 +1103,6 @@
       return 'Other';
     }
 
-    // Improved critical/fatal detection
     function getMaxScoreForQuestion(questionObj) {
       const opts = [...(questionObj?.answerOptions || []), ...(questionObj?.options || [])];
       if (opts.length > 0) { return Math.max(...opts.map(opt => Number(opt.value) || 0)); }
@@ -1073,15 +1123,12 @@
       return { isFatal, isCritical: explicitCritFail || markdownByScore };
     }
 
-    // Enhanced contact info extraction - prioritizes ANI from API
     function extractContactInfo(e) {
       const conversation = e.conversation || {};
       let contactInfo = '';
       
-      // Try to get phone number (ANI) - this is what we want for +44 numbers
       const ani = conversation.ani || conversation.fromAddress || conversation.callerAddress;
       if (ani) {
-        // Format as +44 number if it starts with 44 or 0
         let formattedAni = ani;
         if (ani.startsWith('44')) {
           formattedAni = '+' + ani;
@@ -1091,14 +1138,12 @@
         contactInfo = `Phone: ${formattedAni}`;
       }
       
-      // Try to get email address
       const email = conversation.emailAddress || conversation.fromEmail || conversation.customerEmail;
       if (email) {
         if (contactInfo) contactInfo += ' | ';
         contactInfo += `Email: ${email}`;
       }
       
-      // Try to get other contact info
       if (!contactInfo) {
         const address = conversation.address || conversation.customerAddress;
         if (address) {
@@ -1180,7 +1225,6 @@
       return Array.from(set);
     }
 
-    // Helper for analytics team filtering
     async function agentsForTeams(teamIds){
       await ensureTeamMembersLoaded(teamIds);
       const ids=new Set();
@@ -1207,7 +1251,10 @@
         const agentList = agentIds.length ? agentIds : state.users.map(u=>u.id);
         state.evals = await fetchDetailedEvaluations(agentList, formIds, state.monthStart, state.monthEnd);
         
-        // CRITICAL FIX: Load ALL form details for ALL forms found in evaluations
+        // Clear evaluation data cache
+        state.evaluationDataCache = null;
+        
+        // Load form details
         await loadAllFormDetailsFromEvaluations(state.evals);
         
         msg(`Loaded ${state.evals.length} evaluations.`,'success');
@@ -1238,10 +1285,8 @@
         const data=await fetchDetailedEvaluations(agentList,formIds,start,end);
         state.analyticsEvals=data; state.analyticsRange={start,end};
         
-        // CRITICAL FIX: Load ALL form details for ALL forms found in analytics evaluations
         await loadAllFormDetailsFromEvaluations(data);
         
-        // NEW: Copy the date range to trends tab
         document.getElementById('trendFrom').value = from;
         document.getElementById('trendTo').value = to;
         document.getElementById('trendPassTarget').value = document.getElementById('passTarget').value;
@@ -1275,7 +1320,6 @@
         const data=await fetchDetailedEvaluations(agentList,formIds,start,end);
         state.trendsEvals=data; state.trendsRange={start,end};
         
-        // CRITICAL FIX: Load ALL form details for ALL forms found in trends evaluations
         await loadAllFormDetailsFromEvaluations(data);
         
         msg(`Trends data loaded: ${data.length} evaluations.`, 'success');
@@ -1284,13 +1328,11 @@
       finally{ setLoading(btn,false); }
     }
 
-    // NEW FUNCTION: Load ALL form details from evaluations
     async function loadAllFormDetailsFromEvaluations(evaluations) {
       if (!evaluations || evaluations.length === 0) return;
       
       console.log('Loading form details for all evaluations...');
       
-      // Collect ALL unique form IDs from evaluations
       const formPromises = new Set();
       
       evaluations.forEach(e => {
@@ -1298,17 +1340,14 @@
         const formId = safeGet(e, 'form.id') || e.formId;
         const formVersionId = safeGet(e, 'form.versionId') || e.formVersionId || safeGet(e, 'form.version');
         
-        // Add published form if exists
         if (pubId) {
           formPromises.add(getFormDetails(pubId, '__published__'));
         }
         
-        // Add form with version if exists
         if (formId && formVersionId) {
           formPromises.add(getFormDetails(formId, formVersionId));
         }
         
-        // Always add form without version as fallback
         if (formId) {
           formPromises.add(getFormDetails(formId, null));
         }
@@ -1316,7 +1355,6 @@
       
       console.log(`Loading ${formPromises.size} form details...`);
       
-      // Load all form details
       await Promise.allSettled(Array.from(formPromises));
       console.log('All form details loaded.');
     }
@@ -1336,7 +1374,6 @@
       const start=startDate.toISOString(); const end=endDate.toISOString();
       const base = `https://api.${config.REGION}/api/v2/quality/evaluations/query`;
 
-      // Helper: GET path
       async function getViaGET(singleFormId){
         const params = new URLSearchParams({
           agentUserId: agentId,
@@ -1359,7 +1396,6 @@
         return all;
       }
 
-      // Helper: POST path
       async function getViaPOST(){
         const url = base;
         const body = {
@@ -1405,7 +1441,6 @@
     async function getFormDetails(formId, versionId){
       const key = formKey(formId, versionId);
       
-      // Return cached if available
       if (state.formDetailsCache.has(key)) {
         return state.formDetailsCache.get(key);
       }
@@ -1424,7 +1459,6 @@
         try {
           data = await fetchJsonWithRetry(url, { method: 'GET' });
         } catch (err) {
-          // If specific version fails, try to get the latest version
           if (versionId && versionId !== '__published__') {
             console.log(`Version ${versionId} not found for form ${formId}, trying latest version`);
             data = await fetchJsonWithRetry(
@@ -1436,7 +1470,6 @@
           }
         }
         
-        // Store in cache
         state.formDetailsCache.set(key, data);
         state.formLookupCache.set(key, buildFormLookup(data || {}));
         
@@ -1448,7 +1481,6 @@
       }
     }
 
-    // IMPROVED form lookup
     function buildFormLookup(form){
       const questionText = new Map();
       const answerText = new Map();
@@ -1471,14 +1503,12 @@
         
         const qText = extractQuestionText(q);
         
-        // Map ALL possible IDs
         const ids = [];
         if (q.id) ids.push(q.id);
         if (q.contextId) ids.push(q.contextId);
         if (q.questionId) ids.push(q.questionId);
         if (q.questionContextId) ids.push(q.questionContextId);
         
-        // Map IDs to question text
         ids.forEach(id => {
           if (id && qText) {
             questionText.set(id, qText);
@@ -1486,7 +1516,6 @@
           }
         });
         
-        // Handle answer options
         (q.answerOptions || []).forEach(a => {
           const aText = extractAnswerText(a);
           const answerIds = [];
@@ -1503,24 +1532,18 @@
           });
         });
         
-        // Handle nested questions
         (q.multipleSelectOptionQuestions || []).forEach(addQuestion);
         (q.nestedQuestions || []).forEach(addQuestion);
       }
 
       function walkQuestionGroups(groups) {
         (groups || []).forEach(g => {
-          // Process questions in group
           (g.questions || []).forEach(addQuestion);
-          // Recursively walk nested groups
           walkQuestionGroups(g.questionGroups || []);
         });
       }
       
-      // Process top-level questions
       (form.questions || []).forEach(addQuestion);
-      
-      // Process question groups
       walkQuestionGroups(form.questionGroups || []);
       
       return { questionText, answerText, questionObj };
@@ -1531,38 +1554,31 @@
       const formId = safeGet(e, 'form.id') || e.formId;
       const formVersionId = safeGet(e, 'form.versionId') || e.formVersionId || safeGet(e, 'form.version');
       
-      // Create cache key
       const comboKey = `${pubId || 'no-pub'}|${formId || 'no-form'}|${formVersionId || 'no-ver'}`;
       
       if (state.combinedLookupCache.has(comboKey)) {
         return state.combinedLookupCache.get(comboKey);
       }
       
-      // Load BOTH published form AND specific form
       const loadPromises = [];
       
-      // Always try published form first
       if (pubId) {
         loadPromises.push(getFormDetails(pubId, '__published__'));
       }
       
-      // Try specific form version
       if (formId && formVersionId) {
         loadPromises.push(getFormDetails(formId, formVersionId));
       }
       
-      // Always try form without version
       if (formId) {
         loadPromises.push(getFormDetails(formId, null));
       }
       
-      // Wait for all form details to load
       const results = await Promise.allSettled(loadPromises);
       const details = results
         .filter(r => r.status === 'fulfilled' && r.value)
         .map(r => r.value);
       
-      // Build combined lookup
       const merged = { 
         questionText: new Map(), 
         answerText: new Map(), 
@@ -1576,7 +1592,6 @@
         lk.questionObj.forEach((v, k) => merged.questionObj.set(k, v));
       });
       
-      // Get form name
       const formName = safeGet(e, 'evaluationForm.name') || 
                       safeGet(e, 'form.name') || 
                       (details[0]?.name) || 
@@ -1594,11 +1609,9 @@
       return combined;
     }
 
-    // ===== IMPROVED Question Text Resolution =====
     function approx(a,b){ return Math.abs(Number(a)-Number(b))<1e-6; }
     
     function resolveQuestionTextWithLookup(lookup, qScore) {
-      // Strategy 1: Try to get from qScore.question directly
       if (qScore.question) {
         const directText = qScore.question.text || qScore.question.label || qScore.question.title;
         if (directText) {
@@ -1606,7 +1619,6 @@
         }
       }
       
-      // Strategy 2: Try lookup with all possible IDs
       const idsToTry = [
         qScore.questionId,
         qScore.questionContextId,
@@ -1624,11 +1636,9 @@
         }
       }
       
-      // Strategy 3: Try to find by scanning all question objects for partial matches
       if (idsToTry.length > 0) {
         const allQuestionIds = Array.from(lookup.questionText.keys());
         for (const questionId of allQuestionIds) {
-          // Check for partial matches (sometimes IDs are truncated)
           for (const searchId of idsToTry) {
             if (questionId.includes(searchId) || searchId.includes(questionId)) {
               const text = lookup.questionText.get(questionId);
@@ -1638,13 +1648,11 @@
         }
       }
       
-      // Strategy 4: Try the qScore itself
       const qScoreText = qScore.text || qScore.label || qScore.title;
       if (qScoreText) {
         return qScoreText;
       }
       
-      // Strategy 5: Try to extract from answer options if score matches
       const allQuestionObjs = Array.from(lookup.questionObj.values());
       for (const questionObj of allQuestionObjs) {
         if (questionObj.answerOptions && qScore.score !== undefined) {
@@ -1658,9 +1666,7 @@
         }
       }
       
-      // Last resort: Show ID or generic text
       if (idsToTry[0]) {
-        // Check if ID might actually be the question text (some systems store text as ID)
         const firstId = idsToTry[0];
         if (firstId.length < 100 && !firstId.includes('-') && !firstId.match(/^[a-f0-9]{8}-/i)) {
           return firstId;
@@ -1672,10 +1678,8 @@
     }
 
     function resolveAnswerTextWithLookup(lookup, qScore) {
-      // Try to get answer text from lookup
       const ids = new Set();
       
-      // Collect ALL possible answer IDs
       (qScore.selectedAnswerIds || []).forEach(x => ids.add(x));
       (qScore.selectedAnswerOptionIds || []).forEach(x => ids.add(x));
       if (qScore.selectedAnswerId) ids.add(qScore.selectedAnswerId);
@@ -1697,7 +1701,6 @@
       
       if (texts.length) return texts.join(', ');
       
-      // If no answer text found, try to match score to answer options
       const qIds = [ qScore.questionId, qScore.questionContextId, safeGet(qScore, 'question.id'), safeGet(qScore, 'question.contextId') ].filter(Boolean);
       const q = qIds.map(id => lookup.questionObj.get(id)).find(Boolean);
       
@@ -1717,7 +1720,6 @@
         }
       }
       
-      // Fallbacks
       if (qScore.freeTextAnswer) return String(qScore.freeTextAnswer);
       if (qScore.numericAnswer !== undefined && qScore.numericAnswer !== null) return String(qScore.numericAnswer);
       if (safeGet(qScore, 'answer.text')) return qScore.answer.text;
@@ -1791,16 +1793,13 @@
       return out; 
     }
 
-    // ===== UPDATED ANALYTICS RENDERER WITH PROPER CHART.JS VISUALS =====
     async function renderAnalytics(){
       const raw = getAnalyticsSet();
       
-      // Get chart canvas elements
       const mediaTypeCanvas = document.getElementById('mediaTypeChart');
       const agentTrendCanvas = document.getElementById('agentTrendChart');
       const scoreDistCanvas = document.getElementById('scoreDistributionChart');
       
-      // Check if charts should be rendered
       if(!raw || !raw.length){
         document.getElementById('analyticsKPIs').innerHTML='<div class="muted" style="padding:20px;text-align:center">No analytics data loaded. Use "Load Range" button to load data.</div>';
         document.getElementById('mediaTable').innerHTML='<tr><td class="muted">No data loaded yet.</td></tr>';
@@ -1810,14 +1809,12 @@
         document.getElementById('topAgentsTable').innerHTML='';
         document.getElementById('bottomAgentsTable').innerHTML='';
         
-        // Clear any existing charts properly
         ['mediaTypeChart', 'agentTrendChart', 'scoreDistributionChart'].forEach(id => {
           const canvas = document.getElementById(id);
           if (canvas) {
             const ctx = canvas.getContext('2d');
             ctx.clearRect(0, 0, canvas.width, canvas.height);
             
-            // Destroy existing Chart.js instances
             if (id === 'mediaTypeChart' && window.mediaTypeChartInstance) {
               window.mediaTypeChartInstance.destroy();
               window.mediaTypeChartInstance = null;
@@ -1831,7 +1828,6 @@
               window.scoreDistributionChartInstance = null;
             }
             
-            // Create a placeholder message
             const container = canvas.parentElement;
             if (container) {
               container.innerHTML = `
@@ -1858,7 +1854,6 @@
       const start = state.analyticsRange?.start || state.monthStart;
       const end   = state.analyticsRange?.end   || state.monthEnd;
       
-      // Calculate KPIs
       let withFatal=0, withCritical=0, totalCriticalMarks=0, totalFatalMarks=0;
       let sumScores=0, scored=0;
       for (const e of evals) {
@@ -1893,31 +1888,28 @@
 
       const {pass, band} = getPassSettings();
       
-      // Data for charts
       const mediaTypeData = { Voice: { pass: 0, amber: 0, fail: 0 }, 
                              Email: { pass: 0, amber: 0, fail: 0 }, 
                              Message: { pass: 0, amber: 0, fail: 0 }, 
                              Social: { pass: 0, amber: 0, fail: 0 }, 
                              Other: { pass: 0, amber: 0, fail: 0 } };
       
-      const agentTrendData = new Map(); // agent -> {dates: [], scores: []}
-      const scoreDistribution = Array(10).fill(0); // 0-10, 11-20, ..., 91-100
+      const agentTrendData = new Map();
+      const scoreDistribution = Array(10).fill(0);
       
-      const byAgent=new Map(); // agent -> media -> {count,sum,scored}
+      const byAgent=new Map();
       evals.forEach(e=>{
         const aid=safeGet(e,'agent.id')||e.agentUserId||'(unknown)';
         const name=resolveUserName(aid);
         const mt=guessMediaType(e);
         const p=getEvalPercent(e);
         
-        // Media type chart data
         if (p != null && isFinite(p)) {
           if (p >= pass) mediaTypeData[mt].pass++;
           else if (p >= pass - band) mediaTypeData[mt].amber++;
           else mediaTypeData[mt].fail++;
         }
         
-        // Agent trend data
         if (!agentTrendData.has(name)) {
           agentTrendData.set(name, { dates: [], scores: [] });
         }
@@ -1925,14 +1917,12 @@
         agentTrendData.get(name).dates.push(date);
         agentTrendData.get(name).scores.push(p || 0);
         
-        // Score distribution
         if (p != null && isFinite(p)) {
           const bucket = Math.floor(p / 10);
           const idx = bucket === 10 ? 9 : bucket;
           scoreDistribution[idx]++;
         }
         
-        // Existing media table data
         if(!byAgent.has(aid)) byAgent.set(aid,{name,map:new Map()});
         const m=byAgent.get(aid).map;
         if(!m.has(mt)) m.set(mt,{count:0,sum:0,scored:0});
@@ -1941,14 +1931,13 @@
         if(p!=null&&isFinite(p)){ o.sum+=Number(p); o.scored++; }
       });
 
-      // 1. Media Type Chart (Stacked Bar)
+      // 1. Media Type Chart
       try {
         const mediaTypeCtx = document.getElementById('mediaTypeChart').getContext('2d');
         if (window.mediaTypeChartInstance) {
           window.mediaTypeChartInstance.destroy();
         }
         
-        // Make sure container has canvas again
         const mediaChartContainer = document.querySelector('.analytics-chart-container');
         if (mediaChartContainer && !mediaChartContainer.querySelector('canvas')) {
           mediaChartContainer.innerHTML = '<canvas id="mediaTypeChart"></canvas>';
@@ -1987,61 +1976,32 @@
             responsive: true,
             maintainAspectRatio: false,
             scales: {
-              x: {
-                stacked: true,
-                title: {
-                  display: true,
-                  text: 'Media Type'
-                }
-              },
-              y: {
-                stacked: true,
-                beginAtZero: true,
-                title: {
-                  display: true,
-                  text: 'Number of Evaluations'
-                }
-              }
+              x: { stacked: true, title: { display: true, text: 'Media Type' } },
+              y: { stacked: true, beginAtZero: true, title: { display: true, text: 'Number of Evaluations' } }
             },
-            plugins: {
-              tooltip: {
-                mode: 'index',
-                intersect: false
-              },
-              legend: {
-                position: 'top'
-              }
-            }
+            plugins: { tooltip: { mode: 'index', intersect: false }, legend: { position: 'top' } }
           }
         });
       } catch (chartError) {
         console.error('Error creating mediaTypeChart:', chartError);
-        // Show error message
-        const container = document.querySelector('.analytics-chart-container');
-        if (container) {
-          container.innerHTML = `<div class="error-message" style="margin:20px">Chart error: ${chartError.message}</div>`;
-        }
       }
 
-      // 2. Agent Trend Chart (Line chart for top 5 agents)
+      // 2. Agent Trend Chart
       try {
         const agentTrendCtx = document.getElementById('agentTrendChart').getContext('2d');
         if (window.agentTrendChartInstance) {
           window.agentTrendChartInstance.destroy();
         }
         
-        // Get top 5 agents by number of evaluations
         const topAgents = Array.from(agentTrendData.entries())
           .sort((a, b) => b[1].scores.length - a[1].scores.length)
           .slice(0, 5);
         
-        // Prepare data for line chart
         const allDates = Array.from(new Set(topAgents.flatMap(([name, data]) => 
           data.dates.map(d => d.toISOString().split('T')[0])
         ))).sort();
         
         const datasets = topAgents.map(([name, data], idx) => {
-          // Create map of date to average score for that day
           const dateScoreMap = new Map();
           data.dates.forEach((date, i) => {
             const dateStr = date.toISOString().split('T')[0];
@@ -2052,7 +2012,6 @@
             dateScoreMap.get(dateStr).push(score);
           });
           
-          // Calculate average for each date
           const scoresByDate = allDates.map(date => {
             const scores = dateScoreMap.get(date);
             return scores && scores.length > 0 
@@ -2060,7 +2019,6 @@
               : null;
           });
           
-          // Generate distinct color
           const hue = (idx * 360 / topAgents.length) % 360;
           const color = `hsl(${hue}, 70%, 50%)`;
           
@@ -2085,50 +2043,24 @@
             responsive: true,
             maintainAspectRatio: false,
             scales: {
-              x: {
-                title: {
-                  display: true,
-                  text: 'Date'
-                }
-              },
-              y: {
-                beginAtZero: false,
-                min: 0,
-                max: 100,
-                title: {
-                  display: true,
-                  text: 'Score (%)'
-                },
-                ticks: {
-                  callback: function(value) {
-                    return value + '%';
-                  }
-                }
+              x: { title: { display: true, text: 'Date' } },
+              y: { beginAtZero: false, min: 0, max: 100, title: { display: true, text: 'Score (%)' },
+                ticks: { callback: function(value) { return value + '%'; } }
               }
             },
             plugins: {
-              tooltip: {
-                callbacks: {
-                  label: function(context) {
-                    return `${context.dataset.label}: ${context.parsed.y ? pct(context.parsed.y, 1) : 'N/A'}`;
-                  }
-                }
-              },
-              legend: {
-                position: 'top'
-              }
+              tooltip: { callbacks: { label: function(context) {
+                return `${context.dataset.label}: ${context.parsed.y ? pct(context.parsed.y, 1) : 'N/A'}`;
+              } } },
+              legend: { position: 'top' }
             }
           }
         });
       } catch (chartError) {
         console.error('Error creating agentTrendChart:', chartError);
-        const container = document.querySelectorAll('.card')[9]; // Find the right container
-        if (container && container.querySelector('.card > div')) {
-          container.querySelector('.card > div').innerHTML = `<div class="error-message" style="margin:20px">Chart error: ${chartError.message}</div>`;
-        }
       }
 
-      // 3. Score Distribution Chart (Histogram)
+      // 3. Score Distribution Chart
       try {
         const scoreDistCtx = document.getElementById('scoreDistributionChart').getContext('2d');
         if (window.scoreDistributionChartInstance) {
@@ -2137,7 +2069,6 @@
         
         const scoreLabels = ['0-10%', '11-20%', '21-30%', '31-40%', '41-50%', '51-60%', '61-70%', '71-80%', '81-90%', '91-100%'];
         
-        // Color bars based on score ranges
         const backgroundColors = scoreLabels.map((label, idx) => {
           const minScore = idx * 10;
           if (minScore >= pass) return COLORS.OK;
@@ -2161,43 +2092,21 @@
             responsive: true,
             maintainAspectRatio: false,
             scales: {
-              x: {
-                title: {
-                  display: true,
-                  text: 'Score Range'
-                }
-              },
-              y: {
-                beginAtZero: true,
-                title: {
-                  display: true,
-                  text: 'Number of Evaluations'
-                }
-              }
+              x: { title: { display: true, text: 'Score Range' } },
+              y: { beginAtZero: true, title: { display: true, text: 'Number of Evaluations' } }
             },
-            plugins: {
-              legend: {
-                display: false
-              },
-              tooltip: {
-                callbacks: {
-                  label: function(context) {
-                    return `${context.parsed.y} evaluation${context.parsed.y !== 1 ? 's' : ''}`;
-                  }
-                }
-              }
+            plugins: { legend: { display: false },
+              tooltip: { callbacks: { label: function(context) {
+                return `${context.parsed.y} evaluation${context.parsed.y !== 1 ? 's' : ''}`;
+              } } }
             }
           }
         });
       } catch (chartError) {
         console.error('Error creating scoreDistributionChart:', chartError);
-        const container = document.querySelectorAll('.card')[10]; // Find the right container
-        if (container && container.querySelector('.card > div')) {
-          container.querySelector('.card > div').innerHTML = `<div class="error-message" style="margin:20px">Chart error: ${chartError.message}</div>`;
-        }
       }
 
-      // Build media table (agent × media) - KEEPING EXISTING TABLE
+      // Build media table
       const mediaTypesTable=['Voice','Email','Message','Social','Other'];
       const mediaHead='<thead><tr><th>Agent</th>'+mediaTypesTable.map(mt=>`<th>${mt} (avg)</th>`).join('')+'<th>Overall</th><th>Evaluations</th></tr></thead>';
       let mediaRows='';
@@ -2230,12 +2139,11 @@
       
       document.getElementById('mediaTable').innerHTML=mediaHead+'<tbody>'+mediaRows+'</tbody>';
 
-      // Store insight data for sorting
       window._insightData = insightData;
       renderAgentInsights();
 
       // Repeat failures table
-      const repeatFails = new Map(); // question text -> {formName, agents: Map, count}
+      const repeatFails = new Map();
       for (const e of evals) {
         const lookup = await getCombinedLookupForEval(e);
         const agentName = resolveUserName(safeGet(e, 'agent.id') || e.agentUserId);
@@ -2281,13 +2189,12 @@
         ? `<thead><tr><th>Form</th><th>Question</th><th>Total Marks</th><th>Agents</th><th>Agent Breakdown</th></tr></thead><tbody>${repeatFailRows}</tbody>`
         : '<tr><td class="muted">No repeat failures found.</td></tr>';
 
-      // Daily trend table
+      // Daily trend table - FIXED with proper frozen column
       const days = buildDays(start, end);
       const dayKeys = days.map(d => dayKeyUTC(d));
       const dayLabels = days.map(d => toUKDate(d));
       
-      // Agent trend data for table
-      const agentTrendTable = new Map(); // agent -> day -> {count, sum}
+      const agentTrendTable = new Map();
       evals.forEach(e => {
         const aid = safeGet(e, 'agent.id') || e.agentUserId;
         const name = resolveUserName(aid);
@@ -2309,7 +2216,7 @@
         }
       });
       
-      // Build table
+      // Build table with proper frozen first column
       let trendTable = `<table class="frozen-table">
         <thead>
           <tr>
@@ -2324,7 +2231,7 @@
       Array.from(agentTrendTable.entries())
         .sort(([aName], [bName]) => aName.localeCompare(bName))
         .forEach(([name, dayMap]) => {
-          trendTable += `<tr><td>${name}</td>`;
+          trendTable += `<tr><td><strong>${name}</strong></td>`;
           
           dayKeys.forEach(day => {
             const data = dayMap.get(day);
@@ -2353,7 +2260,6 @@
       const topAgentsTable = sortedAgents.slice(0, 10);
       const bottomAgentsTable = sortedAgents.slice(-10).reverse();
       
-      // Top agents table
       let topHtml = '<thead><tr><th>Rank</th><th>Agent</th><th>Avg Score</th><th>Evaluations</th><th>Failures</th></tr></thead><tbody>';
       topAgentsTable.forEach((agent, i) => {
         const col = colourFor(agent.avg, pass, band);
@@ -2368,7 +2274,6 @@
       topHtml += '</tbody>';
       document.getElementById('topAgentsTable').innerHTML = topHtml;
       
-      // Bottom agents table
       let bottomHtml = '<thead><tr><th>Rank</th><th>Agent</th><th>Avg Score</th><th>Evaluations</th><th>Failures</th></tr></thead><tbody>';
       bottomAgentsTable.forEach((agent, i) => {
         const col = colourFor(agent.avg, pass, band);
@@ -2384,7 +2289,6 @@
       document.getElementById('bottomAgentsTable').innerHTML = bottomHtml;
     }
 
-    // ===== TRENDS RENDERER (Keep existing) =====
     async function renderTrends() {
       const raw = getTrendsSet();
       const trendsView = document.getElementById('trendsView');
@@ -2410,9 +2314,8 @@
       const { pass, band } = getTrendPassSettings();
       const period = document.getElementById('trendPeriodSelect').value;
       
-      // Group evaluations by period
       const periodMap = new Map();
-      const agentPeriodMap = new Map(); // agent -> period -> {count, sum, passes, ambers, fails}
+      const agentPeriodMap = new Map();
       
       evals.forEach(e => {
         const date = new Date(e.releaseDate || e.assignedDate || e.creationDate || e.evaluationDate || e.date || Date.now());
@@ -2430,7 +2333,6 @@
         const agentId = safeGet(e, 'agent.id') || e.agentUserId;
         const agentName = resolveUserName(agentId);
         
-        // Update period totals
         if (!periodMap.has(periodKey)) {
           periodMap.set(periodKey, {
             label: periodLabel,
@@ -2452,7 +2354,6 @@
           else periodData.fails++;
         }
         
-        // Check for critical/fatal
         const qGroups = safeGet(e, 'answers.questionGroupScores') || [];
         qGroups.forEach(g => {
           (g.questionScores || []).forEach(q => {
@@ -2464,7 +2365,6 @@
           });
         });
         
-        // Update agent-period data
         if (!agentPeriodMap.has(agentName)) {
           agentPeriodMap.set(agentName, new Map());
         }
@@ -2488,11 +2388,9 @@
         }
       });
       
-      // Sort periods chronologically
       const sortedPeriods = Array.from(periodMap.keys()).sort();
       const periodData = sortedPeriods.map(key => periodMap.get(key));
       
-      // Calculate KPIs
       let totalEvals = 0;
       let totalScore = 0;
       let totalPasses = 0;
@@ -2519,14 +2417,11 @@
         <div class="kpi"><div class="label">Periods</div><div class="value">${sortedPeriods.length}</div></div>
       `;
       
-      // Update chart title
       document.getElementById('trendsTitle').textContent = 
         period === 'week' ? 'Week over Week Performance' : 'Month over Month Performance';
       
-      // Create Chart.js chart
       const ctx = document.getElementById('trendsChart').getContext('2d');
       
-      // Destroy existing chart if it exists
       if (window.trendsChartInstance) {
         window.trendsChartInstance.destroy();
       }
@@ -2568,38 +2463,12 @@
           responsive: true,
           maintainAspectRatio: false,
           scales: {
-            x: {
-              stacked: true,
-              title: {
-                display: true,
-                text: period === 'week' ? 'Week' : 'Month'
-              }
-            },
-            y: {
-              stacked: true,
-              beginAtZero: true,
-              title: {
-                display: true,
-                text: 'Number of Evaluations'
-              }
-            }
+            x: { stacked: true, title: { display: true, text: period === 'week' ? 'Week' : 'Month' } },
+            y: { stacked: true, beginAtZero: true, title: { display: true, text: 'Number of Evaluations' } }
           },
-          plugins: {
-            tooltip: {
-              mode: 'index',
-              intersect: false
-            },
-            legend: {
-              position: 'top'
-            }
-          }
+          plugins: { tooltip: { mode: 'index', intersect: false }, legend: { position: 'top' } }
         }
       });
-      
-      // Calculate trend statistics
-      let improvementCount = 0;
-      let declineCount = 0;
-      let stableCount = 0;
       
       if (periodData.length >= 2) {
         const firstPeriod = periodData[0];
@@ -2651,7 +2520,6 @@
         `;
       }
       
-      // Build agent improvement table
       const agentImprovements = [];
       
       Array.from(agentPeriodMap.entries()).forEach(([agentName, periodMap]) => {
@@ -2687,7 +2555,6 @@
         }
       });
       
-      // Sort by improvement
       agentImprovements.sort((a, b) => b.avgChange - a.avgChange);
       
       let improvementHtml = '<thead><tr><th>Agent</th><th>First Avg</th><th>Last Avg</th><th>Change</th><th>First Pass Rate</th><th>Last Pass Rate</th><th>Pass Rate Change</th><th>Total Evals</th><th>Trend</th></tr></thead><tbody>';
@@ -2716,7 +2583,7 @@
       document.getElementById('trendImprovementTable').innerHTML = improvementHtml || '<tr><td colspan="9" class="muted">No trend data available for agents.</td></tr>';
     }
 
-    // ===== DETAILS RENDERER =====
+    // ===== DETAILS RENDERER - FIXED =====
     async function applyDetailsFilters() {
       state.detailsAgentFilter = document.getElementById('detailsAgentFilter').value;
       state.detailsScoreFilter = document.getElementById('detailsScoreFilter').value;
@@ -2732,53 +2599,54 @@
       
       c.innerHTML = '<div class="info-message">Loading evaluation details...</div>';
 
-      // Create evaluation data with all needed information
-      const evaluationData = await Promise.all(state.evals.map(async (e) => {
-        const agent = resolveUserName(safeGet(e, 'agent.id') || e.agentUserId);
-        const lookup = await getCombinedLookupForEval(e);
-        const formName = lookup.formName;
-        const date = new Date(e.releaseDate || e.assignedDate || e.creationDate || e.evaluationDate || e.date || Date.now());
-        const when = toDateTime(date);
-        const contactInfo = extractContactInfo(e);
-        const score = getEvalPercent(e);
-        
-        // Check for critical/fatal marks
-        let hasCritical = false;
-        let hasFatal = false;
-        const qGroups = safeGet(e, 'answers.questionGroupScores') || [];
-        for (const g of qgs) {
-          for (const q of (g.questionScores || [])) {
-            const qIds = [q.questionId, q.questionContextId, safeGet(q, 'question.id'), safeGet(q, 'question.contextId')].filter(Boolean);
-            const questionObj = qIds.map(id => lookup.questionObj.get(id)).find(Boolean);
-            const { isFatal, isCritical } = detectCriticalFatalQuestions(q, questionObj);
-            if (isFatal) hasFatal = true;
-            if (isCritical) hasCritical = true;
+      // Use cached data if available
+      if (!state.evaluationDataCache) {
+        // Create evaluation data with all needed information
+        state.evaluationDataCache = await Promise.all(state.evals.map(async (e) => {
+          const agent = resolveUserName(safeGet(e, 'agent.id') || e.agentUserId);
+          const lookup = await getCombinedLookupForEval(e);
+          const formName = lookup.formName;
+          const date = new Date(e.releaseDate || e.assignedDate || e.creationDate || e.evaluationDate || e.date || Date.now());
+          const when = toDateTime(date);
+          const contactInfo = extractContactInfo(e);
+          const score = getEvalPercent(e);
+          
+          // Check for critical/fatal marks
+          let hasCritical = false;
+          let hasFatal = false;
+          const qGroups = safeGet(e, 'answers.questionGroupScores') || [];
+          for (const g of qGroups) {
+            for (const q of (g.questionScores || [])) {
+              const qIds = [q.questionId, q.questionContextId, safeGet(q, 'question.id'), safeGet(q, 'question.contextId')].filter(Boolean);
+              const questionObj = qIds.map(id => lookup.questionObj.get(id)).find(Boolean);
+              const { isFatal, isCritical } = detectCriticalFatalQuestions(q, questionObj);
+              if (isFatal) hasFatal = true;
+              if (isCritical) hasCritical = true;
+            }
           }
-        }
-        
-        return {
-          agent,
-          formName,
-          date,
-          when,
-          contactInfo,
-          score,
-          hasCritical,
-          hasFatal,
-          evalObj: e,
-          lookup
-        };
-      }));
+          
+          return {
+            agent,
+            formName,
+            date,
+            when,
+            contactInfo,
+            score,
+            hasCritical,
+            hasFatal,
+            evalObj: e,
+            lookup
+          };
+        }));
+      }
 
-      // Apply filters
-      let filteredData = evaluationData;
+      let filteredData = state.evaluationDataCache;
       
-      // Agent filter
+      // Apply filters
       if (state.detailsAgentFilter !== 'all') {
         filteredData = filteredData.filter(d => d.agent === state.detailsAgentFilter);
       }
       
-      // Score filter
       if (state.detailsScoreFilter !== 'all') {
         switch(state.detailsScoreFilter) {
           case 'pass':
@@ -2799,7 +2667,7 @@
         }
       }
 
-      // Sort the data based on current sort settings
+      // Sort
       filteredData.sort((a, b) => {
         let aVal, bVal;
         
@@ -2826,14 +2694,14 @@
         }
         
         if (state.detailsSortDirection === 'desc') {
-          return bVal - aVal || (bVal < aVal ? 1 : -1);
+          return (aVal > bVal) ? -1 : (aVal < bVal) ? 1 : 0;
         } else {
-          return aVal - bVal || (aVal < bVal ? -1 : 1);
+          return (aVal < bVal) ? -1 : (aVal > bVal) ? 1 : 0;
         }
       });
 
       // Update agent filter dropdown
-      const uniqueAgents = [...new Set(evaluationData.map(d => d.agent))].sort();
+      const uniqueAgents = [...new Set(state.evaluationDataCache.map(d => d.agent))].sort();
       const agentFilter = document.getElementById('detailsAgentFilter');
       agentFilter.innerHTML = '<option value="all">All Agents</option>' + 
         uniqueAgents.map(agent => `<option value="${agent}" ${state.detailsAgentFilter === agent ? 'selected' : ''}>${agent}</option>`).join('');
@@ -2851,10 +2719,10 @@
           <table class="details-table sortable">
             <thead>
               <tr>
-                <th class="sort-header" onclick="sortDetails('date')">Time${sortArrow('date')}</th>
-                <th class="sort-header" onclick="sortDetails('agent')">Agent${sortArrow('agent')}</th>
-                <th class="sort-header" onclick="sortDetails('form')">Form${sortArrow('form')}</th>
-                <th class="sort-header" onclick="sortDetails('score')">Score${sortArrow('score')}</th>
+                <th class="sort-header" onclick="sortDetails('date')">Time<span class="sort-arrow">${sortArrow('date')}</span></th>
+                <th class="sort-header" onclick="sortDetails('agent')">Agent<span class="sort-arrow">${sortArrow('agent')}</span></th>
+                <th class="sort-header" onclick="sortDetails('form')">Form<span class="sort-arrow">${sortArrow('form')}</span></th>
+                <th class="sort-header" onclick="sortDetails('score')">Score<span class="sort-arrow">${sortArrow('score')}</span></th>
                 <th>Contact Info</th>
                 <th>Details</th>
               </tr>
@@ -2863,14 +2731,16 @@
       `;
 
       // Create rows
-      const rows = await Promise.all(filteredData.map(async (data, index) => {
-        const { agent, formName, when, contactInfo, score, evalObj, lookup, hasCritical, hasFatal } = data;
+      const rows = [];
+      for (let index = 0; index < filteredData.length; index++) {
+        const data = filteredData[index];
+        const { agent, formName, when, contactInfo, score, evalObj, lookup, hasFatal, hasCritical } = data;
         
         let qRows = '';
         const questionGroups = safeGet(evalObj, 'answers.questionGroupScores') || [];
         
-        questionGroups.forEach(group => {
-          (group.questionScores || []).forEach(qScore => {
+        for (const group of questionGroups) {
+          for (const qScore of (group.questionScores || [])) {
             const questionText = resolveQuestionTextWithLookup(lookup, qScore);
             const answerText = resolveAnswerTextWithLookup(lookup, qScore);
             const ansScore = qScore.score ?? null;
@@ -2893,8 +2763,8 @@
               <td>${isFatal ? '<span class="badge badge-fatal">Fatal</span>' : isCritical ? '<span class="badge badge-critical">Critical</span>' : '<span class="badge badge-ok">OK</span>'}</td>
               <td>${allComments}</td>
             </tr>`;
-          });
-        });
+          }
+        }
 
         const questionsTable = qRows 
           ? `<div class="table-container">
@@ -2905,7 +2775,6 @@
              </div>`
           : `<div class="muted">No question data available.</div>`;
 
-        // Add critical/fatal indicators to score
         let scoreDisplay = score === null ? '-' : pct(score, 1);
         if (hasFatal) {
           scoreDisplay += ' <span class="badge badge-fatal">Fatal</span>';
@@ -2913,7 +2782,7 @@
           scoreDisplay += ' <span class="badge badge-critical">Critical</span>';
         }
 
-        return `
+        rows.push(`
           <tr class="expandable-row" onclick="toggleRow(${index})">
             <td>${when}</td>
             <td>${agent}</td>
@@ -2922,27 +2791,19 @@
             <td><div class="contact-info">${contactInfo}</div></td>
             <td><span class="expand-icon">▶</span> Click to expand</td>
           </tr>
-          <tr id="details-row-${index}" class="expandable-content">
+          <tr id="details-row-${index}" class="expandable-content" style="display:none;">
             <td colspan="6">
               ${questionsTable}
             </td>
           </tr>
-        `;
-      }));
+        `);
+      }
 
       const footer = filteredData.length === 0 
         ? '<tr><td colspan="6" class="muted">No evaluations match the selected filters.</td></tr>'
-        : `<tr><td colspan="6" class="muted">Showing ${filteredData.length} of ${evaluationData.length} evaluations</td></tr>`;
+        : `<tr><td colspan="6" class="muted">Showing ${filteredData.length} of ${state.evaluationDataCache.length} evaluations</td></tr>`;
 
       c.innerHTML = header + rows.join('') + footer + '</tbody></table></div>';
-      
-      // Initialize all rows as collapsed
-      for (let i = 0; i < filteredData.length; i++) {
-        const row = document.getElementById(`details-row-${i}`);
-        if (row) {
-          row.style.display = 'none';
-        }
-      }
     }
 
     // ===== CRITICAL RENDERER =====
@@ -2962,43 +2823,40 @@
       const fatalMap=new Map();  
       const critMap=new Map();
       
-      // New data structure for agent failures
-      const agentFailures = new Map(); // agent -> Map(question -> {dates: [], type: 'critical'|'fatal'})
+      const agentFailures = new Map();
       
       function add(map, formName, qText, agentName, date, type){
         const key=formName+'|'+qText;
         if(!map.has(key)) map.set(key,{formName,qText,count:0,agents:new Map()});
         const o=map.get(key); o.count++; o.agents.set(agentName,(o.agents.get(agentName)||0)+1);
         
-  // Add to agent failures
-  if (!agentFailures.has(agentName)) {
-    agentFailures.set(agentName, { 
-      failures: new Map(), 
-      criticalCount: 0, 
-      fatalCount: 0 
-    });
-  }
-  const agentData = agentFailures.get(agentName);
-  const questionKey = `${formName}: ${qText}`;
-  
-  if (!agentData.failures.has(questionKey)) {
-    agentData.failures.set(questionKey, { 
-      dates: [], 
-      type: type,
-      count: 0
-    });
-  }
-  const failure = agentData.failures.get(questionKey);
-  failure.dates.push(date);
-  failure.count++;
-  
-  // Track counts separately
-  if (type === 'fatal') {
-    failure.type = 'fatal';
-    agentData.fatalCount++;
-  } else {
-    agentData.criticalCount++;
-  }
+        if (!agentFailures.has(agentName)) {
+          agentFailures.set(agentName, { 
+            failures: new Map(), 
+            criticalCount: 0, 
+            fatalCount: 0 
+          });
+        }
+        const agentData = agentFailures.get(agentName);
+        const questionKey = `${formName}: ${qText}`;
+        
+        if (!agentData.failures.has(questionKey)) {
+          agentData.failures.set(questionKey, { 
+            dates: [], 
+            type: type,
+            count: 0
+          });
+        }
+        const failure = agentData.failures.get(questionKey);
+        failure.dates.push(date);
+        failure.count++;
+        
+        if (type === 'fatal') {
+          failure.type = 'fatal';
+          agentData.fatalCount++;
+        } else {
+          agentData.criticalCount++;
+        }
       }
 
       for (const e of state.evals){
@@ -3041,7 +2899,6 @@
         </div>
       `;
 
-      // Render agent failures table
       const agentFailureRows = [];
       const agentFailureArray = Array.from(agentFailures.entries())
         .filter(([agent, agentData]) => agentData.failures.size > 0)
@@ -3051,23 +2908,21 @@
           return bTotal - aTotal;
         });
       
- agentFailureArray.forEach(([agentName, agentData]) => {
+      agentFailureArray.forEach(([agentName, agentData]) => {
         const failuresMap = agentData.failures;
         const failures = Array.from(failuresMap.entries())
           .sort((a, b) => {
-            // Sort by type (fatal first) then by number of occurrences
             if (a[1].type === 'fatal' && b[1].type !== 'fatal') return -1;
             if (a[1].type !== 'fatal' && b[1].type === 'fatal') return 1;
             return b[1].count - a[1].count;
           });
         
-        // Calculate totals
         const totalFailures = agentData.fatalCount + agentData.criticalCount;
         const hasFatal = agentData.fatalCount > 0;
         
         const failureItems = failures.map(([question, data]) => {
           const dates = [...new Set(data.dates)].sort().reverse();
-          const recentDates = dates.slice(0, 3); // Show only 3 most recent dates
+          const recentDates = dates.slice(0, 3);
           const datesText = recentDates.join(', ') + (dates.length > 3 ? ` (+${dates.length - 3} more)` : '');
           
           return `
@@ -3080,7 +2935,6 @@
           `;
         }).join('');
         
-        // Update the header to show both counts
         const headerText = `${agentName} - ${totalFailures} Total (${agentData.fatalCount} Fatal, ${agentData.criticalCount} Critical)`;
         
         agentFailureRows.push(`
